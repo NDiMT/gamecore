@@ -158,13 +158,41 @@
     font-size: 0.92em;
     line-height: 1.55;
     box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    transition: transform 0.3s, opacity 0.3s;
   }
+  #clue-panel.collapsed { transform: translateX(calc(-100% - 32px)); opacity: 0; pointer-events: none; }
+  #clue-panel-close {
+    position: absolute; top: 6px; right: 8px;
+    background: transparent; color: #c8a574; border: none;
+    font-size: 1.2em; cursor: pointer; padding: 2px 6px;
+    font-family: inherit;
+    line-height: 1;
+  }
+  #clue-panel-close:hover { color: #ffd684; }
+  #clue-reopen {
+    position: absolute; top: 70px; left: 16px;
+    background: rgba(20, 14, 8, 0.92);
+    color: #ffd684;
+    border: 1px solid #c8a574;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1em;
+    font-family: inherit;
+    display: none;
+    align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    transition: all 0.2s;
+  }
+  #clue-reopen.show { display: flex; }
+  #clue-reopen:hover { background: #c8a574; color: #1a0e05; }
   #clue-panel h3 {
     font-size: 0.8em;
     color: #ffd684;
     letter-spacing: 0.25em;
     margin-bottom: 8px;
     text-transform: uppercase;
+    padding-right: 22px;
   }
   #clue-panel .symbol-row { font-size: 1.6em; letter-spacing: 0.2em; margin: 8px 0; color: #ffd684; }
   #clue-panel code { background: #0e0805; padding: 2px 6px; border-radius: 2px; color: #ffd684; font-family: monospace; }
@@ -337,9 +365,11 @@
   </div>
 
   <div id="clue-panel">
+    <button id="clue-panel-close" title="Κλείσιμο">✕</button>
     <h3 id="clue-title">Στοιχεία σου</h3>
     <div id="clue-body"></div>
   </div>
+  <button id="clue-reopen" title="Άνοιγμα στοιχείων">📋</button>
 
   <div id="instruction">Παρατήρησε τα σύμβολα στο καπάκι. Μίλησε με τον συνεργάτη σου για να λύσετε τον κωδικό των μοχλών.</div>
 
@@ -1507,6 +1537,14 @@ document.getElementById('chat-header').addEventListener('click', () => {
   const c = document.getElementById('chat');
   c.classList.toggle('collapsed');
   document.getElementById('chat-toggle').textContent = c.classList.contains('collapsed') ? '▲' : '▼';
+});
+document.getElementById('clue-panel-close').addEventListener('click', () => {
+  document.getElementById('clue-panel').classList.add('collapsed');
+  document.getElementById('clue-reopen').classList.add('show');
+});
+document.getElementById('clue-reopen').addEventListener('click', () => {
+  document.getElementById('clue-panel').classList.remove('collapsed');
+  document.getElementById('clue-reopen').classList.remove('show');
 });
 
 document.getElementById('reset-btn').addEventListener('click', () => {
