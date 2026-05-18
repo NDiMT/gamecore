@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cipher Lab — Co-op Escape</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', 'Consolas', monospace; }
+  body {
+    background: radial-gradient(ellipse at center, #0f1e2e 0%, #050810 100%);
+    color: #00ff88;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, rgba(0,255,136,0.03) 0, rgba(0,255,136,0.03) 1px, transparent 1px, transparent 3px);
+    pointer-events: none;
+    z-index: 1;
+  }
+  h1 {
+    font-size: 2.8em;
+    letter-spacing: 0.3em;
+    margin-bottom: 20px;
+    text-shadow: 0 0 20px #00ff88, 0 0 40px rgba(0,255,136,0.4);
+    text-align: center;
+    z-index: 2;
+    position: relative;
+  }
+  h2 { color: #ffaa00; margin-bottom: 15px; text-shadow: 0 0 10px rgba(255,170,0,0.5); }
+  .panel {
+    background: rgba(17, 24, 39, 0.9);
+    border: 2px solid #00ff88;
+    border-radius: 8px;
+    padding: 30px;
+    margin: 15px 0;
+    max-width: 800px;
+    width: 100%;
+    box-shadow: 0 0 30px rgba(0,255,136,0.2), inset 0 0 30px rgba(0,255,136,0.05);
+    z-index: 2;
+    position: relative;
+  }
+  button {
+    background: transparent;
+    color: #00ff88;
+    border: 2px solid #00ff88;
+    padding: 12px 24px;
+    font-family: inherit;
+    font-size: 1em;
+    cursor: pointer;
+    margin: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+  }
+  button:hover:not(:disabled) {
+    background: #00ff88;
+    color: #0a0e1a;
+    box-shadow: 0 0 20px rgba(0,255,136,0.5);
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  input {
+    background: #0a0e1a;
+    color: #00ff88;
+    border: 2px solid #00ff88;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 1em;
+    width: 100%;
+    margin: 5px 0;
+    outline: none;
+  }
+  input:focus { box-shadow: 0 0 15px rgba(0,255,136,0.4); }
+  .code-display {
+    font-size: 1.6em;
+    background: #0a0e1a;
+    padding: 15px;
+    border: 1px dashed #00ff88;
+    text-align: center;
+    margin: 15px 0;
+    letter-spacing: 0.2em;
+    word-break: break-all;
+    cursor: pointer;
+  }
+  .code-display:hover { background: rgba(0,255,136,0.1); }
+  #lobby { text-align: center; max-width: 600px; z-index: 2; position: relative; }
+  #lobby p { margin: 15px 0; }
+  #game { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 900px; z-index: 2; position: relative; }
+  #status-bar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border: 1px solid #00ff88;
+    background: rgba(17,24,39,0.9);
+    font-size: 0.9em;
+    letter-spacing: 0.1em;
+  }
+  #chat {
+    width: 100%;
+    background: rgba(10, 14, 26, 0.95);
+    border: 1px solid #00ff88;
+    margin-top: 10px;
+  }
+  #messages {
+    height: 120px;
+    overflow-y: auto;
+    padding: 10px;
+    font-size: 0.9em;
+  }
+  #messages > div { margin: 3px 0; }
+  .msg-me { color: #ffaa00; }
+  .msg-them { color: #44ccff; }
+  .msg-sys { color: #888; font-style: italic; }
+  #chat-input-row { display: flex; padding: 5px; border-top: 1px solid #00ff88; }
+  #chat-input { border: none !important; }
+  .your-view {
+    background: rgba(255,170,0,0.08);
+    padding: 18px;
+    border-left: 4px solid #ffaa00;
+    margin: 15px 0;
+    border-radius: 4px;
+  }
+  .your-view strong { color: #ffcc44; letter-spacing: 0.05em; }
+  .wire-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 15px 0;
+  }
+  .wire-slot {
+    border: 2px dashed #00ff88;
+    padding: 25px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(0,255,136,0.03);
+  }
+  .wire-slot:hover { background: rgba(0,255,136,0.1); }
+  .wire-slot.filled { border-style: solid; }
+  .wire-btn {
+    font-weight: bold;
+    text-shadow: 0 0 5px currentColor;
+  }
+  .symbol { font-size: 2.5em; }
+  .cipher-key {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 15px 0;
+  }
+  .cipher-key > div {
+    background: #0a0e1a;
+    padding: 12px;
+    border: 1px solid #00ff88;
+    text-align: center;
+  }
+  .digit-input {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 25px 0;
+  }
+  .digit {
+    width: 65px;
+    height: 75px;
+    font-size: 2.5em;
+    text-align: center;
+    margin: 0;
+    width: 65px !important;
+  }
+  .digit[readonly] {
+    background: #1a1a2e;
+    opacity: 0.7;
+    border-color: #44ccff;
+    color: #44ccff;
+  }
+  .victory {
+    text-align: center;
+    padding: 50px 20px;
+  }
+  .victory h1 {
+    color: #ffaa00;
+    font-size: 3em;
+    text-shadow: 0 0 30px #ffaa00;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  .blink { animation: blink 1s infinite; }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+  }
+  @media (max-width: 600px) {
+    h1 { font-size: 2em; }
+    .digit { width: 50px !important; height: 60px; font-size: 2em; }
+    .cipher-key { grid-template-columns: repeat(2, 1fr); }
+    .wire-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div id="lobby">
+  <h1>CIPHER LAB</h1>
+  <div class="panel">
+    <p style="margin-bottom: 25px; line-height: 1.6;">
+      Δύο επιστήμονες παγιδευμένοι σε ξεχωριστά δωμάτια ενός μυστικού εργαστηρίου.<br>
+      <span style="opacity:0.7">Κάθε ένας βλέπει διαφορετικά στοιχεία. Πρέπει να συνεργαστείτε για να ξεφύγετε.</span>
+    </p>
+    <div id="lobby-buttons">
+      <button id="host-btn">▶ ΔΗΜΙΟΥΡΓΙΑ ΔΩΜΑΤΙΟΥ</button>
+      <button id="join-btn">⚡ ΕΙΣΟΔΟΣ ΜΕ ΚΩΔΙΚΟ</button>
+    </div>
+
+    <div id="host-section" style="display:none; margin-top:20px;">
+      <p>Δώσε στον συνεργάτη σου τον κωδικό:</p>
+      <div id="host-code" class="code-display" title="Κλικ για αντιγραφή">ΣΥΝΔΕΣΗ...</div>
+      <p style="opacity:0.6;" class="blink">⏳ Αναμονή συνεργάτη...</p>
+    </div>
+
+    <div id="join-section" style="display:none; margin-top:20px;">
+      <input id="join-code" placeholder="ΚΩΔΙΚΟΣ ΔΩΜΑΤΙΟΥ" autocomplete="off" style="text-transform:uppercase;">
+      <button id="connect-btn">ΣΥΝΔΕΣΗ</button>
+      <p id="join-status" style="opacity:0.7; margin-top:10px;"></p>
+    </div>
+  </div>
+  <p style="opacity:0.4; font-size:0.8em; text-align:center;">Peer-to-peer connection · No server · No tracking</p>
+</div>
+
+<div id="game">
+  <div id="status-bar">
+    <span>ΠΑΙΧΤΗΣ: <strong id="role-display" style="color:#ffaa00;"></strong></span>
+    <span>ΓΡΙΦΟΣ <span id="puzzle-num">1</span> / 3</span>
+  </div>
+  <div class="panel" id="puzzle-container"></div>
+  <div id="chat">
+    <div id="messages"></div>
+    <div id="chat-input-row">
+      <input id="chat-input" placeholder="› Πες κάτι στον συνεργάτη...">
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+// ============ NETWORKING ============
+let peer, conn, isHost = false, role = null;
+
+function genCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+function hostGame() {
+  const code = 'CL-' + genCode();
+  peer = new Peer(code, { debug: 1 });
+  peer.on('open', id => {
+    document.getElementById('host-code').textContent = id;
+    document.getElementById('host-code').onclick = () => {
+      navigator.clipboard.writeText(id).then(() => {
+        const el = document.getElementById('host-code');
+        const original = el.textContent;
+        el.textContent = '✓ ΑΝΤΙΓΡΑΦΗΚΕ';
+        setTimeout(() => el.textContent = original, 1200);
+      });
+    };
+  });
+  peer.on('connection', c => {
+    conn = c;
+    isHost = true;
+    role = 'ΑΛΦΑ';
+    c.on('open', () => {
+      startGame();
+      send({ type: 'init', partnerRole: 'ΒΗΤΑ' });
+    });
+    c.on('data', handleData);
+    c.on('close', () => addMessage('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
+  });
+  peer.on('error', err => {
+    alert('Σφάλμα δικτύου: ' + err.type + '\n' + err.message);
+  });
+}
+
+function joinGame(code) {
+  peer = new Peer({ debug: 1 });
+  peer.on('open', () => {
+    conn = peer.connect(code, { reliable: true });
+    conn.on('open', () => {
+      document.getElementById('join-status').textContent = '✓ Συνδέθηκε. Φόρτωση...';
+    });
+    conn.on('data', handleData);
+    conn.on('close', () => addMessage('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
+    conn.on('error', e => {
+      document.getElementById('join-status').textContent = 'Σφάλμα: ' + e.message;
+    });
+  });
+  peer.on('error', err => {
+    let msg = err.message;
+    if (err.type === 'peer-unavailable') msg = 'Δεν βρέθηκε δωμάτιο με αυτόν τον κωδικό.';
+    document.getElementById('join-status').textContent = '✗ ' + msg;
+  });
+}
+
+function send(data) {
+  if (conn && conn.open) conn.send(data);
+}
+
+function handleData(data) {
+  switch (data.type) {
+    case 'init':
+      role = data.partnerRole;
+      isHost = false;
+      startGame();
+      break;
+    case 'chat':
+      addMessage(data.text, 'them');
+      break;
+    case 'puzzle-action':
+      handlePuzzleAction(data);
+      break;
+    case 'next-puzzle':
+      loadPuzzle(data.num);
+      break;
+  }
+}
+
+// ============ UI ============
+function addMessage(text, who) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg-' + who;
+  const prefix = who === 'me' ? 'ΕΣΥ' : who === 'them' ? 'ΣΥΝΕΡΓΑΤΗΣ' : '◆';
+  div.textContent = `[${prefix}] ${text}`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ============ GAME STATE ============
+let currentPuzzle = 1;
+let wireState = { 1: null, 2: null, 3: null, 4: null };
+let digitState = { d1: '', d2: '', d3: '', d4: '' };
+let selectedWire = null;
+
+function startGame() {
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('game').style.display = 'flex';
+  document.getElementById('role-display').textContent = role;
+  addMessage('Σύνδεση επιτυχής. Καλή τύχη, ' + role + '.', 'sys');
+  loadPuzzle(1);
+}
+
+function loadPuzzle(num) {
+  currentPuzzle = num;
+  document.getElementById('puzzle-num').textContent = Math.min(num, 3);
+  const c = document.getElementById('puzzle-container');
+  if (num === 1) c.innerHTML = renderPuzzle1();
+  else if (num === 2) c.innerHTML = renderPuzzle2();
+  else if (num === 3) c.innerHTML = renderPuzzle3();
+  else if (num === 4) c.innerHTML = renderVictory();
+  attachPuzzleHandlers(num);
+}
+
+// ============ PUZZLE 1: WIRES ============
+// ΑΛΦΑ βλέπει το διάγραμμα. ΒΗΤΑ τοποθετεί καλώδια.
+const WIRE_SOLUTION = { 1: 'ΚΟΚΚΙΝΟ', 2: 'ΚΙΤΡΙΝΟ', 3: 'ΜΠΛΕ', 4: 'ΠΡΑΣΙΝΟ' };
+const WIRE_COLORS = {
+  'ΚΟΚΚΙΝΟ': '#ff4444',
+  'ΜΠΛΕ': '#4488ff',
+  'ΠΡΑΣΙΝΟ': '#44ff44',
+  'ΚΙΤΡΙΝΟ': '#ffdd44'
+};
+
+function renderPuzzle1() {
+  if (role === 'ΑΛΦΑ') {
+    return `
+      <h2>ΓΡΙΦΟΣ 1 — ΠΙΝΑΚΑΣ ΚΑΛΩΔΙΩΝ</h2>
+      <p>Στον τοίχο σου υπάρχει το σχηματικό διάγραμμα.<br>
+      Πες στον <strong style="color:#44ccff">ΒΗΤΑ</strong> ποιο χρώμα καλωδίου πάει σε ποια θέση.</p>
+      <div class="your-view">
+        <strong>⚡ ΔΙΑΓΡΑΜΜΑ:</strong>
+        <ul style="list-style:none; padding:10px 0;">
+          ${Object.entries(WIRE_SOLUTION).map(([slot, color]) =>
+            `<li style="margin:10px 0; font-size:1.1em;">› Θέση ${slot} → <span style="color:${WIRE_COLORS[color]}; font-weight:bold; text-shadow:0 0 8px ${WIRE_COLORS[color]};">${color}</span></li>`
+          ).join('')}
+        </ul>
+      </div>
+      <p style="opacity:0.6; text-align:center;" class="blink">⏳ Περιμένεις τον ΒΗΤΑ...</p>
+    `;
+  } else {
+    return `
+      <h2>ΓΡΙΦΟΣ 1 — ΠΙΝΑΚΑΣ ΚΑΛΩΔΙΩΝ</h2>
+      <p>Έχεις 4 αποσυνδεδεμένα καλώδια και 4 θέσεις. Ο <strong style="color:#44ccff">ΑΛΦΑ</strong> έχει το διάγραμμα.<br>
+      <em>Επίλεξε καλώδιο, μετά κάνε κλικ σε θέση.</em></p>
+      <div class="wire-grid">
+        ${[1,2,3,4].map(slot => `
+          <div class="wire-slot" data-slot="${slot}">
+            <div style="opacity:0.7;">ΘΕΣΗ</div>
+            <div style="font-size:2em; font-weight:bold;">${slot}</div>
+            <div id="slot-${slot}" style="margin-top:10px; min-height:24px; font-size:0.85em;">—</div>
+          </div>
+        `).join('')}
+      </div>
+      <p style="margin-top:20px;">Διαθέσιμα καλώδια:</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+        ${Object.keys(WIRE_COLORS).map(c => `
+          <button class="wire-btn" data-color="${c}" style="border-color:${WIRE_COLORS[c]}; color:${WIRE_COLORS[c]};">${c}</button>
+        `).join('')}
+      </div>
+    `;
+  }
+}
+
+// ============ PUZZLE 2: SYMBOL CIPHER ============
+// ΒΗΤΑ έχει το κλειδί. ΑΛΦΑ βλέπει την κωδικοποιημένη λέξη και την πληκτρολογεί.
+const SYMBOL_KEY = { '☆': 'Φ', '◊': 'Υ', '♠': 'Γ', '♣': 'Η' };
+const SYMBOL_MESSAGE = '☆◊♠♣';
+const SYMBOL_ANSWER = 'ΦΥΓΗ';
+
+function renderPuzzle2() {
+  if (role === 'ΑΛΦΑ') {
+    return `
+      <h2>ΓΡΙΦΟΣ 2 — ΚΡΥΠΤΟΓΡΑΦΗΜΑ</h2>
+      <p>Βλέπεις μια χαραγμένη λέξη με παράξενα σύμβολα στον τοίχο.<br>
+      Ο <strong style="color:#44ccff">ΒΗΤΑ</strong> έχει το κλειδί αποκρυπτογράφησης.</p>
+      <div class="your-view" style="text-align:center;">
+        <strong>📜 ΛΕΞΗ ΣΤΟΝ ΤΟΙΧΟ:</strong>
+        <div style="font-size:4em; letter-spacing:0.3em; margin:20px 0; text-shadow:0 0 20px rgba(255,170,0,0.5);">${SYMBOL_MESSAGE}</div>
+      </div>
+      <input id="decode-input" placeholder="ΠΛΗΚΤΡΟΛΟΓΗΣΕ ΤΗ ΛΕΞΗ..." style="text-transform:uppercase; text-align:center; font-size:1.4em; letter-spacing:0.2em;" maxlength="4">
+      <button id="decode-submit" style="width:100%; margin-top:10px;">▶ ΥΠΟΒΟΛΗ</button>
+      <p id="decode-result" style="text-align:center; margin-top:10px; opacity:0.7;"></p>
+    `;
+  } else {
+    return `
+      <h2>ΓΡΙΦΟΣ 2 — ΚΡΥΠΤΟΓΡΑΦΗΜΑ</h2>
+      <p>Βρήκες ένα σκισμένο σημειωματάριο με το κλειδί.<br>
+      Πες στον <strong style="color:#44ccff">ΑΛΦΑ</strong> τι σημαίνει κάθε σύμβολο.</p>
+      <div class="your-view">
+        <strong>🔑 ΚΛΕΙΔΙ ΑΠΟΚΡΥΠΤΟΓΡΑΦΗΣΗΣ:</strong>
+        <div class="cipher-key">
+          ${Object.entries(SYMBOL_KEY).map(([sym, letter]) =>
+            `<div><span class="symbol">${sym}</span><div style="margin-top:5px; font-size:1.3em;">= <strong style="color:#ffcc44;">${letter}</strong></div></div>`
+          ).join('')}
+        </div>
+      </div>
+      <p style="opacity:0.6; text-align:center;" class="blink">⏳ Περιμένεις τον ΑΛΦΑ να εισάγει τη λέξη...</p>
+    `;
+  }
+}
+
+// ============ PUZZLE 3: FINAL CODE ============
+// 4-ψήφιος. ΑΛΦΑ έχει στοιχεία για d1,d2. ΒΗΤΑ έχει για d3,d4.
+// Πλευρές εξαγώνου=6, εποχές=4, πλοκάμια χταποδιού=8, πόδια ανθρώπου=2 → 6482
+const FINAL_CODE = '6482';
+
+function renderPuzzle3() {
+  const clues = role === 'ΑΛΦΑ'
+    ? '<p>› Ψηφίο 1: <em>Πλευρές εξαγώνου</em></p><p>› Ψηφίο 2: <em>Εποχές του χρόνου</em></p>'
+    : '<p>› Ψηφίο 3: <em>Πλοκάμια χταποδιού</em></p><p>› Ψηφίο 4: <em>Πόδια ανθρώπου</em></p>';
+  const editable = role === 'ΑΛΦΑ' ? ['d1','d2'] : ['d3','d4'];
+  return `
+    <h2>ΓΡΙΦΟΣ 3 — ΤΕΛΙΚΟΣ ΚΩΔΙΚΟΣ</h2>
+    <p>Η εξώπορτα έχει 4-ψήφιο κωδικό. Έχεις στοιχεία για 2 ψηφία· ο συνεργάτης σου για τα άλλα 2.<br>
+    <strong>Συμπληρώστε ταυτόχρονα — όταν είναι σωστός ο κωδικός, ξεκλειδώνει.</strong></p>
+    <div class="your-view">
+      <strong>🔍 ΣΤΟΙΧΕΙΑ ΣΟΥ:</strong>
+      ${clues}
+    </div>
+    <div class="digit-input">
+      ${['d1','d2','d3','d4'].map(id => {
+        const isMine = editable.includes(id);
+        return `<input class="digit" id="${id}" maxlength="1" type="text" inputmode="numeric" ${isMine ? '' : 'readonly'}>`;
+      }).join('')}
+    </div>
+    <p id="lock-status" style="text-align:center; font-size:1.2em; min-height:1.5em;"></p>
+  `;
+}
+
+function renderVictory() {
+  return `
+    <div class="victory">
+      <h1>⚡ ΔΡΑΠΕΤΕΥΣΑΤΕ ⚡</h1>
+      <p style="margin-top:30px; font-size:1.2em; opacity:0.9;">Λύσατε όλους τους γρίφους.<br>Το εργαστήριο μένει πίσω.</p>
+      <p style="margin-top:40px; font-size:0.9em; opacity:0.5;">Πατήστε F5 για νέο παιχνίδι.</p>
+    </div>
+  `;
+}
+
+// ============ HANDLERS ============
+function attachPuzzleHandlers(num) {
+  if (num === 1 && role === 'ΒΗΤΑ') {
+    document.querySelectorAll('.wire-btn').forEach(btn => {
+      btn.onclick = () => {
+        selectedWire = btn.dataset.color;
+        document.querySelectorAll('.wire-btn').forEach(b => {
+          b.style.background = 'transparent';
+          b.style.color = WIRE_COLORS[b.dataset.color];
+        });
+        btn.style.background = WIRE_COLORS[selectedWire];
+        btn.style.color = '#0a0e1a';
+      };
+    });
+    document.querySelectorAll('.wire-slot').forEach(slot => {
+      slot.onclick = () => {
+        if (!selectedWire) {
+          addMessage('Επίλεξε πρώτα ένα καλώδιο.', 'sys');
+          return;
+        }
+        const slotNum = slot.dataset.slot;
+        wireState[slotNum] = selectedWire;
+        const slotEl = document.getElementById('slot-' + slotNum);
+        slotEl.innerHTML = `<span style="color:${WIRE_COLORS[selectedWire]}; font-weight:bold; text-shadow:0 0 8px ${WIRE_COLORS[selectedWire]};">${selectedWire}</span>`;
+        slot.classList.add('filled');
+        slot.style.borderColor = WIRE_COLORS[selectedWire];
+        send({ type: 'puzzle-action', puzzle: 1, slot: slotNum, color: selectedWire });
+        checkPuzzle1();
+      };
+    });
+  }
+  if (num === 2 && role === 'ΑΛΦΑ') {
+    const input = document.getElementById('decode-input');
+    const submit = () => {
+      const val = input.value.toUpperCase().trim();
+      if (val === SYMBOL_ANSWER) {
+        document.getElementById('decode-result').innerHTML = '<span style="color:#ffaa00;">✓ ΣΩΣΤΑ! Η πόρτα ανοίγει...</span>';
+        send({ type: 'puzzle-action', puzzle: 2, solved: true });
+        setTimeout(() => nextPuzzle(), 1200);
+      } else {
+        document.getElementById('decode-result').innerHTML = '<span style="color:#ff4444;">✗ Λάθος. Δοκίμασε ξανά.</span>';
+      }
+    };
+    document.getElementById('decode-submit').onclick = submit;
+    input.addEventListener('keypress', e => { if (e.key === 'Enter') submit(); });
+    input.focus();
+  }
+  if (num === 3) {
+    document.querySelectorAll('.digit').forEach(inp => {
+      if (!inp.readOnly) {
+        inp.oninput = e => {
+          const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 1);
+          e.target.value = v;
+          digitState[inp.id] = v;
+          send({ type: 'puzzle-action', puzzle: 3, field: inp.id, value: v });
+          checkPuzzle3();
+        };
+      }
+    });
+    const firstEditable = document.querySelector('.digit:not([readonly])');
+    if (firstEditable) firstEditable.focus();
+  }
+}
+
+function handlePuzzleAction(data) {
+  if (data.puzzle === 1) {
+    if (role === 'ΑΛΦΑ') {
+      addMessage(`ΒΗΤΑ → ${data.color} στη θέση ${data.slot}`, 'sys');
+      wireState[data.slot] = data.color;
+      checkPuzzle1();
+    }
+  }
+  if (data.puzzle === 2 && data.solved) {
+    addMessage('Ο ΑΛΦΑ έλυσε το κρυπτογράφημα!', 'sys');
+    setTimeout(() => { if (currentPuzzle === 2) loadPuzzle(3); }, 1200);
+  }
+  if (data.puzzle === 3) {
+    digitState[data.field] = data.value;
+    const el = document.getElementById(data.field);
+    if (el) el.value = data.value;
+    checkPuzzle3();
+  }
+}
+
+function checkPuzzle1() {
+  const ok = Object.entries(WIRE_SOLUTION).every(([slot, color]) => wireState[slot] === color);
+  if (ok && currentPuzzle === 1) {
+    addMessage('✓ Καλώδια σωστά! Η πόρτα ξεκλειδώνει...', 'sys');
+    setTimeout(() => nextPuzzle(), 1500);
+  }
+}
+
+function checkPuzzle3() {
+  const code = (digitState.d1 || '_') + (digitState.d2 || '_') + (digitState.d3 || '_') + (digitState.d4 || '_');
+  const status = document.getElementById('lock-status');
+  if (!status) return;
+  if (code === FINAL_CODE) {
+    status.innerHTML = '<span style="color:#ffaa00;">✓ ΞΕΚΛΕΙΔΩΘΗΚΕ ✓</span>';
+    setTimeout(() => { if (currentPuzzle === 3) nextPuzzle(); }, 1500);
+  } else if (!code.includes('_')) {
+    status.innerHTML = `<span style="color:#ff4444;">[ ${code.split('').join(' ')} ] — ΛΑΘΟΣ</span>`;
+  } else {
+    status.innerHTML = `<span style="opacity:0.6;">[ ${code.split('').join(' ')} ]</span>`;
+  }
+}
+
+function nextPuzzle() {
+  const next = currentPuzzle < 3 ? currentPuzzle + 1 : 4;
+  if (next === currentPuzzle) return;
+  loadPuzzle(next);
+  send({ type: 'next-puzzle', num: next });
+}
+
+// ============ LOBBY EVENTS ============
+document.getElementById('host-btn').onclick = () => {
+  document.getElementById('lobby-buttons').style.display = 'none';
+  document.getElementById('host-section').style.display = 'block';
+  hostGame();
+};
+document.getElementById('join-btn').onclick = () => {
+  document.getElementById('lobby-buttons').style.display = 'none';
+  document.getElementById('join-section').style.display = 'block';
+  document.getElementById('join-code').focus();
+};
+document.getElementById('connect-btn').onclick = () => {
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!code) return;
+  document.getElementById('join-status').textContent = '⏳ Σύνδεση...';
+  joinGame(code);
+};
+document.getElementById('join-code').addEventListener('keypress', e => {
+  if (e.key === 'Enter') document.getElementById('connect-btn').click();
+});
+document.getElementById('chat-input').addEventListener('keypress', e => {
+  if (e.key === 'Enter') {
+    const text = e.target.value.trim();
+    if (!text) return;
+    addMessage(text, 'me');
+    send({ type: 'chat', text });
+    e.target.value = '';
+  }
+});
+</script>
+</body>
+</html>
