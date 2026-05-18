@@ -256,59 +256,128 @@
 // ============ NETWORKING ============
 let peer, conn, isHost = false, role = null;
 
+// PeerJS config: explicit STUN + free TURN (Open Relay) for restrictive NATs/mobile
+const PEER_CONFIG = {
+  debug: 2,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:openrelay.metered.ca:80' },
+      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    ]
+  }
+};
+
 function genCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let s = '';
+  // ID prefix required by PeerJS (cannot start with digit). Format: cl + 6 chars.
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let s = 'cl';
   for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return s;
 }
 
+function showDisplayCode(id) {
+  // Show without "cl" prefix to user; we re-add it on join.
+  return id.startsWith('cl') ? id.slice(2).toUpperCase() : id.toUpperCase();
+}
+
 function hostGame() {
-  const code = 'CL-' + genCode();
-  peer = new Peer(code, { debug: 1 });
+  const code = genCode();
+  document.getElementById('host-code').textContent = '⏳ Σύνδεση...';
+  peer = new Peer(code, PEER_CONFIG);
+
+  const timeout = setTimeout(() => {
+    document.getElementById('host-code').textContent = '✗ TIMEOUT — πάτα refresh';
+  }, 15000);
+
   peer.on('open', id => {
-    document.getElementById('host-code').textContent = id;
-    document.getElementById('host-code').onclick = () => {
-      navigator.clipboard.writeText(id).then(() => {
-        const el = document.getElementById('host-code');
+    clearTimeout(timeout);
+    const display = showDisplayCode(id);
+    const el = document.getElementById('host-code');
+    el.textContent = display;
+    el.onclick = () => {
+      navigator.clipboard.writeText(display).then(() => {
         const original = el.textContent;
         el.textContent = '✓ ΑΝΤΙΓΡΑΦΗΚΕ';
         setTimeout(() => el.textContent = original, 1200);
       });
     };
+    console.log('[host] peer open, id=', id);
   });
   peer.on('connection', c => {
+    console.log('[host] incoming connection from', c.peer);
     conn = c;
     isHost = true;
     role = 'ΑΛΦΑ';
     c.on('open', () => {
+      console.log('[host] data channel open');
       startGame();
       send({ type: 'init', partnerRole: 'ΒΗΤΑ' });
     });
     c.on('data', handleData);
     c.on('close', () => addMessage('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
+    c.on('error', e => console.error('[host] conn error', e));
+  });
+  peer.on('disconnected', () => {
+    console.warn('[host] disconnected from broker, reconnecting...');
+    if (peer && !peer.destroyed) peer.reconnect();
   });
   peer.on('error', err => {
-    alert('Σφάλμα δικτύου: ' + err.type + '\n' + err.message);
+    console.error('[host] peer error', err);
+    clearTimeout(timeout);
+    if (err.type === 'unavailable-id') {
+      document.getElementById('host-code').textContent = '✗ ID σε χρήση — refresh';
+    } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
+      document.getElementById('host-code').textContent = '✗ Network — δοκίμασε ξανά';
+    } else {
+      document.getElementById('host-code').textContent = '✗ ' + err.type;
+    }
   });
 }
 
-function joinGame(code) {
-  peer = new Peer({ debug: 1 });
-  peer.on('open', () => {
+function joinGame(rawCode) {
+  // Accept code with or without "cl" prefix
+  let code = rawCode.toLowerCase().trim();
+  code = code.replace(/^cl[-_]?/, '');
+  code = 'cl' + code;
+  console.log('[guest] joining', code);
+
+  document.getElementById('join-status').textContent = '⏳ Σύνδεση στον broker...';
+  peer = new Peer(PEER_CONFIG);
+
+  const timeout = setTimeout(() => {
+    document.getElementById('join-status').textContent = '✗ TIMEOUT — έλεγξε κωδικό/internet';
+  }, 20000);
+
+  peer.on('open', myId => {
+    console.log('[guest] peer open, id=', myId);
+    document.getElementById('join-status').textContent = '⏳ Σύνδεση σε δωμάτιο...';
     conn = peer.connect(code, { reliable: true });
     conn.on('open', () => {
-      document.getElementById('join-status').textContent = '✓ Συνδέθηκε. Φόρτωση...';
+      clearTimeout(timeout);
+      console.log('[guest] data channel open');
+      document.getElementById('join-status').textContent = '✓ Συνδέθηκε.';
     });
     conn.on('data', handleData);
     conn.on('close', () => addMessage('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
     conn.on('error', e => {
-      document.getElementById('join-status').textContent = 'Σφάλμα: ' + e.message;
+      console.error('[guest] conn error', e);
+      document.getElementById('join-status').textContent = '✗ Σφάλμα: ' + (e.message || e.type);
     });
   });
+  peer.on('disconnected', () => {
+    console.warn('[guest] disconnected from broker');
+    if (peer && !peer.destroyed) peer.reconnect();
+  });
   peer.on('error', err => {
-    let msg = err.message;
+    console.error('[guest] peer error', err);
+    clearTimeout(timeout);
+    let msg = err.message || err.type;
     if (err.type === 'peer-unavailable') msg = 'Δεν βρέθηκε δωμάτιο με αυτόν τον κωδικό.';
+    else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') msg = 'Πρόβλημα δικτύου. Δοκίμασε ξανά.';
     document.getElementById('join-status').textContent = '✗ ' + msg;
   });
 }
