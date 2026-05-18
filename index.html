@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MECHANO — 3D Escape Box</title>
+<title>MECHANO — 3D Co-op Escape</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: #e8d6a8; font-family: 'Georgia', serif; }
@@ -11,47 +11,186 @@
   #canvas:active { cursor: grabbing; }
   #canvas.pointing { cursor: pointer; }
 
+  /* ============ LOBBY ============ */
+  #lobby {
+    position: fixed; inset: 0; z-index: 200;
+    background: radial-gradient(circle, #1a1410 0%, #000 80%);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: #d4af6a;
+    text-align: center;
+    padding: 20px;
+  }
+  #lobby h1 {
+    font-size: 4em;
+    letter-spacing: 0.4em;
+    margin-bottom: 16px;
+    text-shadow: 0 0 30px #d4af6a, 0 0 60px rgba(212,175,106,0.4);
+    animation: glow 3s ease-in-out infinite;
+  }
+  #lobby h2 { letter-spacing: 0.3em; font-size: 1em; color: #c8a574; opacity: 0.75; margin-bottom: 30px; }
+  #lobby p { margin: 12px 0; max-width: 620px; line-height: 1.6; opacity: 0.9; }
+  #lobby p.small { opacity: 0.55; font-size: 0.85em; font-family: monospace; letter-spacing: 0.1em; }
+
+  @keyframes glow {
+    0%, 100% { text-shadow: 0 0 30px #d4af6a, 0 0 60px rgba(212,175,106,0.4); }
+    50% { text-shadow: 0 0 40px #ffd684, 0 0 80px rgba(255,214,132,0.6); }
+  }
+
+  .panel {
+    background: rgba(20, 14, 8, 0.85);
+    border: 1px solid #c8a574;
+    border-radius: 6px;
+    padding: 26px;
+    margin: 16px;
+    max-width: 480px;
+    width: 100%;
+    box-shadow: 0 0 30px rgba(212,175,106,0.15);
+  }
+  .row-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .lobby-btn {
+    background: transparent;
+    color: #d4af6a;
+    border: 2px solid #d4af6a;
+    padding: 12px 28px;
+    font-size: 1em;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: inherit;
+    min-width: 180px;
+  }
+  .lobby-btn:hover:not(:disabled) {
+    background: #d4af6a;
+    color: #1a0e05;
+    box-shadow: 0 0 25px rgba(212,175,106,0.5);
+  }
+  .lobby-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  input.text-input {
+    background: #0e0805;
+    color: #d4af6a;
+    border: 1px solid #c8a574;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 1.1em;
+    width: 100%;
+    margin: 10px 0;
+    outline: none;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    text-align: center;
+  }
+  input.text-input:focus { box-shadow: 0 0 15px rgba(212,175,106,0.4); }
+  .code-display {
+    font-size: 1.8em;
+    background: #0e0805;
+    padding: 14px;
+    border: 1px dashed #d4af6a;
+    text-align: center;
+    margin: 12px 0;
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    color: #ffd684;
+  }
+  .code-display:hover { background: rgba(212,175,106,0.08); }
+  .lobby-status { opacity: 0.65; font-size: 0.9em; margin-top: 10px; min-height: 1.2em; }
+  .blink { animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  .corner-link {
+    position: fixed; bottom: 12px; right: 16px;
+    color: rgba(212,175,106,0.3);
+    font-size: 0.75em;
+    text-decoration: none;
+    font-family: monospace;
+    pointer-events: auto;
+    z-index: 5;
+  }
+  .corner-link:hover { color: #d4af6a; }
+
+  /* ============ GAME UI ============ */
   #ui {
     position: fixed; inset: 0;
     pointer-events: none;
     z-index: 10;
+    display: none;
   }
+  #ui.show { display: block; }
   #ui > * { pointer-events: auto; }
 
   #top-bar {
     position: absolute; top: 0; left: 0; right: 0;
-    padding: 16px 24px;
+    padding: 14px 22px;
     display: flex; justify-content: space-between; align-items: center;
     background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent);
+    flex-wrap: wrap;
+    gap: 10px;
   }
-  #title {
-    font-size: 1.3em;
+  #title-bar { display: flex; align-items: center; gap: 16px; }
+  #game-title {
+    font-size: 1.2em;
     letter-spacing: 0.4em;
     color: #d4af6a;
     text-shadow: 0 0 10px rgba(212,175,106,0.5);
   }
-  #stage {
+  #role-badge {
+    background: rgba(212,175,106,0.15);
+    border: 1px solid #d4af6a;
+    padding: 4px 12px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: #ffd684;
+    letter-spacing: 0.2em;
+  }
+  #stage-indicator {
     font-size: 0.95em;
     letter-spacing: 0.15em;
     color: #c8a574;
-    opacity: 0.85;
   }
-  #stage strong { color: #ffd684; }
+  #stage-indicator strong { color: #ffd684; }
+
+  #clue-panel {
+    position: absolute; top: 70px; left: 16px;
+    max-width: 320px;
+    background: rgba(20, 14, 8, 0.92);
+    border: 1px solid #c8a574;
+    border-left: 4px solid #ffd684;
+    padding: 14px 18px;
+    border-radius: 4px;
+    font-size: 0.92em;
+    line-height: 1.55;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  }
+  #clue-panel h3 {
+    font-size: 0.8em;
+    color: #ffd684;
+    letter-spacing: 0.25em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  #clue-panel .symbol-row { font-size: 1.6em; letter-spacing: 0.2em; margin: 8px 0; color: #ffd684; }
+  #clue-panel code { background: #0e0805; padding: 2px 6px; border-radius: 2px; color: #ffd684; font-family: monospace; }
+  #clue-panel .digit-block { display: flex; gap: 6px; justify-content: center; margin: 10px 0; font-size: 1.3em; font-family: monospace; }
+  #clue-panel .digit-block span { background: #0e0805; border: 1px solid #5a4a2a; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  #clue-panel .digit-block span.filled { color: #ffd684; border-color: #ffd684; }
+  #clue-panel .digit-block span.hidden { color: #5a4a2a; }
+  #clue-panel .seq-display { font-size: 0.95em; margin-top: 6px; }
+  #clue-panel .seq-display .color-chip {
+    display: inline-block; width: 18px; height: 18px; border-radius: 50%;
+    margin: 0 3px; vertical-align: middle;
+    box-shadow: 0 0 6px currentColor;
+  }
 
   #instruction {
-    position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
     max-width: 600px; width: calc(100% - 40px);
-    padding: 14px 20px;
+    padding: 12px 20px;
     background: rgba(20, 14, 8, 0.85);
     border: 1px solid #c8a574;
     border-radius: 4px;
     text-align: center;
-    font-size: 1em;
+    font-size: 0.95em;
     line-height: 1.5;
     box-shadow: 0 0 25px rgba(0,0,0,0.6);
-    transition: opacity 0.3s;
   }
-  #instruction.fade { opacity: 0.3; }
 
   #controls {
     position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -61,54 +200,67 @@
     background: rgba(20, 14, 8, 0.9);
     color: #d4af6a;
     border: 1px solid #c8a574;
-    width: 44px; height: 44px;
+    width: 42px; height: 42px;
     border-radius: 50%;
-    font-size: 1.2em;
+    font-size: 1.1em;
     cursor: pointer;
     transition: all 0.2s;
     display: flex; align-items: center; justify-content: center;
     font-family: inherit;
   }
   .icon-btn:hover { background: #c8a574; color: #1a0e05; transform: scale(1.05); }
+  .icon-btn.active { background: #c8a574; color: #1a0e05; }
 
-  #intro {
-    position: fixed; inset: 0; z-index: 100;
-    background: radial-gradient(circle, #1a1410 0%, #000 80%);
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
+  /* ============ CHAT ============ */
+  #chat {
+    position: absolute;
+    bottom: 80px; right: 16px;
+    width: 280px;
+    background: rgba(10, 6, 3, 0.92);
+    border: 1px solid #c8a574;
+    border-radius: 4px;
+    transition: transform 0.3s;
+  }
+  #chat.collapsed { transform: translateY(calc(100% - 38px)); }
+  #chat-header {
+    padding: 8px 12px;
+    background: rgba(212,175,106,0.1);
+    cursor: pointer;
+    font-size: 0.85em;
+    letter-spacing: 0.15em;
+    display: flex; justify-content: space-between;
+  }
+  #chat-messages {
+    height: 140px;
+    overflow-y: auto;
+    padding: 8px 12px;
+    font-size: 0.85em;
+  }
+  #chat-messages > div { margin: 3px 0; line-height: 1.4; }
+  .msg-me { color: #ffd684; }
+  .msg-them { color: #88ccff; }
+  .msg-sys { color: #888; font-style: italic; font-size: 0.85em; }
+  #chat-input-row { display: flex; padding: 4px; border-top: 1px solid #5a4a2a; }
+  #chat-input {
+    background: #0e0805; color: #d4af6a; border: none;
+    padding: 8px; flex: 1; font-family: inherit; font-size: 0.9em;
+    outline: none;
+  }
+
+  /* ============ INTRO / VICTORY ============ */
+  #waiting-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    flex-direction: column; justify-content: center; align-items: center;
     color: #d4af6a;
     text-align: center;
+    z-index: 50;
     padding: 20px;
   }
-  #intro h1 {
-    font-size: 4em;
-    letter-spacing: 0.4em;
-    margin-bottom: 30px;
-    text-shadow: 0 0 30px #d4af6a, 0 0 60px rgba(212,175,106,0.4);
-    animation: glow 3s ease-in-out infinite;
-  }
-  @keyframes glow {
-    0%, 100% { text-shadow: 0 0 30px #d4af6a, 0 0 60px rgba(212,175,106,0.4); }
-    50% { text-shadow: 0 0 40px #ffd684, 0 0 80px rgba(255,214,132,0.6); }
-  }
-  #intro p { margin: 10px 0; max-width: 600px; line-height: 1.6; opacity: 0.85; }
-  #intro .small { opacity: 0.55; font-size: 0.85em; margin-top: 20px; font-family: monospace; letter-spacing: 0.1em; }
-  #start-btn {
-    margin-top: 40px;
-    background: transparent;
-    color: #d4af6a;
-    border: 2px solid #d4af6a;
-    padding: 14px 36px;
-    font-size: 1.1em;
-    letter-spacing: 0.3em;
-    cursor: pointer;
-    transition: all 0.3s;
-    font-family: inherit;
-  }
-  #start-btn:hover {
-    background: #d4af6a;
-    color: #1a0e05;
-    box-shadow: 0 0 30px rgba(212,175,106,0.6);
-  }
+  #waiting-overlay.show { display: flex; }
+  #waiting-overlay h2 { font-size: 1.6em; letter-spacing: 0.3em; margin-bottom: 20px; }
+  #waiting-overlay p { max-width: 500px; line-height: 1.6; opacity: 0.85; }
 
   #victory {
     position: fixed; inset: 0; z-index: 99;
@@ -129,39 +281,14 @@
     animation: glow 2s ease-in-out infinite;
   }
   #victory p { margin-top: 20px; color: #d4af6a; font-size: 1.2em; opacity: 0.9; }
-  #victory button { pointer-events: auto; }
 
-  #hint-popup {
-    position: absolute; top: 70px; right: 20px;
-    background: rgba(20, 14, 8, 0.95);
-    border: 1px solid #c8a574;
-    padding: 14px 18px;
-    max-width: 280px;
-    border-radius: 4px;
-    display: none;
-    font-size: 0.9em;
-    line-height: 1.5;
-  }
-  #hint-popup.show { display: block; }
-  #hint-popup h3 { color: #ffd684; margin-bottom: 8px; font-size: 1em; letter-spacing: 0.1em; }
-
-  .corner-link {
-    position: fixed; top: 10px; right: 10px;
-    color: rgba(212,175,106,0.4);
-    font-size: 0.75em;
-    text-decoration: none;
-    font-family: monospace;
-    pointer-events: auto;
-    z-index: 5;
-  }
-  .corner-link:hover { color: #d4af6a; }
-
-  @media (max-width: 600px) {
-    #intro h1 { font-size: 2.5em; letter-spacing: 0.2em; }
-    #title { font-size: 1em; letter-spacing: 0.2em; }
-    #stage { font-size: 0.8em; }
-    #instruction { font-size: 0.85em; padding: 10px 14px; bottom: 75px; }
-    .icon-btn { width: 38px; height: 38px; }
+  @media (max-width: 700px) {
+    #lobby h1 { font-size: 2.5em; letter-spacing: 0.2em; }
+    #clue-panel { max-width: calc(100% - 32px); font-size: 0.85em; padding: 10px 14px; top: 60px; }
+    #chat { width: calc(100% - 32px); right: 16px; left: 16px; bottom: 75px; }
+    #instruction { font-size: 0.85em; bottom: 240px; }
+    #game-title { font-size: 1em; letter-spacing: 0.2em; }
+    #stage-indicator { font-size: 0.8em; }
   }
 </style>
 </head>
@@ -169,39 +296,79 @@
 
 <canvas id="canvas"></canvas>
 
-<a href="coop.html" class="corner-link">› coop version</a>
-
-<div id="intro">
+<!-- ============ LOBBY ============ -->
+<div id="lobby">
   <h1>MECHANO</h1>
-  <p>Ένα μηχανικό κουτί κρύβει το πιο πολυπόθητο μυστικό.</p>
-  <p>Τρία στάδια. Μοχλοί. Καντράν. Κουμπιά.<br>Παρατήρησε τα στοιχεία στο ίδιο το κουτί.</p>
-  <p class="small">drag = περιστροφή · click = αλληλεπίδραση · scroll = ζουμ</p>
-  <button id="start-btn">▶ ΞΕΚΙΝΑ</button>
+  <h2>3D · CO-OP · ESCAPE</h2>
+  <p>Ένα μηχανικό κουτί κρύβει ένα μυστικό. Δύο επιστήμονες — εσύ κι ο συνεργάτης σου — βλέπετε <em>διαφορετικά</em> στοιχεία. Πρέπει να μιλήσετε για να λύσετε τους γρίφους μαζί.</p>
+
+  <div class="panel" id="lobby-main">
+    <div class="row-btns">
+      <button class="lobby-btn" id="host-btn">▶ ΦΤΙΑΞΕ ΔΩΜΑΤΙΟ</button>
+      <button class="lobby-btn" id="join-btn">⚡ ΜΠΕΣ ΜΕ ΚΩΔΙΚΟ</button>
+    </div>
+  </div>
+
+  <div class="panel" id="host-panel" style="display:none;">
+    <p style="margin-bottom: 10px;">Δώσε στον συνεργάτη σου τον κωδικό:</p>
+    <div class="code-display" id="host-code" title="Κλικ για αντιγραφή">···</div>
+    <p class="lobby-status blink" id="host-status">⏳ Αναμονή συνεργάτη...</p>
+  </div>
+
+  <div class="panel" id="join-panel" style="display:none;">
+    <p>Πληκτρολόγησε τον κωδικό του δωματίου:</p>
+    <input class="text-input" id="join-code-input" placeholder="XXXXXX" maxlength="20" autocomplete="off">
+    <button class="lobby-btn" id="connect-btn" style="width:100%;">ΣΥΝΔΕΣΗ</button>
+    <p class="lobby-status" id="join-status"></p>
+  </div>
+
+  <p class="small">Peer-to-peer · No server · Drag = περιστροφή · Click = αλληλεπίδραση</p>
+  <a href="coop.html" class="corner-link">› simple 2D version</a>
 </div>
 
+<!-- ============ GAME UI ============ -->
 <div id="ui">
   <div id="top-bar">
-    <div id="title">MECHANO</div>
-    <div id="stage">ΣΤΑΔΙΟ <strong id="stage-num">1</strong> / 3</div>
+    <div id="title-bar">
+      <div id="game-title">MECHANO</div>
+      <div id="role-badge">Παίκτης: <strong id="role-name">—</strong></div>
+    </div>
+    <div id="stage-indicator">ΣΤΑΔΙΟ <strong id="stage-num">1</strong> / 3</div>
   </div>
-  <div id="instruction">Παρατήρησε τους μοχλούς και τις ενδείξεις στην πλάκα στην κορυφή.</div>
+
+  <div id="clue-panel">
+    <h3 id="clue-title">Στοιχεία σου</h3>
+    <div id="clue-body"></div>
+  </div>
+
+  <div id="instruction">Παρατήρησε τα σύμβολα στο καπάκι. Μίλησε με τον συνεργάτη σου για να λύσετε τον κωδικό των μοχλών.</div>
+
   <div id="controls">
-    <button class="icon-btn" id="hint-btn" title="Υπόδειξη">?</button>
     <button class="icon-btn" id="reset-btn" title="Επαναφορά κάμερας">⟲</button>
     <button class="icon-btn" id="sound-btn" title="Ήχος">♪</button>
   </div>
-  <div id="hint-popup">
-    <h3>ΥΠΟΔΕΙΞΗ</h3>
-    <div id="hint-text"></div>
+
+  <div id="chat" class="collapsed">
+    <div id="chat-header"><span>CHAT</span><span id="chat-toggle">▲</span></div>
+    <div id="chat-messages"></div>
+    <div id="chat-input-row">
+      <input id="chat-input" placeholder="Πληκτρολόγησε...">
+    </div>
   </div>
 </div>
 
-<div id="victory">
-  <h1>ΕΛΕΥΘΕΡΟΣ</h1>
-  <p>Το μυστικό αποκαλύφθηκε.</p>
-  <p style="margin-top:30px; font-size:0.9em; opacity:0.7;">Refresh για νέο παιχνίδι.</p>
+<div id="waiting-overlay">
+  <h2>ΣΥΝΔΕΣΗ ΕΤΟΙΜΗ</h2>
+  <p>Περίμενε τον συνεργάτη να φορτώσει τη σκηνή...</p>
 </div>
 
+<div id="victory">
+  <h1>ΕΛΕΥΘΕΡΟΙ</h1>
+  <p>Λύσατε όλους τους γρίφους μαζί.</p>
+  <p style="margin-top:30px; font-size:0.9em; opacity:0.7;">F5 για νέο παιχνίδι</p>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script type="importmap">
 {
   "imports": {
@@ -216,19 +383,40 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // =========================================================
-// CONFIG / STATE
+// PUZZLE DATA
 // =========================================================
-const LEVER_TARGET = [0, 2, 1]; // 0=back, 1=up, 2=forward — solution
-const DIAL_SOLUTION = [7, 14, 3]; // sequence of dial numbers
-const DIAL_SEGMENTS = 20;
-const BUTTON_COUNT = 4;
-const BUTTON_SEQUENCE = [0, 2, 1, 3, 0]; // colors index
-const BUTTON_COLORS = [0xff4444, 0x44ff66, 0x4488ff, 0xffdd44];
+const TOP_SIGILS = ['⚓', '☼', '♆'];        // visible on top plate to BOTH
+// sigil → position mapping (used for the actual solution)
+const SIGIL_MEANING = { '⚓': 0, '☼': 2, '♆': 1 }; // 0=left, 1=center, 2=right
+// Each player only KNOWS some sigil meanings:
+const ALPHA_KEY = ['⚓', '♆']; // ΑΛΦΑ knows what ⚓ and ♆ mean
+const BETA_KEY  = ['☼'];      // ΒΗΤΑ knows what ☼ means
+// Resulting LEVER_TARGET (auto-derived):
+const LEVER_TARGET = TOP_SIGILS.map(s => SIGIL_MEANING[s]); // [0, 2, 1]
 
+const DIAL_SEGMENTS = 20;
+const DIAL_BASE   = [7, 14, 19, 4];   // numbers shown on the paper (4 digits)
+const DIAL_OFFSET = 3;                // each digit must be shifted by +3 before dialing
+// Final solution (auto-derived): each base+offset mod 20
+const DIAL_SOLUTION = DIAL_BASE.map(n => (n + DIAL_OFFSET) % DIAL_SEGMENTS);
+// ΑΛΦΑ sees: digits at indices 0, 2 of the paper (the rest are smudged)
+const ALPHA_DIGITS = [0, 2];
+const BETA_DIGITS  = [1, 3];
+// Only ΒΗΤΑ knows the offset; ΑΛΦΑ doesn't know it
+
+const BUTTON_COUNT = 4;
+const BUTTON_COLORS = [0xff4444, 0x44ff66, 0x4488ff, 0xffdd44];
+const BUTTON_NAMES_EL = ['ΚΟΚΚΙΝΟ', 'ΠΡΑΣΙΝΟ', 'ΜΠΛΕ', 'ΚΙΤΡΙΝΟ'];
+const BUTTON_SEQUENCE = [2, 0, 3, 1, 2, 0]; // 6-step Simon
+
+// =========================================================
+// STATE
+// =========================================================
 const state = {
-  stage: 1,
+  stage: 0,            // 0 = lobby/loading
   soundOn: true,
-  levers: [1, 1, 1], // start at middle
+  role: null,          // 'ΑΛΦΑ' or 'ΒΗΤΑ'
+  levers: [1, 1, 1],   // current positions (0/1/2)
   dialAngle: 0,
   dialSubmitted: [],
   buttonInput: [],
@@ -237,7 +425,136 @@ const state = {
 };
 
 // =========================================================
-// AUDIO (Web Audio synth — no files)
+// NETWORKING (PeerJS)
+// =========================================================
+let peer = null, conn = null, isHost = false;
+
+const PEER_CONFIG = {
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    ]
+  }
+};
+
+function genCode() {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let s = 'mch';
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+function showCode(id) { return id.startsWith('mch') ? id.slice(3).toUpperCase() : id.toUpperCase(); }
+
+function hostGame() {
+  const code = genCode();
+  isHost = true;
+  document.getElementById('host-code').textContent = '⏳ ...';
+  peer = new Peer(code, PEER_CONFIG);
+  const t = setTimeout(() => document.getElementById('host-code').textContent = '✗ Timeout', 15000);
+  peer.on('open', id => {
+    clearTimeout(t);
+    const disp = showCode(id);
+    const el = document.getElementById('host-code');
+    el.textContent = disp;
+    el.onclick = () => navigator.clipboard.writeText(disp).then(() => {
+      const o = el.textContent; el.textContent = '✓ ΑΝΤΙΓΡΑΦΗΚΕ'; setTimeout(() => el.textContent = o, 1200);
+    });
+  });
+  peer.on('connection', c => {
+    conn = c;
+    state.role = 'ΑΛΦΑ';
+    c.on('open', () => {
+      send({ type: 'init', partnerRole: 'ΒΗΤΑ' });
+      startGame();
+    });
+    c.on('data', onData);
+    c.on('close', () => addChat('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
+  });
+  peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  peer.on('error', err => {
+    clearTimeout(t);
+    document.getElementById('host-code').textContent = '✗ ' + (err.type || err.message);
+  });
+}
+
+function joinGame(rawCode) {
+  let code = rawCode.toLowerCase().replace(/^mch[-_]?/, '');
+  code = 'mch' + code;
+  document.getElementById('join-status').textContent = '⏳ Σύνδεση...';
+  peer = new Peer(PEER_CONFIG);
+  const t = setTimeout(() => document.getElementById('join-status').textContent = '✗ Timeout', 20000);
+  peer.on('open', () => {
+    conn = peer.connect(code, { reliable: true });
+    conn.on('open', () => {
+      clearTimeout(t);
+      document.getElementById('join-status').textContent = '✓ Συνδέθηκε.';
+    });
+    conn.on('data', onData);
+    conn.on('close', () => addChat('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
+  });
+  peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  peer.on('error', err => {
+    clearTimeout(t);
+    let m = err.message || err.type;
+    if (err.type === 'peer-unavailable') m = 'Δεν βρέθηκε δωμάτιο με αυτόν τον κωδικό.';
+    document.getElementById('join-status').textContent = '✗ ' + m;
+  });
+}
+
+function send(data) {
+  if (conn && conn.open) conn.send(data);
+}
+
+function onData(data) {
+  switch (data.type) {
+    case 'init':
+      state.role = data.partnerRole;
+      startGame();
+      break;
+    case 'chat':
+      addChat(data.text, 'them');
+      break;
+    case 'lever':
+      applyLeverChange(data.index, data.position);
+      break;
+    case 'dial-rotate':
+      dial.rotation.y = data.angle;
+      updateDialReading();
+      break;
+    case 'dial-snap':
+      dial.rotation.y = data.angle;
+      state.dialAngle = data.value;
+      break;
+    case 'dial-submit':
+      applyDialSubmit(data.num, data.step);
+      break;
+    case 'dial-reset':
+      resetDial();
+      break;
+    case 'start-simon':
+      runSimonSequence();
+      break;
+    case 'button-press':
+      pressButton(data.index, false);
+      break;
+    case 'button-fail':
+      handleButtonFail();
+      break;
+    case 'stage-complete':
+      if (data.stage === 1) completeStage1();
+      else if (data.stage === 2) completeStage2();
+      else if (data.stage === 3) victory();
+      break;
+  }
+}
+
+// =========================================================
+// AUDIO
 // =========================================================
 let audioCtx = null;
 function audio() {
@@ -264,7 +581,7 @@ function chime() { beep(523, 0.1); setTimeout(() => beep(659, 0.1), 80); setTime
 function buzz() { beep(120, 0.3, 'sawtooth', 0.15); }
 
 // =========================================================
-// SCENE
+// THREE.JS SCENE (built but hidden until lobby done)
 // =========================================================
 const canvas = document.getElementById('canvas');
 const scene = new THREE.Scene();
@@ -293,66 +610,46 @@ controls.minPolarAngle = Math.PI * 0.15;
 controls.maxPolarAngle = Math.PI * 0.5;
 controls.enablePan = false;
 
-// =========================================================
-// LIGHTING
-// =========================================================
+// Lighting
 const ambient = new THREE.AmbientLight(0x4a3a2a, 0.35);
 scene.add(ambient);
-
 const keyLight = new THREE.SpotLight(0xffd49a, 80, 25, Math.PI / 5, 0.4, 1.5);
 keyLight.position.set(4, 10, 5);
 keyLight.target.position.set(0, 1, 0);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
-keyLight.shadow.camera.near = 1;
-keyLight.shadow.camera.far = 25;
 keyLight.shadow.bias = -0.0005;
 scene.add(keyLight, keyLight.target);
-
 const fillLight = new THREE.PointLight(0x3366aa, 4, 18);
 fillLight.position.set(-5, 3, -4);
 scene.add(fillLight);
-
 const rimLight = new THREE.PointLight(0xff6633, 2, 12);
 rimLight.position.set(5, 1, -5);
 scene.add(rimLight);
-
-// Inner glow lights (turn on as stages complete)
 const innerLight = new THREE.PointLight(0xffaa44, 0, 4);
 innerLight.position.set(0, 1.6, 0);
 scene.add(innerLight);
 
-// =========================================================
-// TABLE
-// =========================================================
-const tableGroup = new THREE.Group();
+// Table
 const tableTopGeo = new THREE.CylinderGeometry(6, 6, 0.25, 48);
 const tableMat = new THREE.MeshStandardMaterial({ color: 0x1c1108, roughness: 0.85, metalness: 0.05 });
 const tableTop = new THREE.Mesh(tableTopGeo, tableMat);
 tableTop.position.y = -0.125;
 tableTop.receiveShadow = true;
-tableGroup.add(tableTop);
-scene.add(tableGroup);
+scene.add(tableTop);
 
-// =========================================================
-// MATERIALS
-// =========================================================
-function wood(color = 0x6b4423) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05 });
-}
+// Materials
 const brass = new THREE.MeshStandardMaterial({ color: 0xc8a574, roughness: 0.28, metalness: 0.88 });
 const brassDark = new THREE.MeshStandardMaterial({ color: 0x8a6f3d, roughness: 0.4, metalness: 0.75 });
-const darkMetal = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.45, metalness: 0.7 });
 const redKnob = new THREE.MeshStandardMaterial({ color: 0xaa2222, roughness: 0.4, metalness: 0.4 });
 
-// Texture cache
+// Texture helpers
 function textTexture(text, size = 256, opts = {}) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
   ctx.fillStyle = opts.bg || '#3a2a18';
   ctx.fillRect(0, 0, size, size);
-  // Wood grain noise
   for (let i = 0; i < 80; i++) {
     ctx.strokeStyle = `rgba(0,0,0,${Math.random() * 0.1})`;
     ctx.beginPath();
@@ -376,7 +673,6 @@ function dialTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
-  // Brass background
   const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   grad.addColorStop(0, '#d4af6a');
   grad.addColorStop(1, '#8a6f3d');
@@ -387,7 +683,6 @@ function dialTexture() {
   ctx.strokeStyle = '#5a4a2a';
   ctx.lineWidth = 6;
   ctx.stroke();
-  // Tick marks and numbers
   ctx.fillStyle = '#1a0e05';
   ctx.font = `bold ${size * 0.06}px Georgia`;
   ctx.textAlign = 'center';
@@ -395,10 +690,7 @@ function dialTexture() {
   for (let i = 0; i < DIAL_SEGMENTS; i++) {
     const angle = (i / DIAL_SEGMENTS) * Math.PI * 2 - Math.PI / 2;
     const r = size / 2 - 60;
-    const x = size / 2 + Math.cos(angle) * r;
-    const y = size / 2 + Math.sin(angle) * r;
-    ctx.fillText(String(i), x, y);
-    // tick
+    ctx.fillText(String(i), size / 2 + Math.cos(angle) * r, size / 2 + Math.sin(angle) * r);
     ctx.strokeStyle = '#1a0e05';
     ctx.lineWidth = i % 5 === 0 ? 5 : 2;
     const r1 = size / 2 - 18;
@@ -414,62 +706,79 @@ function dialTexture() {
   return t;
 }
 
-function hintPlateTexture() {
-  const size = 512;
+function topPlateTexture() {
+  const w = 512, h = 256;
   const c = document.createElement('canvas');
-  c.width = size;
-  c.height = size / 2;
+  c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#3a2a18';
-  ctx.fillRect(0, 0, c.width, c.height);
-  // Engraved arrows: 0=left, 1=center, 2=right
-  const positions = ['◀', '▲', '▶'];
-  const arrows = LEVER_TARGET.map(p => positions[p]);
+  ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 60; i++) {
+    ctx.strokeStyle = `rgba(0,0,0,${Math.random() * 0.12})`;
+    ctx.beginPath();
+    ctx.moveTo(0, Math.random() * h);
+    ctx.lineTo(w, Math.random() * h);
+    ctx.stroke();
+  }
   ctx.fillStyle = '#1a0e05';
-  ctx.font = `bold ${c.height * 0.55}px Georgia`;
+  ctx.font = `bold ${h * 0.55}px Georgia`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  arrows.forEach((arrow, i) => {
-    const x = (c.width / 4) * (i + 1);
-    ctx.fillText(arrow, x, c.height * 0.55);
-  });
-  // small numbers above
-  ctx.font = `bold ${c.height * 0.18}px Georgia`;
+  TOP_SIGILS.forEach((s, i) => ctx.fillText(s, (w / 4) * (i + 1), h * 0.55));
+  ctx.font = `bold ${h * 0.18}px Georgia`;
   ctx.fillStyle = '#5a4a2a';
-  ['I', 'II', 'III'].forEach((n, i) => {
-    ctx.fillText(n, (c.width / 4) * (i + 1), c.height * 0.18);
-  });
+  ['I', 'II', 'III'].forEach((n, i) => ctx.fillText(n, (w / 4) * (i + 1), h * 0.18));
   const t = new THREE.CanvasTexture(c);
   t.anisotropy = 8;
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
-function paperTexture(text1, text2) {
-  const size = 512;
+function paperTexture(role) {
+  // Each player sees a different version of the paper inside the compartment
+  const w = 512, h = 360;
   const c = document.createElement('canvas');
-  c.width = size; c.height = size / 1.4;
+  c.width = w; c.height = h;
   const ctx = c.getContext('2d');
-  // Aged paper
-  const grad = ctx.createRadialGradient(size / 2, c.height / 2, 50, size / 2, c.height / 2, size / 2);
+  const grad = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, w / 2);
   grad.addColorStop(0, '#e8d6a8');
   grad.addColorStop(1, '#b89c70');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, c.height);
-  // Stains
-  for (let i = 0; i < 30; i++) {
+  ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 40; i++) {
     ctx.fillStyle = `rgba(80,40,20,${Math.random() * 0.15})`;
     ctx.beginPath();
-    ctx.arc(Math.random() * size, Math.random() * c.height, Math.random() * 15, 0, Math.PI * 2);
+    ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 18, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.fillStyle = '#3a2a18';
-  ctx.font = `italic ${size * 0.06}px Georgia`;
+  ctx.font = `italic ${w * 0.06}px Georgia`;
   ctx.textAlign = 'center';
-  ctx.fillText(text1, size / 2, c.height * 0.4);
-  ctx.font = `bold ${size * 0.1}px Georgia`;
-  ctx.fillStyle = '#5a2a0a';
-  ctx.fillText(text2, size / 2, c.height * 0.65);
+  ctx.fillText('Συνδυασμός 4 ψηφίων:', w / 2, h * 0.25);
+
+  // Show 4 boxes; only your digits are legible
+  const yourDigits = role === 'ΑΛΦΑ' ? ALPHA_DIGITS : BETA_DIGITS;
+  ctx.font = `bold ${w * 0.12}px Georgia`;
+  for (let i = 0; i < 4; i++) {
+    const x = w * (0.18 + i * 0.22);
+    const y = h * 0.55;
+    if (yourDigits.includes(i)) {
+      ctx.fillStyle = '#5a2a0a';
+      ctx.fillText(String(DIAL_BASE[i]), x, y);
+    } else {
+      ctx.fillStyle = '#5a4a2a';
+      // Smudged ink
+      ctx.fillText('▒▒', x, y);
+    }
+  }
+  // Bottom note: role-specific extra clue
+  ctx.font = `italic ${w * 0.045}px Georgia`;
+  ctx.fillStyle = '#3a2a18';
+  if (role === 'ΒΗΤΑ') {
+    ctx.fillText('* πρόσθεσε ' + DIAL_OFFSET + ' σε κάθε ψηφίο πριν την εισαγωγή', w / 2, h * 0.82);
+  } else {
+    ctx.fillText('(λείπει ένα σημείωμα...)', w / 2, h * 0.82);
+  }
   const t = new THREE.CanvasTexture(c);
   t.anisotropy = 8;
   t.colorSpace = THREE.SRGBColorSpace;
@@ -477,18 +786,15 @@ function paperTexture(text1, text2) {
 }
 
 // =========================================================
-// THE BOX
+// BOX
 // =========================================================
 const box = new THREE.Group();
 scene.add(box);
-
 const BOX_W = 4, BOX_H = 2.4, BOX_D = 3;
 
-// Wood texture for body
 const woodTex = textTexture('', 512, { bg: '#5a3a1a', color: '#3a2a18' });
 const woodMatTex = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.78, metalness: 0.06 });
 
-// Body (main mass minus top lid which is separate)
 const bodyHeight = BOX_H * 0.7;
 const bodyGeo = new THREE.BoxGeometry(BOX_W, bodyHeight, BOX_D);
 const body = new THREE.Mesh(bodyGeo, woodMatTex);
@@ -497,7 +803,6 @@ body.castShadow = true;
 body.receiveShadow = true;
 box.add(body);
 
-// Top lid (slides forward to open after stage 1)
 const lid = new THREE.Group();
 lid.position.y = bodyHeight;
 box.add(lid);
@@ -508,38 +813,43 @@ lidMain.position.y = lidThickness / 2;
 lidMain.castShadow = true;
 lid.add(lidMain);
 
-// Hint plate on top of lid
-const hintPlate = new THREE.Mesh(
+// Top hint plate (sigils)
+const topPlate = new THREE.Mesh(
   new THREE.PlaneGeometry(1.8, 0.9),
-  new THREE.MeshStandardMaterial({ map: hintPlateTexture(), roughness: 0.6, metalness: 0.3 })
+  new THREE.MeshStandardMaterial({ map: topPlateTexture(), roughness: 0.6, metalness: 0.3 })
 );
-hintPlate.rotation.x = -Math.PI / 2;
-hintPlate.position.set(0, lidThickness + 0.001, 0);
-lid.add(hintPlate);
+topPlate.rotation.x = -Math.PI / 2;
+topPlate.position.set(0, lidThickness + 0.001, 0);
+lid.add(topPlate);
 
-// Hint plate frame (brass border)
 function brassFrame(w, h, depth = 0.04, thick = 0.06) {
   const grp = new THREE.Group();
   const horiz = new THREE.BoxGeometry(w + thick * 2, thick, depth);
   const vert = new THREE.BoxGeometry(thick, h + thick * 2, depth);
-  const top = new THREE.Mesh(horiz, brass); top.position.y = h / 2 + thick / 2; grp.add(top);
-  const bot = new THREE.Mesh(horiz, brass); bot.position.y = -h / 2 - thick / 2; grp.add(bot);
-  const lf = new THREE.Mesh(vert, brass); lf.position.x = -w / 2 - thick / 2; grp.add(lf);
-  const rt = new THREE.Mesh(vert, brass); rt.position.x = w / 2 + thick / 2; grp.add(rt);
-  grp.children.forEach(m => m.castShadow = true);
+  ['t', 'b'].forEach((side, i) => {
+    const m = new THREE.Mesh(horiz, brass);
+    m.position.y = (side === 't' ? 1 : -1) * (h / 2 + thick / 2);
+    m.castShadow = true;
+    grp.add(m);
+  });
+  [-1, 1].forEach(sgn => {
+    const m = new THREE.Mesh(vert, brass);
+    m.position.x = sgn * (w / 2 + thick / 2);
+    m.castShadow = true;
+    grp.add(m);
+  });
   return grp;
 }
-const hintFrame = brassFrame(1.8, 0.9, 0.025, 0.05);
-hintFrame.rotation.x = -Math.PI / 2;
-hintFrame.position.set(0, lidThickness + 0.005, 0);
-lid.add(hintFrame);
+const topPlateFrame = brassFrame(1.8, 0.9, 0.025, 0.05);
+topPlateFrame.rotation.x = -Math.PI / 2;
+topPlateFrame.position.set(0, lidThickness + 0.005, 0);
+lid.add(topPlateFrame);
 
-// Top compartment (revealed when lid slides)
+// Compartment (revealed after stage 1)
 const compartmentGroup = new THREE.Group();
 compartmentGroup.position.y = bodyHeight;
 box.add(compartmentGroup);
 
-// Inside compartment: paper note + dial assembly base
 const compartmentFloor = new THREE.Mesh(
   new THREE.BoxGeometry(BOX_W * 0.95, 0.05, BOX_D * 0.95),
   new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.9 })
@@ -548,30 +858,22 @@ compartmentFloor.position.y = -bodyHeight * 0.2;
 compartmentFloor.receiveShadow = true;
 compartmentGroup.add(compartmentFloor);
 
-// Paper note (showing dial combination)
+// Paper (set later when role known)
 const paperMesh = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.0, 0.7),
-  new THREE.MeshStandardMaterial({
-    map: paperTexture('Συνδυασμός:', DIAL_SOLUTION.join(' — ')),
-    roughness: 0.95,
-    metalness: 0,
-    side: THREE.DoubleSide
-  })
+  new THREE.PlaneGeometry(1.2, 0.84),
+  new THREE.MeshStandardMaterial({ color: 0xd4c090, roughness: 0.95, metalness: 0, side: THREE.DoubleSide })
 );
 paperMesh.rotation.x = -Math.PI / 2 + 0.05;
 paperMesh.rotation.z = 0.08;
-paperMesh.position.set(-1.0, -bodyHeight * 0.2 + 0.03, 0.5);
+paperMesh.position.set(-1.1, -bodyHeight * 0.2 + 0.03, 0.5);
 compartmentGroup.add(paperMesh);
 
-// Dial assembly (inside compartment, only visible/usable after stage 1)
+// Dial assembly
 const dialAssembly = new THREE.Group();
 dialAssembly.position.set(0.5, -bodyHeight * 0.2 + 0.05, 0);
 compartmentGroup.add(dialAssembly);
 
-const dialBase = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.85, 0.85, 0.1, 32),
-  brassDark
-);
+const dialBase = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.1, 32), brassDark);
 dialBase.castShadow = true;
 dialBase.receiveShadow = true;
 dialAssembly.add(dialBase);
@@ -586,7 +888,6 @@ dial.userData.interactive = true;
 dial.userData.type = 'dial';
 dialAssembly.add(dial);
 
-// Pointer indicator (fixed, points to current number)
 const pointer = new THREE.Mesh(
   new THREE.ConeGeometry(0.06, 0.18, 4),
   new THREE.MeshStandardMaterial({ color: 0xff4444, roughness: 0.3, metalness: 0.5, emissive: 0xaa0000, emissiveIntensity: 0.4 })
@@ -595,11 +896,9 @@ pointer.rotation.x = Math.PI;
 pointer.position.set(0, 0.18, -0.78);
 dialAssembly.add(pointer);
 
-// Submit lever (small brass lever next to dial — click to register number)
 const submitLever = new THREE.Group();
 submitLever.position.set(0, 0.05, 0.95);
 dialAssembly.add(submitLever);
-
 const submitBase = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 16), brassDark);
 submitLever.add(submitBase);
 const submitArm = new THREE.Group();
@@ -614,53 +913,37 @@ submitKnob.userData.type = 'submit';
 submitArm.add(submitKnob);
 submitLever.add(submitArm);
 
-// Display showing how many dial entries submitted (3 LEDs)
 const submitLeds = [];
-for (let i = 0; i < 3; i++) {
+for (let i = 0; i < 4; i++) {
   const led = new THREE.Mesh(
-    new THREE.SphereGeometry(0.05, 12, 10),
+    new THREE.SphereGeometry(0.045, 12, 10),
     new THREE.MeshStandardMaterial({ color: 0x442200, emissive: 0x000000, roughness: 0.4 })
   );
-  led.position.set(-0.2 + i * 0.2, 0.1, 0.95);
+  led.position.set(-0.27 + i * 0.18, 0.1, 0.95);
   dialAssembly.add(led);
   submitLeds.push(led);
 }
-
-// Hide compartment contents initially
 compartmentGroup.visible = false;
 
 // =========================================================
-// LEVERS (Stage 1)
+// LEVERS
 // =========================================================
 const levers = [];
-
 function makeLever(x) {
   const g = new THREE.Group();
-
-  const baseMount = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.5, 0.15),
-    brassDark
-  );
-  baseMount.castShadow = true;
-  baseMount.receiveShadow = true;
+  const baseMount = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.15), brassDark);
+  baseMount.castShadow = true; baseMount.receiveShadow = true;
   g.add(baseMount);
-
   const pivotGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 16);
   pivotGeo.rotateZ(Math.PI / 2);
   const pivot = new THREE.Mesh(pivotGeo, brass);
   pivot.castShadow = true;
   g.add(pivot);
-
-  // Arm — pivots around X axis
   const armGroup = new THREE.Group();
-  const armMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.05, 0.7, 12),
-    brass
-  );
+  const armMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 12), brass);
   armMesh.position.y = 0.35;
   armMesh.castShadow = true;
   armGroup.add(armMesh);
-
   const handle = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 24, 18),
     new THREE.MeshStandardMaterial({ color: 0xaa3322, roughness: 0.4, metalness: 0.3, emissive: 0x110000 })
@@ -670,39 +953,29 @@ function makeLever(x) {
   handle.userData.interactive = true;
   handle.userData.type = 'lever';
   armGroup.add(handle);
-
   g.add(armGroup);
   g.position.set(x, bodyHeight * 0.55, BOX_D / 2 + 0.05);
   g.userData.armGroup = armGroup;
-
   return g;
 }
-
 const leverXs = [-1.1, 0, 1.1];
 leverXs.forEach((x, i) => {
   const lever = makeLever(x);
   lever.userData.index = i;
-  // Find handle inside
-  lever.traverse(c => {
-    if (c.userData.interactive) c.userData.leverIndex = i;
-  });
-  setLeverAngle(lever, 1, false); // start at middle (up)
+  lever.traverse(c => { if (c.userData.interactive) c.userData.leverIndex = i; });
+  setLeverAngle(lever, 1, false);
   box.add(lever);
   levers.push(lever);
 });
 
 function setLeverAngle(lever, position, animate = true) {
-  // position 0=left (◀), 1=center (▲), 2=right (▶) — rotates around Z to avoid box clipping
   const targetRot = position === 0 ? Math.PI / 3 : position === 1 ? 0 : -Math.PI / 3;
   const armGroup = lever.userData.armGroup;
-  if (!animate) {
-    armGroup.rotation.z = targetRot;
-    return;
-  }
+  if (!animate) { armGroup.rotation.z = targetRot; return; }
   tween(armGroup.rotation, 'z', targetRot, 350, easeOutBack);
 }
 
-// Roman numerals above each lever
+// Roman numeral plates above each lever
 ['I', 'II', 'III'].forEach((numeral, i) => {
   const plateMat = new THREE.MeshStandardMaterial({
     map: textTexture(numeral, 128, { bg: '#3a2a18', color: '#d4af6a', fontSize: 90 }),
@@ -714,10 +987,10 @@ function setLeverAngle(lever, position, animate = true) {
 });
 
 // =========================================================
-// COLOR BUTTONS (Stage 3)
+// COLOR BUTTONS (Stage 3) — on back face
 // =========================================================
 const buttonsGroup = new THREE.Group();
-buttonsGroup.position.set(0, bodyHeight * 0.35, -BOX_D / 2 - 0.05); // back face
+buttonsGroup.position.set(0, bodyHeight * 0.45, -BOX_D / 2 - 0.05);
 buttonsGroup.rotation.y = Math.PI;
 box.add(buttonsGroup);
 
@@ -744,8 +1017,6 @@ for (let i = 0; i < BUTTON_COUNT; i++) {
   buttonsGroup.add(b);
   colorButtons.push(b);
 }
-
-// Start button for Simon sequence
 const startBtn = new THREE.Mesh(
   new THREE.CylinderGeometry(0.18, 0.18, 0.12, 32),
   new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x888888, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0.4 })
@@ -756,49 +1027,9 @@ startBtn.castShadow = true;
 startBtn.userData.interactive = true;
 startBtn.userData.type = 'startBtn';
 buttonsGroup.add(startBtn);
-
-// Buttons hidden initially
 buttonsGroup.visible = false;
 
-// "I/II/III" labels above buttons (the order indicator with color hint mapping)
-const buttonsBackPlate = new THREE.Mesh(
-  new THREE.PlaneGeometry(2.6, 1.2),
-  new THREE.MeshStandardMaterial({ map: textTexture('●●●●●', 512, { bg: '#1a0e05', color: '#3a2a18', fontSize: 80 }), roughness: 0.7 })
-);
-buttonsBackPlate.position.set(0, 0.05, 0);
-buttonsGroup.add(buttonsBackPlate);
-
-// =========================================================
-// DECORATIVE BRASS DETAILS
-// =========================================================
-// Corner braces on body
-function cornerBrace(x, y, z) {
-  const g = new THREE.Group();
-  const horiz = new THREE.BoxGeometry(0.35, 0.06, 0.06);
-  const vert = new THREE.BoxGeometry(0.06, 0.06, 0.35);
-  const upDown = new THREE.BoxGeometry(0.06, 0.35, 0.06);
-  const h = new THREE.Mesh(horiz, brass); h.castShadow = true; g.add(h);
-  const v = new THREE.Mesh(vert, brass); v.castShadow = true; g.add(v);
-  const u = new THREE.Mesh(upDown, brass); u.castShadow = true; g.add(u);
-  g.position.set(x, y, z);
-  return g;
-}
-
-// Place corner braces at top and bottom corners
-const cornerSigns = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
-cornerSigns.forEach(([sx, sz]) => {
-  const x = sx * (BOX_W / 2 - 0.03);
-  const z = sz * (BOX_D / 2 - 0.03);
-  // Mirror geometry by adjusting positions
-  const cb1 = cornerBrace(x, 0.18, z);
-  const cb2 = cornerBrace(x, bodyHeight - 0.18, z);
-  // Flip the cross dimensions to lay along inside corner
-  if (sx > 0) { cb1.scale.x = -1; cb2.scale.x = -1; }
-  if (sz > 0) { cb1.scale.z = -1; cb2.scale.z = -1; }
-  box.add(cb1, cb2);
-});
-
-// Front panel — decorative rivets around levers
+// Decorative rivets
 function rivet(x, y, z) {
   const r = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), brass);
   r.position.set(x, y, z);
@@ -823,13 +1054,13 @@ function tween(obj, prop, target, duration = 500, easing = easeInOutCubic, onCom
   const startTime = performance.now();
   function step(now) {
     const t = Math.min(1, (now - startTime) / duration);
-    const e = easing(t);
-    obj[prop] = start + (target - start) * e;
+    obj[prop] = start + (target - start) * easing(t);
     if (t < 1) requestAnimationFrame(step);
     else if (onComplete) onComplete();
   }
   requestAnimationFrame(step);
 }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // =========================================================
 // RAYCAST / INTERACTION
@@ -837,12 +1068,12 @@ function tween(obj, prop, target, duration = 500, easing = easeInOutCubic, onCom
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hoveredInteractive = null;
+let dragging = false, dialDragStart = null, didDrag = false, dragStart = null;
+let lastDialBroadcast = 0;
 
 function getInteractives() {
   const arr = [];
-  scene.traverse(obj => {
-    if (obj.userData.interactive && obj.visible && isFamilyVisible(obj)) arr.push(obj);
-  });
+  scene.traverse(obj => { if (obj.userData.interactive && isFamilyVisible(obj)) arr.push(obj); });
   return arr;
 }
 function isFamilyVisible(obj) {
@@ -850,7 +1081,6 @@ function isFamilyVisible(obj) {
   while (o) { if (!o.visible) return false; o = o.parent; }
   return true;
 }
-
 function pickAt(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
@@ -860,16 +1090,11 @@ function pickAt(clientX, clientY) {
   return hits[0] || null;
 }
 
-let dragging = false;
-let dragStart = null;
-let dialDragStart = null;
-let didDrag = false;
-
 canvas.addEventListener('pointerdown', e => {
   dragStart = { x: e.clientX, y: e.clientY };
   didDrag = false;
   const hit = pickAt(e.clientX, e.clientY);
-  if (hit && hit.object.userData.type === 'dial') {
+  if (hit && hit.object.userData.type === 'dial' && state.stage === 2) {
     dialDragStart = { angle: Math.atan2(mouse.y, mouse.x), dialAngle: dial.rotation.y };
     controls.enabled = false;
     dragging = true;
@@ -877,8 +1102,7 @@ canvas.addEventListener('pointerdown', e => {
 });
 canvas.addEventListener('pointermove', e => {
   if (dragStart) {
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
+    const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) didDrag = true;
   }
   if (dragging && dialDragStart) {
@@ -889,9 +1113,13 @@ canvas.addEventListener('pointermove', e => {
     let delta = angleNow - dialDragStart.angle;
     dial.rotation.y = dialDragStart.dialAngle + delta * 1.5;
     updateDialReading();
+    // Throttle broadcast to ~30fps
+    const now = performance.now();
+    if (now - lastDialBroadcast > 33) {
+      lastDialBroadcast = now;
+      send({ type: 'dial-rotate', angle: dial.rotation.y });
+    }
   }
-
-  // Hover state for cursor
   const hit = pickAt(e.clientX, e.clientY);
   if (hit) {
     canvas.classList.add('pointing');
@@ -905,13 +1133,11 @@ canvas.addEventListener('pointermove', e => {
     if (hoveredInteractive) { hoverOut(hoveredInteractive); hoveredInteractive = null; }
   }
 });
-
 canvas.addEventListener('pointerup', e => {
   controls.enabled = true;
   if (dragging) {
     dragging = false;
     dialDragStart = null;
-    // Snap dial to nearest segment
     snapDial();
     return;
   }
@@ -934,10 +1160,39 @@ function hoverOut(obj) {
 }
 
 // =========================================================
+// CLICK HANDLER (local action + broadcast)
+// =========================================================
+function handleClick(obj) {
+  const t = obj.userData.type;
+  if (t === 'lever' && state.stage === 1) {
+    const idx = obj.userData.leverIndex;
+    const newPos = (state.levers[idx] + 1) % 3;
+    applyLeverChange(idx, newPos);
+    send({ type: 'lever', index: idx, position: newPos });
+  } else if (t === 'submit' && state.stage === 2) {
+    submitDialNumber(true);
+  } else if (t === 'startBtn' && state.stage === 3) {
+    if (!state.buttonShowing) {
+      send({ type: 'start-simon' });
+      runSimonSequence();
+    }
+  } else if (t === 'button' && state.stage === 3) {
+    if (state.buttonShowing) return;
+    pressButton(obj.userData.index, true);
+  }
+}
+
+function applyLeverChange(idx, pos) {
+  state.levers[idx] = pos;
+  setLeverAngle(levers[idx], pos);
+  clunk();
+  if (isHost) checkStage1();
+}
+
+// =========================================================
 // DIAL LOGIC
 // =========================================================
 function updateDialReading() {
-  // Number under pointer = inverse of dial rotation
   const seg = ((-dial.rotation.y / (Math.PI * 2)) * DIAL_SEGMENTS) % DIAL_SEGMENTS;
   state.dialAngle = ((Math.round(seg) % DIAL_SEGMENTS) + DIAL_SEGMENTS) % DIAL_SEGMENTS;
 }
@@ -947,16 +1202,20 @@ function snapDial() {
   tween(dial.rotation, 'y', snapped, 200, easeOutCubic, () => {
     updateDialReading();
     beep(440, 0.05, 'triangle', 0.05);
+    send({ type: 'dial-snap', angle: snapped, value: state.dialAngle });
   });
 }
 
-function submitDialNumber() {
+function submitDialNumber(broadcast) {
   if (state.stage !== 2) return;
   const num = state.dialAngle;
   const step = state.dialSubmitted.length;
+  applyDialSubmit(num, step);
+  if (broadcast) send({ type: 'dial-submit', num, step });
+}
+function applyDialSubmit(num, step) {
+  if (state.dialSubmitted.length !== step) return; // out-of-order safety
   state.dialSubmitted.push(num);
-
-  // Light up LED
   const expected = DIAL_SOLUTION[step];
   const led = submitLeds[step];
   if (num === expected) {
@@ -970,105 +1229,88 @@ function submitDialNumber() {
     led.material.emissiveIntensity = 1;
     buzz();
   }
-
-  // Animate lever press
   tween(submitArm.rotation, 'x', 0.4, 120, easeOutCubic, () => {
     tween(submitArm.rotation, 'x', 0, 200, easeOutBack);
   });
-
-  // Check completion
-  if (state.dialSubmitted.length === 3) {
+  if (state.dialSubmitted.length === DIAL_SOLUTION.length) {
     const correct = state.dialSubmitted.every((v, i) => v === DIAL_SOLUTION[i]);
     setTimeout(() => {
-      if (correct) {
+      if (correct && isHost) {
+        send({ type: 'stage-complete', stage: 2 });
         completeStage2();
-      } else {
-        // Reset
-        state.dialSubmitted = [];
-        submitLeds.forEach(l => {
-          l.material.color.setHex(0x442200);
-          l.material.emissive.setHex(0x000000);
-          l.material.emissiveIntensity = 0;
-        });
-        setInstruction('Λάθος συνδυασμός. Δοκίμασε ξανά.');
-        buzz();
+      } else if (!correct) {
+        // Only host triggers reset broadcast
+        if (isHost) {
+          send({ type: 'dial-reset' });
+          resetDial();
+          setInstruction('Λάθος συνδυασμός. Δοκιμάστε ξανά.');
+        }
       }
     }, 800);
   }
 }
-
-// =========================================================
-// CLICK HANDLER
-// =========================================================
-function handleClick(obj) {
-  const t = obj.userData.type;
-  if (t === 'lever' && state.stage === 1) {
-    const idx = obj.userData.leverIndex;
-    state.levers[idx] = (state.levers[idx] + 1) % 3;
-    setLeverAngle(levers[idx], state.levers[idx]);
-    clunk();
-    checkStage1();
-  } else if (t === 'dial' && state.stage === 2) {
-    // ignored — handled by drag
-  } else if (t === 'submit' && state.stage === 2) {
-    submitDialNumber();
-  } else if (t === 'startBtn' && state.stage === 3) {
-    if (!state.buttonShowing) playButtonSequence();
-  } else if (t === 'button' && state.stage === 3) {
-    if (state.buttonShowing) return;
-    pressButton(obj.userData.index);
-  }
+function resetDial() {
+  state.dialSubmitted = [];
+  submitLeds.forEach(l => {
+    l.material.color.setHex(0x442200);
+    l.material.emissive.setHex(0x000000);
+    l.material.emissiveIntensity = 0;
+  });
+  buzz();
 }
 
 // =========================================================
-// STAGE 1: LEVERS
+// STAGE 1 CHECK
 // =========================================================
 function checkStage1() {
   if (state.stage !== 1) return;
   if (state.levers.every((v, i) => v === LEVER_TARGET[i])) {
-    setTimeout(completeStage1, 600);
+    setTimeout(() => {
+      send({ type: 'stage-complete', stage: 1 });
+      completeStage1();
+    }, 500);
   }
 }
+
+// =========================================================
+// STAGE TRANSITIONS
+// =========================================================
 function completeStage1() {
+  if (state.stage >= 2) return;
   state.stage = 2;
   document.getElementById('stage-num').textContent = '2';
   setInstruction('Το καπάκι ανοίγει. Παρατήρησε μέσα στο κουτί.');
   chime();
-  // Slide lid forward and tilt open
   compartmentGroup.visible = true;
   tween(lid.position, 'z', BOX_D * 0.4, 1400, easeInOutCubic);
   tween(lid.rotation, 'x', -0.5, 1400, easeInOutCubic, () => {
-    setInstruction('Σύρε το καντράν για περιστροφή. Πάτα τον κόκκινο μοχλό για κάθε αριθμό.');
+    setInstruction('Διαβάστε το χαρτί. Ένας από εσάς ξέρει τον μετασχηματισμό. Γυρίστε το καντράν και πατήστε τον κόκκινο μοχλό.');
     innerLight.intensity = 6;
-    // Move camera to look inside
     flyCameraTo(new THREE.Vector3(0, 5.5, 4), new THREE.Vector3(0, bodyHeight, 0));
+    updateClues();
   });
 }
-
-// =========================================================
-// STAGE 2: DIAL
-// =========================================================
 function completeStage2() {
+  if (state.stage >= 3) return;
   state.stage = 3;
   document.getElementById('stage-num').textContent = '3';
   chime();
-  setInstruction('Τελευταίο στάδιο: γύρνα το κουτί. Στο πίσω μέρος βρίσκονται τα κουμπιά.');
-  // Reveal buttons on back face — animate compartment closing slightly
+  setInstruction('Τελευταίο στάδιο. Το κουτί στρέφεται...');
   buttonsGroup.visible = true;
-  // Move camera around to the back
   setTimeout(() => {
     flyCameraTo(new THREE.Vector3(0, 3, -7), new THREE.Vector3(0, bodyHeight * 0.5, 0));
-    setInstruction('Πάτα τον ΛΕΥΚΟ μοχλό για την ακολουθία. Μετά πάτα τα χρωματιστά κουμπιά στη σωστή σειρά.');
+    updateClues();
+    setInstruction('ΑΛΦΑ πατά το ΛΕΥΚΟ κουμπί. Μόνο ΑΛΦΑ θα δει την ακολουθία — πες την στον ΒΗΤΑ που θα την πατήσει.');
   }, 1500);
 }
 
 // =========================================================
-// STAGE 3: BUTTONS (SIMON)
+// STAGE 3: SIMON
 // =========================================================
-async function playButtonSequence() {
+async function runSimonSequence() {
   state.buttonShowing = true;
   state.buttonInput = [];
-  // Flash start button
+  setInstruction('Παρακολουθούν...');
   flashEmissive(startBtn, 1.2, 200);
   await sleep(600);
   for (const i of BUTTON_SEQUENCE) {
@@ -1076,54 +1318,58 @@ async function playButtonSequence() {
     await sleep(180);
   }
   state.buttonShowing = false;
-  setInstruction('Επανάλαβε την ακολουθία πατώντας τα κουμπιά.');
+  setInstruction('Επαναλάβετε την ακολουθία πατώντας τα κουμπιά στη σωστή σειρά.');
 }
-
 function flashColorButton(idx) {
   return new Promise(resolve => {
     const b = colorButtons[idx];
     const origE = b.userData.originalEmissive;
-    b.material.emissiveIntensity = 1.5;
-    // Move button slightly out as press feedback
-    tween(b.position, 'z', 0.18, 120, easeOutCubic);
+    // Only ΑΛΦΑ sees the flash; ΒΗΤΑ gets a generic sound but no visual
+    if (state.role === 'ΑΛΦΑ') {
+      b.material.emissiveIntensity = 1.5;
+      tween(b.position, 'z', 0.18, 120, easeOutCubic);
+    }
     beep(220 + idx * 130, 0.25, 'sine', 0.1);
     setTimeout(() => {
-      b.material.emissiveIntensity = origE;
-      tween(b.position, 'z', 0.05, 200, easeOutBack);
+      if (state.role === 'ΑΛΦΑ') {
+        b.material.emissiveIntensity = origE;
+        tween(b.position, 'z', 0.05, 200, easeOutBack);
+      }
       resolve();
     }, 380);
   });
 }
-
-function pressButton(idx) {
+function pressButton(idx, broadcast) {
   const b = colorButtons[idx];
-  // Visual press
   flashEmissive(b, 1.5, 200);
   tween(b.position, 'z', -0.05, 80, easeOutCubic, () => tween(b.position, 'z', 0.05, 180, easeOutBack));
   beep(220 + idx * 130, 0.2, 'sine', 0.1);
   state.buttonInput.push(idx);
+  if (broadcast) send({ type: 'button-press', index: idx });
   const i = state.buttonInput.length - 1;
   if (BUTTON_SEQUENCE[i] !== idx) {
-    // Fail
-    setTimeout(() => {
-      buzz();
-      state.buttonInput = [];
-      setInstruction('Λάθος. Πάτα τον λευκό μοχλό για νέα ακολουθία.');
-    }, 250);
+    if (broadcast || isHost) {
+      setTimeout(() => {
+        send({ type: 'button-fail' });
+        handleButtonFail();
+      }, 250);
+    }
     return;
   }
   if (state.buttonInput.length === BUTTON_SEQUENCE.length) {
-    setTimeout(victory, 400);
+    if (isHost) setTimeout(() => { send({ type: 'stage-complete', stage: 3 }); victory(); }, 400);
   }
 }
-
+function handleButtonFail() {
+  buzz();
+  state.buttonInput = [];
+  setInstruction('Λάθος. ΑΛΦΑ πάτα ξανά το λευκό κουμπί για να ξαναδείς την ακολουθία.');
+}
 function flashEmissive(mesh, intensity, duration) {
   const orig = mesh.material.emissiveIntensity;
   mesh.material.emissiveIntensity = intensity;
   setTimeout(() => mesh.material.emissiveIntensity = orig, duration);
 }
-
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // =========================================================
 // VICTORY
@@ -1133,24 +1379,20 @@ function victory() {
   chime();
   setTimeout(chime, 300);
   setTimeout(chime, 600);
-  // Open entire box: lid flies off, golden glow
   tween(lid.position, 'y', bodyHeight + 2.5, 2000, easeOutCubic);
   tween(lid.rotation, 'x', -Math.PI * 0.3, 2000, easeOutCubic);
   tween(lid.rotation, 'z', 0.3, 2000, easeOutCubic);
   innerLight.intensity = 25;
   innerLight.color.setHex(0xffd684);
   tween(innerLight, 'distance', 12, 2000, easeOutCubic);
-
   flyCameraTo(new THREE.Vector3(0, 5, 7), new THREE.Vector3(0, bodyHeight + 0.5, 0));
-
   document.getElementById('instruction').style.display = 'none';
-  setTimeout(() => {
-    document.getElementById('victory').classList.add('show');
-  }, 1500);
+  document.getElementById('clue-panel').style.display = 'none';
+  setTimeout(() => document.getElementById('victory').classList.add('show'), 1500);
 }
 
 // =========================================================
-// CAMERA FLY-TO
+// CAMERA FLY
 // =========================================================
 function flyCameraTo(targetPos, targetLook, duration = 1500) {
   const startPos = camera.position.clone();
@@ -1175,42 +1417,150 @@ function setInstruction(text) {
   document.getElementById('instruction').textContent = text;
 }
 
-document.getElementById('hint-btn').addEventListener('click', () => {
-  const p = document.getElementById('hint-popup');
-  const ht = document.getElementById('hint-text');
-  if (p.classList.contains('show')) {
-    p.classList.remove('show');
-    return;
+function updateClues() {
+  const body = document.getElementById('clue-body');
+  const role = state.role;
+  const title = document.getElementById('clue-title');
+  if (state.stage === 1) {
+    title.textContent = 'Σου · Στάδιο 1';
+    const myKey = role === 'ΑΛΦΑ' ? ALPHA_KEY : BETA_KEY;
+    const otherRole = role === 'ΑΛΦΑ' ? 'ΒΗΤΑ' : 'ΑΛΦΑ';
+    const POS_NAMES = ['ΑΡΙΣΤΕΡΑ', 'ΚΕΝΤΡΟ', 'ΔΕΞΙΑ'];
+    let html = '<p>Στο καπάκι έχουν χαραχθεί 3 σύμβολα:</p>';
+    html += '<div class="symbol-row">' + TOP_SIGILS.join(' &nbsp; ') + '</div>';
+    html += '<p>Ξέρεις τη σημασία αυτών:</p>';
+    html += '<ul style="padding-left:20px;margin:8px 0;">';
+    myKey.forEach(s => {
+      html += `<li><span style="font-size:1.3em;color:#ffd684;">${s}</span> = <code>${POS_NAMES[SIGIL_MEANING[s]]}</code></li>`;
+    });
+    html += '</ul>';
+    html += `<p style="opacity:0.7;font-size:0.85em;margin-top:8px;">Τα υπόλοιπα τα ξέρει ο <strong>${otherRole}</strong> — μιλήστε.</p>`;
+    body.innerHTML = html;
+  } else if (state.stage === 2) {
+    title.textContent = 'Σου · Στάδιο 2';
+    const myDigits = role === 'ΑΛΦΑ' ? ALPHA_DIGITS : BETA_DIGITS;
+    let html = '<p>Στο χαρτί διακρίνεις:</p>';
+    html += '<div class="digit-block">';
+    for (let i = 0; i < 4; i++) {
+      if (myDigits.includes(i)) html += `<span class="filled">${DIAL_BASE[i]}</span>`;
+      else html += '<span class="hidden">▒</span>';
+    }
+    html += '</div>';
+    if (role === 'ΒΗΤΑ') {
+      html += `<p style="margin-top:10px;">Στο κάτω μέρος του χαρτιού: <em>"πρόσθεσε <strong>${DIAL_OFFSET}</strong> σε κάθε ψηφίο πριν την εισαγωγή"</em></p>`;
+    } else {
+      html += '<p style="margin-top:10px;opacity:0.75;">Στο κάτω μέρος υπάρχει κάτι, αλλά είναι μουτζουρωμένο.</p>';
+    }
+    html += '<p style="opacity:0.7;font-size:0.85em;margin-top:8px;">Συνδυάστε τα ψηφία και τον μετασχηματισμό.</p>';
+    body.innerHTML = html;
+  } else if (state.stage === 3) {
+    title.textContent = 'Σου · Στάδιο 3';
+    let html = '';
+    if (role === 'ΑΛΦΑ') {
+      html += '<p>Όταν πατήσεις το <strong>λευκό</strong> κουμπί, μόνο εσύ θα δεις την ακολουθία να αναβοσβήνει.</p>';
+      html += '<p style="margin-top:8px;">Πες κάθε χρώμα στον ΒΗΤΑ — αυτός θα τα πατήσει.</p>';
+      html += '<div class="seq-display">Χρώματα κουμπιών:';
+      BUTTON_COLORS.forEach((c, i) => {
+        const hex = '#' + c.toString(16).padStart(6, '0');
+        html += ` <span class="color-chip" style="background:${hex};color:${hex};"></span> <strong>${BUTTON_NAMES_EL[i]}</strong>`;
+        if (i < BUTTON_COLORS.length - 1) html += ',';
+      });
+      html += '</div>';
+    } else {
+      html += '<p>Ο ΑΛΦΑ θα σου πει χρώματα. Πάτα τα κουμπιά στη σειρά που σου λέει.</p>';
+      html += '<p style="margin-top:8px;opacity:0.75;">Λάθος = ξεκινάτε από την αρχή της ακολουθίας.</p>';
+      html += '<div class="seq-display">Χρώματα κουμπιών:';
+      BUTTON_COLORS.forEach((c, i) => {
+        const hex = '#' + c.toString(16).padStart(6, '0');
+        html += ` <span class="color-chip" style="background:${hex};color:${hex};"></span> <strong>${BUTTON_NAMES_EL[i]}</strong>`;
+        if (i < BUTTON_COLORS.length - 1) html += ',';
+      });
+      html += '</div>';
+    }
+    body.innerHTML = html;
   }
-  const hints = {
-    1: 'Η πλάκα πάνω στο καπάκι δείχνει την κατεύθυνση κάθε μοχλού: <strong>◀ αριστερά</strong>, <strong>▲ κέντρο</strong>, <strong>▶ δεξιά</strong>. Πάτα κάθε κόκκινη χειρολαβή για να την αλλάξεις.',
-    2: 'Ο συνδυασμός βρίσκεται γραμμένος στο χαρτί μέσα στο κουτί. Σύρε το καντράν για να γυρίσει, και πάτα τον κόκκινο μοχλό για κάθε αριθμό.',
-    3: 'Πάτα πρώτα το <strong>λευκό</strong> κουμπί για να δεις την ακολουθία. Μετά πάτα τα χρωματιστά κουμπιά στην ίδια σειρά. Λάθος = ξεκινάς από την αρχή.'
-  };
-  ht.innerHTML = hints[state.stage] || '';
-  p.classList.add('show');
-  setTimeout(() => p.classList.remove('show'), 8000);
+}
+
+// =========================================================
+// CHAT
+// =========================================================
+function addChat(text, who) {
+  const c = document.getElementById('chat-messages');
+  const d = document.createElement('div');
+  d.className = 'msg-' + who;
+  const prefix = who === 'me' ? 'ΕΣΥ' : who === 'them' ? 'ΣΥΝΕΡΓΑΤΗΣ' : '◆';
+  d.textContent = `[${prefix}] ${text}`;
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+
+document.getElementById('chat-input').addEventListener('keypress', e => {
+  if (e.key === 'Enter') {
+    const text = e.target.value.trim();
+    if (!text) return;
+    addChat(text, 'me');
+    send({ type: 'chat', text });
+    e.target.value = '';
+  }
+});
+document.getElementById('chat-header').addEventListener('click', () => {
+  const c = document.getElementById('chat');
+  c.classList.toggle('collapsed');
+  document.getElementById('chat-toggle').textContent = c.classList.contains('collapsed') ? '▲' : '▼';
 });
 
 document.getElementById('reset-btn').addEventListener('click', () => {
-  flyCameraTo(new THREE.Vector3(5, 4, 6.5), new THREE.Vector3(0, 1.2, 0));
+  // Reset camera based on current stage
+  if (state.stage === 1) flyCameraTo(new THREE.Vector3(5, 4, 6.5), new THREE.Vector3(0, 1.2, 0));
+  else if (state.stage === 2) flyCameraTo(new THREE.Vector3(0, 5.5, 4), new THREE.Vector3(0, bodyHeight, 0));
+  else if (state.stage === 3) flyCameraTo(new THREE.Vector3(0, 3, -7), new THREE.Vector3(0, bodyHeight * 0.5, 0));
 });
-
 document.getElementById('sound-btn').addEventListener('click', e => {
   state.soundOn = !state.soundOn;
   e.target.textContent = state.soundOn ? '♪' : '♪̸';
   if (state.soundOn) beep(660, 0.1);
 });
 
-document.getElementById('start-btn').addEventListener('click', () => {
-  document.getElementById('intro').style.display = 'none';
+// =========================================================
+// LOBBY EVENTS
+// =========================================================
+document.getElementById('host-btn').addEventListener('click', () => {
+  document.getElementById('lobby-main').style.display = 'none';
+  document.getElementById('host-panel').style.display = 'block';
+  hostGame();
+});
+document.getElementById('join-btn').addEventListener('click', () => {
+  document.getElementById('lobby-main').style.display = 'none';
+  document.getElementById('join-panel').style.display = 'block';
+  document.getElementById('join-code-input').focus();
+});
+document.getElementById('connect-btn').addEventListener('click', () => {
+  const code = document.getElementById('join-code-input').value.trim();
+  if (!code) return;
+  document.getElementById('connect-btn').disabled = true;
+  joinGame(code);
+});
+document.getElementById('join-code-input').addEventListener('keypress', e => {
+  if (e.key === 'Enter') document.getElementById('connect-btn').click();
+});
+
+function startGame() {
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('ui').classList.add('show');
+  document.getElementById('role-name').textContent = state.role;
+  state.stage = 1;
+  // Set paper texture based on role
+  paperMesh.material.map = paperTexture(state.role);
+  paperMesh.material.needsUpdate = true;
+  updateClues();
+  addChat('Σύνδεση επιτυχής. Είσαι ' + state.role + '.', 'sys');
   // Unlock audio
   audio();
   beep(440, 0.05, 'sine', 0.05);
-});
+}
 
 // =========================================================
-// RESIZE
+// RESIZE + LOOP
 // =========================================================
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -1218,9 +1568,6 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// =========================================================
-// RENDER LOOP
-// =========================================================
 function loop() {
   controls.update();
   renderer.render(scene, camera);
