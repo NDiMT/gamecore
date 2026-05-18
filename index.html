@@ -253,6 +253,83 @@
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
+// ============ WEBRTC SUPPORT CHECK ============
+function checkWebRTC() {
+  const RTCPC = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+  const checks = {
+    'RTCPeerConnection': !!RTCPC,
+    'WebSocket': !!window.WebSocket,
+    'Secure context (HTTPS)': !!window.isSecureContext,
+    'PeerJS library loaded': typeof Peer !== 'undefined'
+  };
+  return {
+    ok: Object.values(checks).every(Boolean),
+    checks
+  };
+}
+
+function detectInAppBrowser() {
+  const ua = navigator.userAgent || '';
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) return 'Facebook';
+  if (/Instagram/i.test(ua)) return 'Instagram';
+  if (/TikTok|musical_ly/i.test(ua)) return 'TikTok';
+  if (/Line\//i.test(ua)) return 'LINE';
+  if (/Twitter/i.test(ua)) return 'Twitter/X';
+  if (/Snapchat/i.test(ua)) return 'Snapchat';
+  if (/MicroMessenger/i.test(ua)) return 'WeChat';
+  if (/Messenger/i.test(ua)) return 'Messenger';
+  return null;
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const support = checkWebRTC();
+  const inApp = detectInAppBrowser();
+
+  if (!support.ok || inApp) {
+    const failed = Object.entries(support.checks).filter(([_, v]) => !v).map(([k]) => k);
+    let html = '<h2 style="color:#ff4444;">⚠ ΜΗ ΣΥΜΒΑΤΟ BROWSER</h2>';
+
+    if (inApp) {
+      html += `<div style="background:rgba(255,68,68,0.1); border-left:4px solid #ff4444; padding:15px; margin:15px 0;">
+        <strong>Είσαι μέσα από την εφαρμογή ${inApp}.</strong><br>
+        Τα in-app browsers μπλοκάρουν WebRTC.
+        <br><br>
+        <strong>Λύση:</strong> Κάνε <em>"Άνοιγμα σε browser"</em> ή <em>"Open in Chrome/Safari"</em> από το μενού (⋯).
+      </div>`;
+    }
+
+    if (failed.length) {
+      html += `<div style="background:rgba(255,170,0,0.1); border-left:4px solid #ffaa00; padding:15px; margin:15px 0;">
+        <strong>Λείπουν:</strong> ${failed.join(', ')}
+      </div>`;
+    }
+
+    if (!inApp && failed.includes('RTCPeerConnection')) {
+      html += `<p style="margin-top:15px;">Πιθανές αιτίες:</p>
+        <ul style="margin:10px 0 10px 20px; line-height:1.7;">
+          <li>Brave Browser με <em>Shields = aggressive</em> → πέσε στο shield για το site</li>
+          <li>Privacy extension (uBlock κτλ) που μπλοκάρει WebRTC</li>
+          <li>Πολύ παλιός browser (IE, παλιό Safari)</li>
+          <li>Firefox με <code>privacy.resistFingerprinting = true</code></li>
+        </ul>
+        <p><strong>Δοκίμασε:</strong> Chrome ή Edge σε normal window.</p>`;
+    }
+
+    html += `<details style="margin-top:20px; opacity:0.6; font-size:0.85em;">
+      <summary style="cursor:pointer;">Τεχνικές πληροφορίες</summary>
+      <pre style="margin-top:10px; padding:10px; background:#0a0e1a; border:1px solid #444; overflow:auto; font-size:0.8em; white-space:pre-wrap; word-break:break-all;">${
+        'UA: ' + navigator.userAgent + '\n' +
+        'Protocol: ' + location.protocol + '\n' +
+        'Checks:\n' + Object.entries(support.checks).map(([k,v]) => '  ' + (v?'✓':'✗') + ' ' + k).join('\n')
+      }</pre>
+    </details>`;
+
+    document.querySelector('#lobby .panel').innerHTML = html;
+    document.querySelector('#lobby h1').style.color = '#ff4444';
+    return;
+  }
+});
+
 // ============ NETWORKING ============
 let peer, conn, isHost = false, role = null;
 
