@@ -3,712 +3,1231 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cipher Lab — Co-op Escape</title>
+<title>MECHANO — 3D Escape Box</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', 'Consolas', monospace; }
-  body {
-    background: radial-gradient(ellipse at center, #0f1e2e 0%, #050810 100%);
-    color: #00ff88;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-    overflow-x: hidden;
-  }
-  body::before {
-    content: '';
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: repeating-linear-gradient(0deg, rgba(0,255,136,0.03) 0, rgba(0,255,136,0.03) 1px, transparent 1px, transparent 3px);
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: #e8d6a8; font-family: 'Georgia', serif; }
+  #canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  #canvas:active { cursor: grabbing; }
+  #canvas.pointing { cursor: pointer; }
+
+  #ui {
+    position: fixed; inset: 0;
     pointer-events: none;
-    z-index: 1;
+    z-index: 10;
   }
-  h1 {
-    font-size: 2.8em;
-    letter-spacing: 0.3em;
-    margin-bottom: 20px;
-    text-shadow: 0 0 20px #00ff88, 0 0 40px rgba(0,255,136,0.4);
-    text-align: center;
-    z-index: 2;
-    position: relative;
+  #ui > * { pointer-events: auto; }
+
+  #top-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: 16px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent);
   }
-  h2 { color: #ffaa00; margin-bottom: 15px; text-shadow: 0 0 10px rgba(255,170,0,0.5); }
-  .panel {
-    background: rgba(17, 24, 39, 0.9);
-    border: 2px solid #00ff88;
-    border-radius: 8px;
-    padding: 30px;
-    margin: 15px 0;
-    max-width: 800px;
-    width: 100%;
-    box-shadow: 0 0 30px rgba(0,255,136,0.2), inset 0 0 30px rgba(0,255,136,0.05);
-    z-index: 2;
-    position: relative;
+  #title {
+    font-size: 1.3em;
+    letter-spacing: 0.4em;
+    color: #d4af6a;
+    text-shadow: 0 0 10px rgba(212,175,106,0.5);
   }
-  button {
-    background: transparent;
-    color: #00ff88;
-    border: 2px solid #00ff88;
-    padding: 12px 24px;
-    font-family: inherit;
-    font-size: 1em;
-    cursor: pointer;
-    margin: 5px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    transition: all 0.2s;
+  #stage {
+    font-size: 0.95em;
+    letter-spacing: 0.15em;
+    color: #c8a574;
+    opacity: 0.85;
   }
-  button:hover:not(:disabled) {
-    background: #00ff88;
-    color: #0a0e1a;
-    box-shadow: 0 0 20px rgba(0,255,136,0.5);
-  }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  input {
-    background: #0a0e1a;
-    color: #00ff88;
-    border: 2px solid #00ff88;
-    padding: 10px;
-    font-family: inherit;
-    font-size: 1em;
-    width: 100%;
-    margin: 5px 0;
-    outline: none;
-  }
-  input:focus { box-shadow: 0 0 15px rgba(0,255,136,0.4); }
-  .code-display {
-    font-size: 1.6em;
-    background: #0a0e1a;
-    padding: 15px;
-    border: 1px dashed #00ff88;
-    text-align: center;
-    margin: 15px 0;
-    letter-spacing: 0.2em;
-    word-break: break-all;
-    cursor: pointer;
-  }
-  .code-display:hover { background: rgba(0,255,136,0.1); }
-  #lobby { text-align: center; max-width: 600px; z-index: 2; position: relative; }
-  #lobby p { margin: 15px 0; }
-  #game { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 900px; z-index: 2; position: relative; }
-  #status-bar {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    padding: 12px 20px;
-    border: 1px solid #00ff88;
-    background: rgba(17,24,39,0.9);
-    font-size: 0.9em;
-    letter-spacing: 0.1em;
-  }
-  #chat {
-    width: 100%;
-    background: rgba(10, 14, 26, 0.95);
-    border: 1px solid #00ff88;
-    margin-top: 10px;
-  }
-  #messages {
-    height: 120px;
-    overflow-y: auto;
-    padding: 10px;
-    font-size: 0.9em;
-  }
-  #messages > div { margin: 3px 0; }
-  .msg-me { color: #ffaa00; }
-  .msg-them { color: #44ccff; }
-  .msg-sys { color: #888; font-style: italic; }
-  #chat-input-row { display: flex; padding: 5px; border-top: 1px solid #00ff88; }
-  #chat-input { border: none !important; }
-  .your-view {
-    background: rgba(255,170,0,0.08);
-    padding: 18px;
-    border-left: 4px solid #ffaa00;
-    margin: 15px 0;
+  #stage strong { color: #ffd684; }
+
+  #instruction {
+    position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+    max-width: 600px; width: calc(100% - 40px);
+    padding: 14px 20px;
+    background: rgba(20, 14, 8, 0.85);
+    border: 1px solid #c8a574;
     border-radius: 4px;
-  }
-  .your-view strong { color: #ffcc44; letter-spacing: 0.05em; }
-  .wire-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin: 15px 0;
-  }
-  .wire-slot {
-    border: 2px dashed #00ff88;
-    padding: 25px 8px;
     text-align: center;
+    font-size: 1em;
+    line-height: 1.5;
+    box-shadow: 0 0 25px rgba(0,0,0,0.6);
+    transition: opacity 0.3s;
+  }
+  #instruction.fade { opacity: 0.3; }
+
+  #controls {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px;
+  }
+  .icon-btn {
+    background: rgba(20, 14, 8, 0.9);
+    color: #d4af6a;
+    border: 1px solid #c8a574;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    font-size: 1.2em;
     cursor: pointer;
     transition: all 0.2s;
-    background: rgba(0,255,136,0.03);
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
   }
-  .wire-slot:hover { background: rgba(0,255,136,0.1); }
-  .wire-slot.filled { border-style: solid; }
-  .wire-btn {
-    font-weight: bold;
-    text-shadow: 0 0 5px currentColor;
-  }
-  .symbol { font-size: 2.5em; }
-  .cipher-key {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin: 15px 0;
-  }
-  .cipher-key > div {
-    background: #0a0e1a;
-    padding: 12px;
-    border: 1px solid #00ff88;
+  .icon-btn:hover { background: #c8a574; color: #1a0e05; transform: scale(1.05); }
+
+  #intro {
+    position: fixed; inset: 0; z-index: 100;
+    background: radial-gradient(circle, #1a1410 0%, #000 80%);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: #d4af6a;
     text-align: center;
+    padding: 20px;
   }
-  .digit-input {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin: 25px 0;
+  #intro h1 {
+    font-size: 4em;
+    letter-spacing: 0.4em;
+    margin-bottom: 30px;
+    text-shadow: 0 0 30px #d4af6a, 0 0 60px rgba(212,175,106,0.4);
+    animation: glow 3s ease-in-out infinite;
   }
-  .digit {
-    width: 65px;
-    height: 75px;
-    font-size: 2.5em;
+  @keyframes glow {
+    0%, 100% { text-shadow: 0 0 30px #d4af6a, 0 0 60px rgba(212,175,106,0.4); }
+    50% { text-shadow: 0 0 40px #ffd684, 0 0 80px rgba(255,214,132,0.6); }
+  }
+  #intro p { margin: 10px 0; max-width: 600px; line-height: 1.6; opacity: 0.85; }
+  #intro .small { opacity: 0.55; font-size: 0.85em; margin-top: 20px; font-family: monospace; letter-spacing: 0.1em; }
+  #start-btn {
+    margin-top: 40px;
+    background: transparent;
+    color: #d4af6a;
+    border: 2px solid #d4af6a;
+    padding: 14px 36px;
+    font-size: 1.1em;
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: inherit;
+  }
+  #start-btn:hover {
+    background: #d4af6a;
+    color: #1a0e05;
+    box-shadow: 0 0 30px rgba(212,175,106,0.6);
+  }
+
+  #victory {
+    position: fixed; inset: 0; z-index: 99;
+    display: none;
+    background: radial-gradient(circle, rgba(212,175,106,0.15), rgba(0,0,0,0.85));
+    flex-direction: column; justify-content: center; align-items: center;
     text-align: center;
-    margin: 0;
-    width: 65px !important;
+    pointer-events: none;
+    animation: fadeIn 2s;
   }
-  .digit[readonly] {
-    background: #1a1a2e;
-    opacity: 0.7;
-    border-color: #44ccff;
-    color: #44ccff;
+  #victory.show { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  #victory h1 {
+    font-size: 3.5em;
+    color: #ffd684;
+    text-shadow: 0 0 30px #ffd684, 0 0 60px #d4af6a;
+    letter-spacing: 0.3em;
+    animation: glow 2s ease-in-out infinite;
   }
-  .victory {
-    text-align: center;
-    padding: 50px 20px;
+  #victory p { margin-top: 20px; color: #d4af6a; font-size: 1.2em; opacity: 0.9; }
+  #victory button { pointer-events: auto; }
+
+  #hint-popup {
+    position: absolute; top: 70px; right: 20px;
+    background: rgba(20, 14, 8, 0.95);
+    border: 1px solid #c8a574;
+    padding: 14px 18px;
+    max-width: 280px;
+    border-radius: 4px;
+    display: none;
+    font-size: 0.9em;
+    line-height: 1.5;
   }
-  .victory h1 {
-    color: #ffaa00;
-    font-size: 3em;
-    text-shadow: 0 0 30px #ffaa00;
-    animation: pulse 1.5s infinite;
+  #hint-popup.show { display: block; }
+  #hint-popup h3 { color: #ffd684; margin-bottom: 8px; font-size: 1em; letter-spacing: 0.1em; }
+
+  .corner-link {
+    position: fixed; top: 10px; right: 10px;
+    color: rgba(212,175,106,0.4);
+    font-size: 0.75em;
+    text-decoration: none;
+    font-family: monospace;
+    pointer-events: auto;
+    z-index: 5;
   }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-  }
-  .blink { animation: blink 1s infinite; }
-  @keyframes blink {
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0.3; }
-  }
+  .corner-link:hover { color: #d4af6a; }
+
   @media (max-width: 600px) {
-    h1 { font-size: 2em; }
-    .digit { width: 50px !important; height: 60px; font-size: 2em; }
-    .cipher-key { grid-template-columns: repeat(2, 1fr); }
-    .wire-grid { grid-template-columns: repeat(2, 1fr); }
+    #intro h1 { font-size: 2.5em; letter-spacing: 0.2em; }
+    #title { font-size: 1em; letter-spacing: 0.2em; }
+    #stage { font-size: 0.8em; }
+    #instruction { font-size: 0.85em; padding: 10px 14px; bottom: 75px; }
+    .icon-btn { width: 38px; height: 38px; }
   }
 </style>
 </head>
 <body>
 
-<div id="lobby">
-  <h1>CIPHER LAB</h1>
-  <div class="panel">
-    <p style="margin-bottom: 25px; line-height: 1.6;">
-      Δύο επιστήμονες παγιδευμένοι σε ξεχωριστά δωμάτια ενός μυστικού εργαστηρίου.<br>
-      <span style="opacity:0.7">Κάθε ένας βλέπει διαφορετικά στοιχεία. Πρέπει να συνεργαστείτε για να ξεφύγετε.</span>
-    </p>
-    <div id="lobby-buttons">
-      <button id="host-btn">▶ ΔΗΜΙΟΥΡΓΙΑ ΔΩΜΑΤΙΟΥ</button>
-      <button id="join-btn">⚡ ΕΙΣΟΔΟΣ ΜΕ ΚΩΔΙΚΟ</button>
-    </div>
+<canvas id="canvas"></canvas>
 
-    <div id="host-section" style="display:none; margin-top:20px;">
-      <p>Δώσε στον συνεργάτη σου τον κωδικό:</p>
-      <div id="host-code" class="code-display" title="Κλικ για αντιγραφή">ΣΥΝΔΕΣΗ...</div>
-      <p style="opacity:0.6;" class="blink">⏳ Αναμονή συνεργάτη...</p>
-    </div>
+<a href="coop.html" class="corner-link">› coop version</a>
 
-    <div id="join-section" style="display:none; margin-top:20px;">
-      <input id="join-code" placeholder="ΚΩΔΙΚΟΣ ΔΩΜΑΤΙΟΥ" autocomplete="off" style="text-transform:uppercase;">
-      <button id="connect-btn">ΣΥΝΔΕΣΗ</button>
-      <p id="join-status" style="opacity:0.7; margin-top:10px;"></p>
-    </div>
-  </div>
-  <p style="opacity:0.4; font-size:0.8em; text-align:center;">Peer-to-peer connection · No server · No tracking</p>
+<div id="intro">
+  <h1>MECHANO</h1>
+  <p>Ένα μηχανικό κουτί κρύβει το πιο πολυπόθητο μυστικό.</p>
+  <p>Τρία στάδια. Μοχλοί. Καντράν. Κουμπιά.<br>Παρατήρησε τα στοιχεία στο ίδιο το κουτί.</p>
+  <p class="small">drag = περιστροφή · click = αλληλεπίδραση · scroll = ζουμ</p>
+  <button id="start-btn">▶ ΞΕΚΙΝΑ</button>
 </div>
 
-<div id="game">
-  <div id="status-bar">
-    <span>ΠΑΙΧΤΗΣ: <strong id="role-display" style="color:#ffaa00;"></strong></span>
-    <span>ΓΡΙΦΟΣ <span id="puzzle-num">1</span> / 3</span>
+<div id="ui">
+  <div id="top-bar">
+    <div id="title">MECHANO</div>
+    <div id="stage">ΣΤΑΔΙΟ <strong id="stage-num">1</strong> / 3</div>
   </div>
-  <div class="panel" id="puzzle-container"></div>
-  <div id="chat">
-    <div id="messages"></div>
-    <div id="chat-input-row">
-      <input id="chat-input" placeholder="› Πες κάτι στον συνεργάτη...">
-    </div>
+  <div id="instruction">Παρατήρησε τους μοχλούς και τις ενδείξεις στην πλάκα στην κορυφή.</div>
+  <div id="controls">
+    <button class="icon-btn" id="hint-btn" title="Υπόδειξη">?</button>
+    <button class="icon-btn" id="reset-btn" title="Επαναφορά κάμερας">⟲</button>
+    <button class="icon-btn" id="sound-btn" title="Ήχος">♪</button>
+  </div>
+  <div id="hint-popup">
+    <h3>ΥΠΟΔΕΙΞΗ</h3>
+    <div id="hint-text"></div>
   </div>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script>
-// ============ NETWORKING ============
-let peer, conn, isHost = false, role = null;
+<div id="victory">
+  <h1>ΕΛΕΥΘΕΡΟΣ</h1>
+  <p>Το μυστικό αποκαλύφθηκε.</p>
+  <p style="margin-top:30px; font-size:0.9em; opacity:0.7;">Refresh για νέο παιχνίδι.</p>
+</div>
 
-// PeerJS config: explicit STUN + free TURN (Open Relay) for restrictive NATs/mobile
-const PEER_CONFIG = {
-  debug: 2,
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:openrelay.metered.ca:80' },
-      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-    ]
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
   }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// =========================================================
+// CONFIG / STATE
+// =========================================================
+const LEVER_TARGET = [0, 2, 1]; // 0=back, 1=up, 2=forward — solution
+const DIAL_SOLUTION = [7, 14, 3]; // sequence of dial numbers
+const DIAL_SEGMENTS = 20;
+const BUTTON_COUNT = 4;
+const BUTTON_SEQUENCE = [0, 2, 1, 3, 0]; // colors index
+const BUTTON_COLORS = [0xff4444, 0x44ff66, 0x4488ff, 0xffdd44];
+
+const state = {
+  stage: 1,
+  soundOn: true,
+  levers: [1, 1, 1], // start at middle
+  dialAngle: 0,
+  dialSubmitted: [],
+  buttonInput: [],
+  buttonShowing: false,
+  solved: false
 };
 
-function genCode() {
-  // ID prefix required by PeerJS (cannot start with digit). Format: cl + 6 chars.
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-  let s = 'cl';
-  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
+// =========================================================
+// AUDIO (Web Audio synth — no files)
+// =========================================================
+let audioCtx = null;
+function audio() {
+  if (!state.soundOn) return null;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(freq, duration = 0.1, type = 'sine', gain = 0.1) {
+  const ctx = audio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  g.gain.value = 0;
+  g.gain.linearRampToValueAtTime(gain, ctx.currentTime + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+  osc.connect(g).connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + duration);
+}
+function clunk() { beep(80, 0.15, 'square', 0.15); setTimeout(() => beep(60, 0.1, 'sawtooth', 0.1), 50); }
+function chime() { beep(523, 0.1); setTimeout(() => beep(659, 0.1), 80); setTimeout(() => beep(784, 0.15), 160); }
+function buzz() { beep(120, 0.3, 'sawtooth', 0.15); }
+
+// =========================================================
+// SCENE
+// =========================================================
+const canvas = document.getElementById('canvas');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x080610);
+scene.fog = new THREE.FogExp2(0x080610, 0.04);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(5, 4, 6.5);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 1.2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 4;
+controls.maxDistance = 12;
+controls.minPolarAngle = Math.PI * 0.15;
+controls.maxPolarAngle = Math.PI * 0.5;
+controls.enablePan = false;
+
+// =========================================================
+// LIGHTING
+// =========================================================
+const ambient = new THREE.AmbientLight(0x4a3a2a, 0.35);
+scene.add(ambient);
+
+const keyLight = new THREE.SpotLight(0xffd49a, 80, 25, Math.PI / 5, 0.4, 1.5);
+keyLight.position.set(4, 10, 5);
+keyLight.target.position.set(0, 1, 0);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 25;
+keyLight.shadow.bias = -0.0005;
+scene.add(keyLight, keyLight.target);
+
+const fillLight = new THREE.PointLight(0x3366aa, 4, 18);
+fillLight.position.set(-5, 3, -4);
+scene.add(fillLight);
+
+const rimLight = new THREE.PointLight(0xff6633, 2, 12);
+rimLight.position.set(5, 1, -5);
+scene.add(rimLight);
+
+// Inner glow lights (turn on as stages complete)
+const innerLight = new THREE.PointLight(0xffaa44, 0, 4);
+innerLight.position.set(0, 1.6, 0);
+scene.add(innerLight);
+
+// =========================================================
+// TABLE
+// =========================================================
+const tableGroup = new THREE.Group();
+const tableTopGeo = new THREE.CylinderGeometry(6, 6, 0.25, 48);
+const tableMat = new THREE.MeshStandardMaterial({ color: 0x1c1108, roughness: 0.85, metalness: 0.05 });
+const tableTop = new THREE.Mesh(tableTopGeo, tableMat);
+tableTop.position.y = -0.125;
+tableTop.receiveShadow = true;
+tableGroup.add(tableTop);
+scene.add(tableGroup);
+
+// =========================================================
+// MATERIALS
+// =========================================================
+function wood(color = 0x6b4423) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05 });
+}
+const brass = new THREE.MeshStandardMaterial({ color: 0xc8a574, roughness: 0.28, metalness: 0.88 });
+const brassDark = new THREE.MeshStandardMaterial({ color: 0x8a6f3d, roughness: 0.4, metalness: 0.75 });
+const darkMetal = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.45, metalness: 0.7 });
+const redKnob = new THREE.MeshStandardMaterial({ color: 0xaa2222, roughness: 0.4, metalness: 0.4 });
+
+// Texture cache
+function textTexture(text, size = 256, opts = {}) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = opts.bg || '#3a2a18';
+  ctx.fillRect(0, 0, size, size);
+  // Wood grain noise
+  for (let i = 0; i < 80; i++) {
+    ctx.strokeStyle = `rgba(0,0,0,${Math.random() * 0.1})`;
+    ctx.beginPath();
+    ctx.moveTo(0, Math.random() * size);
+    ctx.bezierCurveTo(size * 0.3, Math.random() * size, size * 0.7, Math.random() * size, size, Math.random() * size);
+    ctx.stroke();
+  }
+  ctx.fillStyle = opts.color || '#d4af6a';
+  ctx.font = `bold ${opts.fontSize || size * 0.5}px ${opts.font || 'serif'}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, size / 2, size / 2);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
-function showDisplayCode(id) {
-  // Show without "cl" prefix to user; we re-add it on join.
-  return id.startsWith('cl') ? id.slice(2).toUpperCase() : id.toUpperCase();
+function dialTexture() {
+  const size = 1024;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  // Brass background
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, '#d4af6a');
+  grad.addColorStop(1, '#8a6f3d');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#5a4a2a';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  // Tick marks and numbers
+  ctx.fillStyle = '#1a0e05';
+  ctx.font = `bold ${size * 0.06}px Georgia`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < DIAL_SEGMENTS; i++) {
+    const angle = (i / DIAL_SEGMENTS) * Math.PI * 2 - Math.PI / 2;
+    const r = size / 2 - 60;
+    const x = size / 2 + Math.cos(angle) * r;
+    const y = size / 2 + Math.sin(angle) * r;
+    ctx.fillText(String(i), x, y);
+    // tick
+    ctx.strokeStyle = '#1a0e05';
+    ctx.lineWidth = i % 5 === 0 ? 5 : 2;
+    const r1 = size / 2 - 18;
+    const r2 = i % 5 === 0 ? size / 2 - 40 : size / 2 - 30;
+    ctx.beginPath();
+    ctx.moveTo(size / 2 + Math.cos(angle) * r1, size / 2 + Math.sin(angle) * r1);
+    ctx.lineTo(size / 2 + Math.cos(angle) * r2, size / 2 + Math.sin(angle) * r2);
+    ctx.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 16;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
-function hostGame() {
-  const code = genCode();
-  document.getElementById('host-code').textContent = '⏳ Σύνδεση...';
-  peer = new Peer(code, PEER_CONFIG);
+function hintPlateTexture() {
+  const size = 512;
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size / 2;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#3a2a18';
+  ctx.fillRect(0, 0, c.width, c.height);
+  // Engraved triangles indicating lever positions
+  const positions = ['◀', '▶', '▲']; // back, forward, up — visual mapping
+  // LEVER_TARGET = [0,2,1] => back, forward, up
+  const arrows = LEVER_TARGET.map(p => positions[p]);
+  ctx.fillStyle = '#1a0e05';
+  ctx.font = `bold ${c.height * 0.55}px Georgia`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  arrows.forEach((arrow, i) => {
+    const x = (c.width / 4) * (i + 1);
+    ctx.fillText(arrow, x, c.height * 0.55);
+  });
+  // small numbers above
+  ctx.font = `bold ${c.height * 0.18}px Georgia`;
+  ctx.fillStyle = '#5a4a2a';
+  ['I', 'II', 'III'].forEach((n, i) => {
+    ctx.fillText(n, (c.width / 4) * (i + 1), c.height * 0.18);
+  });
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
-  const timeout = setTimeout(() => {
-    document.getElementById('host-code').textContent = '✗ TIMEOUT — πάτα refresh';
-  }, 15000);
+function paperTexture(text1, text2) {
+  const size = 512;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size / 1.4;
+  const ctx = c.getContext('2d');
+  // Aged paper
+  const grad = ctx.createRadialGradient(size / 2, c.height / 2, 50, size / 2, c.height / 2, size / 2);
+  grad.addColorStop(0, '#e8d6a8');
+  grad.addColorStop(1, '#b89c70');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, c.height);
+  // Stains
+  for (let i = 0; i < 30; i++) {
+    ctx.fillStyle = `rgba(80,40,20,${Math.random() * 0.15})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * size, Math.random() * c.height, Math.random() * 15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#3a2a18';
+  ctx.font = `italic ${size * 0.06}px Georgia`;
+  ctx.textAlign = 'center';
+  ctx.fillText(text1, size / 2, c.height * 0.4);
+  ctx.font = `bold ${size * 0.1}px Georgia`;
+  ctx.fillStyle = '#5a2a0a';
+  ctx.fillText(text2, size / 2, c.height * 0.65);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
-  peer.on('open', id => {
-    clearTimeout(timeout);
-    const display = showDisplayCode(id);
-    const el = document.getElementById('host-code');
-    el.textContent = display;
-    el.onclick = () => {
-      navigator.clipboard.writeText(display).then(() => {
-        const original = el.textContent;
-        el.textContent = '✓ ΑΝΤΙΓΡΑΦΗΚΕ';
-        setTimeout(() => el.textContent = original, 1200);
-      });
-    };
-    console.log('[host] peer open, id=', id);
+// =========================================================
+// THE BOX
+// =========================================================
+const box = new THREE.Group();
+scene.add(box);
+
+const BOX_W = 4, BOX_H = 2.4, BOX_D = 3;
+
+// Wood texture for body
+const woodTex = textTexture('', 512, { bg: '#5a3a1a', color: '#3a2a18' });
+const woodMatTex = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.78, metalness: 0.06 });
+
+// Body (main mass minus top lid which is separate)
+const bodyHeight = BOX_H * 0.7;
+const bodyGeo = new THREE.BoxGeometry(BOX_W, bodyHeight, BOX_D);
+const body = new THREE.Mesh(bodyGeo, woodMatTex);
+body.position.y = bodyHeight / 2;
+body.castShadow = true;
+body.receiveShadow = true;
+box.add(body);
+
+// Top lid (slides forward to open after stage 1)
+const lid = new THREE.Group();
+lid.position.y = bodyHeight;
+box.add(lid);
+
+const lidThickness = BOX_H * 0.18;
+const lidMain = new THREE.Mesh(new THREE.BoxGeometry(BOX_W, lidThickness, BOX_D), woodMatTex);
+lidMain.position.y = lidThickness / 2;
+lidMain.castShadow = true;
+lid.add(lidMain);
+
+// Hint plate on top of lid
+const hintPlate = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.8, 0.9),
+  new THREE.MeshStandardMaterial({ map: hintPlateTexture(), roughness: 0.6, metalness: 0.3 })
+);
+hintPlate.rotation.x = -Math.PI / 2;
+hintPlate.position.set(0, lidThickness + 0.001, 0);
+lid.add(hintPlate);
+
+// Hint plate frame (brass border)
+function brassFrame(w, h, depth = 0.04, thick = 0.06) {
+  const grp = new THREE.Group();
+  const horiz = new THREE.BoxGeometry(w + thick * 2, thick, depth);
+  const vert = new THREE.BoxGeometry(thick, h + thick * 2, depth);
+  const top = new THREE.Mesh(horiz, brass); top.position.y = h / 2 + thick / 2; grp.add(top);
+  const bot = new THREE.Mesh(horiz, brass); bot.position.y = -h / 2 - thick / 2; grp.add(bot);
+  const lf = new THREE.Mesh(vert, brass); lf.position.x = -w / 2 - thick / 2; grp.add(lf);
+  const rt = new THREE.Mesh(vert, brass); rt.position.x = w / 2 + thick / 2; grp.add(rt);
+  grp.children.forEach(m => m.castShadow = true);
+  return grp;
+}
+const hintFrame = brassFrame(1.8, 0.9, 0.025, 0.05);
+hintFrame.rotation.x = -Math.PI / 2;
+hintFrame.position.set(0, lidThickness + 0.005, 0);
+lid.add(hintFrame);
+
+// Top compartment (revealed when lid slides)
+const compartmentGroup = new THREE.Group();
+compartmentGroup.position.y = bodyHeight;
+box.add(compartmentGroup);
+
+// Inside compartment: paper note + dial assembly base
+const compartmentFloor = new THREE.Mesh(
+  new THREE.BoxGeometry(BOX_W * 0.95, 0.05, BOX_D * 0.95),
+  new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.9 })
+);
+compartmentFloor.position.y = -bodyHeight * 0.2;
+compartmentFloor.receiveShadow = true;
+compartmentGroup.add(compartmentFloor);
+
+// Paper note (showing dial combination)
+const paperMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.0, 0.7),
+  new THREE.MeshStandardMaterial({
+    map: paperTexture('Συνδυασμός:', DIAL_SOLUTION.join(' — ')),
+    roughness: 0.95,
+    metalness: 0,
+    side: THREE.DoubleSide
+  })
+);
+paperMesh.rotation.x = -Math.PI / 2 + 0.05;
+paperMesh.rotation.z = 0.08;
+paperMesh.position.set(-1.0, -bodyHeight * 0.2 + 0.03, 0.5);
+compartmentGroup.add(paperMesh);
+
+// Dial assembly (inside compartment, only visible/usable after stage 1)
+const dialAssembly = new THREE.Group();
+dialAssembly.position.set(0.5, -bodyHeight * 0.2 + 0.05, 0);
+compartmentGroup.add(dialAssembly);
+
+const dialBase = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.85, 0.85, 0.1, 32),
+  brassDark
+);
+dialBase.castShadow = true;
+dialBase.receiveShadow = true;
+dialAssembly.add(dialBase);
+
+const dial = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.75, 0.75, 0.08, 64),
+  new THREE.MeshStandardMaterial({ map: dialTexture(), roughness: 0.4, metalness: 0.7 })
+);
+dial.position.y = 0.08;
+dial.castShadow = true;
+dial.userData.interactive = true;
+dial.userData.type = 'dial';
+dialAssembly.add(dial);
+
+// Pointer indicator (fixed, points to current number)
+const pointer = new THREE.Mesh(
+  new THREE.ConeGeometry(0.06, 0.18, 4),
+  new THREE.MeshStandardMaterial({ color: 0xff4444, roughness: 0.3, metalness: 0.5, emissive: 0xaa0000, emissiveIntensity: 0.4 })
+);
+pointer.rotation.x = Math.PI;
+pointer.position.set(0, 0.18, -0.78);
+dialAssembly.add(pointer);
+
+// Submit lever (small brass lever next to dial — click to register number)
+const submitLever = new THREE.Group();
+submitLever.position.set(0, 0.05, 0.95);
+dialAssembly.add(submitLever);
+
+const submitBase = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 16), brassDark);
+submitLever.add(submitBase);
+const submitArm = new THREE.Group();
+const submitArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 12), brass);
+submitArmMesh.position.y = 0.15;
+submitArm.add(submitArmMesh);
+const submitKnob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), redKnob);
+submitKnob.position.y = 0.3;
+submitKnob.castShadow = true;
+submitKnob.userData.interactive = true;
+submitKnob.userData.type = 'submit';
+submitArm.add(submitKnob);
+submitLever.add(submitArm);
+
+// Display showing how many dial entries submitted (3 LEDs)
+const submitLeds = [];
+for (let i = 0; i < 3; i++) {
+  const led = new THREE.Mesh(
+    new THREE.SphereGeometry(0.05, 12, 10),
+    new THREE.MeshStandardMaterial({ color: 0x442200, emissive: 0x000000, roughness: 0.4 })
+  );
+  led.position.set(-0.2 + i * 0.2, 0.1, 0.95);
+  dialAssembly.add(led);
+  submitLeds.push(led);
+}
+
+// Hide compartment contents initially
+compartmentGroup.visible = false;
+
+// =========================================================
+// LEVERS (Stage 1)
+// =========================================================
+const levers = [];
+
+function makeLever(x) {
+  const g = new THREE.Group();
+
+  const baseMount = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.5, 0.15),
+    brassDark
+  );
+  baseMount.castShadow = true;
+  baseMount.receiveShadow = true;
+  g.add(baseMount);
+
+  const pivotGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 16);
+  pivotGeo.rotateZ(Math.PI / 2);
+  const pivot = new THREE.Mesh(pivotGeo, brass);
+  pivot.castShadow = true;
+  g.add(pivot);
+
+  // Arm — pivots around X axis
+  const armGroup = new THREE.Group();
+  const armMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.05, 0.7, 12),
+    brass
+  );
+  armMesh.position.y = 0.35;
+  armMesh.castShadow = true;
+  armGroup.add(armMesh);
+
+  const handle = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 24, 18),
+    new THREE.MeshStandardMaterial({ color: 0xaa3322, roughness: 0.4, metalness: 0.3, emissive: 0x110000 })
+  );
+  handle.position.y = 0.72;
+  handle.castShadow = true;
+  handle.userData.interactive = true;
+  handle.userData.type = 'lever';
+  armGroup.add(handle);
+
+  g.add(armGroup);
+  g.position.set(x, bodyHeight * 0.55, BOX_D / 2 + 0.05);
+  g.userData.armGroup = armGroup;
+
+  return g;
+}
+
+const leverXs = [-1.1, 0, 1.1];
+leverXs.forEach((x, i) => {
+  const lever = makeLever(x);
+  lever.userData.index = i;
+  // Find handle inside
+  lever.traverse(c => {
+    if (c.userData.interactive) c.userData.leverIndex = i;
   });
-  peer.on('connection', c => {
-    console.log('[host] incoming connection from', c.peer);
-    conn = c;
-    isHost = true;
-    role = 'ΑΛΦΑ';
-    c.on('open', () => {
-      console.log('[host] data channel open');
-      startGame();
-      send({ type: 'init', partnerRole: 'ΒΗΤΑ' });
-    });
-    c.on('data', handleData);
-    c.on('close', () => addMessage('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
-    c.on('error', e => console.error('[host] conn error', e));
+  setLeverAngle(lever, 1, false); // start at middle (up)
+  box.add(lever);
+  levers.push(lever);
+});
+
+function setLeverAngle(lever, position, animate = true) {
+  // position 0=back (lever leans away from player), 1=up, 2=forward (toward player)
+  const targetRot = position === 0 ? -Math.PI / 3 : position === 1 ? 0 : Math.PI / 3;
+  const armGroup = lever.userData.armGroup;
+  if (!animate) {
+    armGroup.rotation.x = targetRot;
+    return;
+  }
+  tween(armGroup.rotation, 'x', targetRot, 350, easeOutBack);
+}
+
+// Roman numerals above each lever
+['I', 'II', 'III'].forEach((numeral, i) => {
+  const plateMat = new THREE.MeshStandardMaterial({
+    map: textTexture(numeral, 128, { bg: '#3a2a18', color: '#d4af6a', fontSize: 90 }),
+    roughness: 0.6, metalness: 0.3
   });
-  peer.on('disconnected', () => {
-    console.warn('[host] disconnected from broker, reconnecting...');
-    if (peer && !peer.destroyed) peer.reconnect();
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), plateMat);
+  plate.position.set(leverXs[i], bodyHeight * 0.9, BOX_D / 2 + 0.01);
+  box.add(plate);
+});
+
+// =========================================================
+// COLOR BUTTONS (Stage 3)
+// =========================================================
+const buttonsGroup = new THREE.Group();
+buttonsGroup.position.set(0, bodyHeight * 0.35, -BOX_D / 2 - 0.05); // back face
+buttonsGroup.rotation.y = Math.PI;
+box.add(buttonsGroup);
+
+const colorButtons = [];
+for (let i = 0; i < BUTTON_COUNT; i++) {
+  const colorHex = BUTTON_COLORS[i];
+  const b = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.1, 24),
+    new THREE.MeshStandardMaterial({
+      color: colorHex,
+      emissive: colorHex,
+      emissiveIntensity: 0.15,
+      roughness: 0.3,
+      metalness: 0.2
+    })
+  );
+  b.rotation.x = Math.PI / 2;
+  b.position.set(-0.9 + i * 0.6, 0.3, 0.05);
+  b.castShadow = true;
+  b.userData.interactive = true;
+  b.userData.type = 'button';
+  b.userData.index = i;
+  b.userData.originalEmissive = 0.15;
+  buttonsGroup.add(b);
+  colorButtons.push(b);
+}
+
+// Start button for Simon sequence
+const startBtn = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.18, 0.18, 0.12, 32),
+  new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x888888, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0.4 })
+);
+startBtn.rotation.x = Math.PI / 2;
+startBtn.position.set(0, -0.3, 0.05);
+startBtn.castShadow = true;
+startBtn.userData.interactive = true;
+startBtn.userData.type = 'startBtn';
+buttonsGroup.add(startBtn);
+
+// Buttons hidden initially
+buttonsGroup.visible = false;
+
+// "I/II/III" labels above buttons (the order indicator with color hint mapping)
+const buttonsBackPlate = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.6, 1.2),
+  new THREE.MeshStandardMaterial({ map: textTexture('●●●●●', 512, { bg: '#1a0e05', color: '#3a2a18', fontSize: 80 }), roughness: 0.7 })
+);
+buttonsBackPlate.position.set(0, 0.05, 0);
+buttonsGroup.add(buttonsBackPlate);
+
+// =========================================================
+// DECORATIVE BRASS DETAILS
+// =========================================================
+// Corner braces on body
+function cornerBrace(x, y, z) {
+  const g = new THREE.Group();
+  const horiz = new THREE.BoxGeometry(0.35, 0.06, 0.06);
+  const vert = new THREE.BoxGeometry(0.06, 0.06, 0.35);
+  const upDown = new THREE.BoxGeometry(0.06, 0.35, 0.06);
+  const h = new THREE.Mesh(horiz, brass); h.castShadow = true; g.add(h);
+  const v = new THREE.Mesh(vert, brass); v.castShadow = true; g.add(v);
+  const u = new THREE.Mesh(upDown, brass); u.castShadow = true; g.add(u);
+  g.position.set(x, y, z);
+  return g;
+}
+
+// Place corner braces at top and bottom corners
+const cornerSigns = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+cornerSigns.forEach(([sx, sz]) => {
+  const x = sx * (BOX_W / 2 - 0.03);
+  const z = sz * (BOX_D / 2 - 0.03);
+  // Mirror geometry by adjusting positions
+  const cb1 = cornerBrace(x, 0.18, z);
+  const cb2 = cornerBrace(x, bodyHeight - 0.18, z);
+  // Flip the cross dimensions to lay along inside corner
+  if (sx > 0) { cb1.scale.x = -1; cb2.scale.x = -1; }
+  if (sz > 0) { cb1.scale.z = -1; cb2.scale.z = -1; }
+  box.add(cb1, cb2);
+});
+
+// Front panel — decorative rivets around levers
+function rivet(x, y, z) {
+  const r = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), brass);
+  r.position.set(x, y, z);
+  r.castShadow = true;
+  return r;
+}
+for (let i = 0; i < 8; i++) {
+  const x = -BOX_W / 2 + 0.18 + (BOX_W - 0.36) * (i / 7);
+  box.add(rivet(x, 0.18, BOX_D / 2 + 0.01));
+  box.add(rivet(x, bodyHeight - 0.18, BOX_D / 2 + 0.01));
+}
+
+// =========================================================
+// ANIMATION / TWEEN
+// =========================================================
+const easeOutBack = t => 1 + 2.5 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+const easeInOutCubic = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+
+function tween(obj, prop, target, duration = 500, easing = easeInOutCubic, onComplete) {
+  const start = obj[prop];
+  const startTime = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    const e = easing(t);
+    obj[prop] = start + (target - start) * e;
+    if (t < 1) requestAnimationFrame(step);
+    else if (onComplete) onComplete();
+  }
+  requestAnimationFrame(step);
+}
+
+// =========================================================
+// RAYCAST / INTERACTION
+// =========================================================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredInteractive = null;
+
+function getInteractives() {
+  const arr = [];
+  scene.traverse(obj => {
+    if (obj.userData.interactive && obj.visible && isFamilyVisible(obj)) arr.push(obj);
   });
-  peer.on('error', err => {
-    console.error('[host] peer error', err);
-    clearTimeout(timeout);
-    if (err.type === 'unavailable-id') {
-      document.getElementById('host-code').textContent = '✗ ID σε χρήση — refresh';
-    } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
-      document.getElementById('host-code').textContent = '✗ Network — δοκίμασε ξανά';
-    } else {
-      document.getElementById('host-code').textContent = '✗ ' + err.type;
+  return arr;
+}
+function isFamilyVisible(obj) {
+  let o = obj;
+  while (o) { if (!o.visible) return false; o = o.parent; }
+  return true;
+}
+
+function pickAt(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(getInteractives(), false);
+  return hits[0] || null;
+}
+
+let dragging = false;
+let dragStart = null;
+let dialDragStart = null;
+let didDrag = false;
+
+canvas.addEventListener('pointerdown', e => {
+  dragStart = { x: e.clientX, y: e.clientY };
+  didDrag = false;
+  const hit = pickAt(e.clientX, e.clientY);
+  if (hit && hit.object.userData.type === 'dial') {
+    dialDragStart = { angle: Math.atan2(mouse.y, mouse.x), dialAngle: dial.rotation.y };
+    controls.enabled = false;
+    dragging = true;
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  if (dragStart) {
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) didDrag = true;
+  }
+  if (dragging && dialDragStart) {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    const angleNow = Math.atan2(mouse.y, mouse.x);
+    let delta = angleNow - dialDragStart.angle;
+    dial.rotation.y = dialDragStart.dialAngle + delta * 1.5;
+    updateDialReading();
+  }
+
+  // Hover state for cursor
+  const hit = pickAt(e.clientX, e.clientY);
+  if (hit) {
+    canvas.classList.add('pointing');
+    if (hoveredInteractive !== hit.object) {
+      if (hoveredInteractive) hoverOut(hoveredInteractive);
+      hoveredInteractive = hit.object;
+      hoverIn(hit.object);
     }
-  });
-}
-
-function joinGame(rawCode) {
-  // Accept code with or without "cl" prefix
-  let code = rawCode.toLowerCase().trim();
-  code = code.replace(/^cl[-_]?/, '');
-  code = 'cl' + code;
-  console.log('[guest] joining', code);
-
-  document.getElementById('join-status').textContent = '⏳ Σύνδεση στον broker...';
-  peer = new Peer(PEER_CONFIG);
-
-  const timeout = setTimeout(() => {
-    document.getElementById('join-status').textContent = '✗ TIMEOUT — έλεγξε κωδικό/internet';
-  }, 20000);
-
-  peer.on('open', myId => {
-    console.log('[guest] peer open, id=', myId);
-    document.getElementById('join-status').textContent = '⏳ Σύνδεση σε δωμάτιο...';
-    conn = peer.connect(code, { reliable: true });
-    conn.on('open', () => {
-      clearTimeout(timeout);
-      console.log('[guest] data channel open');
-      document.getElementById('join-status').textContent = '✓ Συνδέθηκε.';
-    });
-    conn.on('data', handleData);
-    conn.on('close', () => addMessage('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
-    conn.on('error', e => {
-      console.error('[guest] conn error', e);
-      document.getElementById('join-status').textContent = '✗ Σφάλμα: ' + (e.message || e.type);
-    });
-  });
-  peer.on('disconnected', () => {
-    console.warn('[guest] disconnected from broker');
-    if (peer && !peer.destroyed) peer.reconnect();
-  });
-  peer.on('error', err => {
-    console.error('[guest] peer error', err);
-    clearTimeout(timeout);
-    let msg = err.message || err.type;
-    if (err.type === 'peer-unavailable') msg = 'Δεν βρέθηκε δωμάτιο με αυτόν τον κωδικό.';
-    else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') msg = 'Πρόβλημα δικτύου. Δοκίμασε ξανά.';
-    document.getElementById('join-status').textContent = '✗ ' + msg;
-  });
-}
-
-function send(data) {
-  if (conn && conn.open) conn.send(data);
-}
-
-function handleData(data) {
-  switch (data.type) {
-    case 'init':
-      role = data.partnerRole;
-      isHost = false;
-      startGame();
-      break;
-    case 'chat':
-      addMessage(data.text, 'them');
-      break;
-    case 'puzzle-action':
-      handlePuzzleAction(data);
-      break;
-    case 'next-puzzle':
-      loadPuzzle(data.num);
-      break;
-  }
-}
-
-// ============ UI ============
-function addMessage(text, who) {
-  const msgs = document.getElementById('messages');
-  const div = document.createElement('div');
-  div.className = 'msg-' + who;
-  const prefix = who === 'me' ? 'ΕΣΥ' : who === 'them' ? 'ΣΥΝΕΡΓΑΤΗΣ' : '◆';
-  div.textContent = `[${prefix}] ${text}`;
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-// ============ GAME STATE ============
-let currentPuzzle = 1;
-let wireState = { 1: null, 2: null, 3: null, 4: null };
-let digitState = { d1: '', d2: '', d3: '', d4: '' };
-let selectedWire = null;
-
-function startGame() {
-  document.getElementById('lobby').style.display = 'none';
-  document.getElementById('game').style.display = 'flex';
-  document.getElementById('role-display').textContent = role;
-  addMessage('Σύνδεση επιτυχής. Καλή τύχη, ' + role + '.', 'sys');
-  loadPuzzle(1);
-}
-
-function loadPuzzle(num) {
-  currentPuzzle = num;
-  document.getElementById('puzzle-num').textContent = Math.min(num, 3);
-  const c = document.getElementById('puzzle-container');
-  if (num === 1) c.innerHTML = renderPuzzle1();
-  else if (num === 2) c.innerHTML = renderPuzzle2();
-  else if (num === 3) c.innerHTML = renderPuzzle3();
-  else if (num === 4) c.innerHTML = renderVictory();
-  attachPuzzleHandlers(num);
-}
-
-// ============ PUZZLE 1: WIRES ============
-// ΑΛΦΑ βλέπει το διάγραμμα. ΒΗΤΑ τοποθετεί καλώδια.
-const WIRE_SOLUTION = { 1: 'ΚΟΚΚΙΝΟ', 2: 'ΚΙΤΡΙΝΟ', 3: 'ΜΠΛΕ', 4: 'ΠΡΑΣΙΝΟ' };
-const WIRE_COLORS = {
-  'ΚΟΚΚΙΝΟ': '#ff4444',
-  'ΜΠΛΕ': '#4488ff',
-  'ΠΡΑΣΙΝΟ': '#44ff44',
-  'ΚΙΤΡΙΝΟ': '#ffdd44'
-};
-
-function renderPuzzle1() {
-  if (role === 'ΑΛΦΑ') {
-    return `
-      <h2>ΓΡΙΦΟΣ 1 — ΠΙΝΑΚΑΣ ΚΑΛΩΔΙΩΝ</h2>
-      <p>Στον τοίχο σου υπάρχει το σχηματικό διάγραμμα.<br>
-      Πες στον <strong style="color:#44ccff">ΒΗΤΑ</strong> ποιο χρώμα καλωδίου πάει σε ποια θέση.</p>
-      <div class="your-view">
-        <strong>⚡ ΔΙΑΓΡΑΜΜΑ:</strong>
-        <ul style="list-style:none; padding:10px 0;">
-          ${Object.entries(WIRE_SOLUTION).map(([slot, color]) =>
-            `<li style="margin:10px 0; font-size:1.1em;">› Θέση ${slot} → <span style="color:${WIRE_COLORS[color]}; font-weight:bold; text-shadow:0 0 8px ${WIRE_COLORS[color]};">${color}</span></li>`
-          ).join('')}
-        </ul>
-      </div>
-      <p style="opacity:0.6; text-align:center;" class="blink">⏳ Περιμένεις τον ΒΗΤΑ...</p>
-    `;
   } else {
-    return `
-      <h2>ΓΡΙΦΟΣ 1 — ΠΙΝΑΚΑΣ ΚΑΛΩΔΙΩΝ</h2>
-      <p>Έχεις 4 αποσυνδεδεμένα καλώδια και 4 θέσεις. Ο <strong style="color:#44ccff">ΑΛΦΑ</strong> έχει το διάγραμμα.<br>
-      <em>Επίλεξε καλώδιο, μετά κάνε κλικ σε θέση.</em></p>
-      <div class="wire-grid">
-        ${[1,2,3,4].map(slot => `
-          <div class="wire-slot" data-slot="${slot}">
-            <div style="opacity:0.7;">ΘΕΣΗ</div>
-            <div style="font-size:2em; font-weight:bold;">${slot}</div>
-            <div id="slot-${slot}" style="margin-top:10px; min-height:24px; font-size:0.85em;">—</div>
-          </div>
-        `).join('')}
-      </div>
-      <p style="margin-top:20px;">Διαθέσιμα καλώδια:</p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-        ${Object.keys(WIRE_COLORS).map(c => `
-          <button class="wire-btn" data-color="${c}" style="border-color:${WIRE_COLORS[c]}; color:${WIRE_COLORS[c]};">${c}</button>
-        `).join('')}
-      </div>
-    `;
+    canvas.classList.remove('pointing');
+    if (hoveredInteractive) { hoverOut(hoveredInteractive); hoveredInteractive = null; }
+  }
+});
+
+canvas.addEventListener('pointerup', e => {
+  controls.enabled = true;
+  if (dragging) {
+    dragging = false;
+    dialDragStart = null;
+    // Snap dial to nearest segment
+    snapDial();
+    return;
+  }
+  if (didDrag) { dragStart = null; return; }
+  dragStart = null;
+  const hit = pickAt(e.clientX, e.clientY);
+  if (hit) handleClick(hit.object);
+});
+
+function hoverIn(obj) {
+  if (obj.material && obj.material.emissiveIntensity !== undefined) {
+    obj.userData._origEmissive = obj.material.emissiveIntensity;
+    obj.material.emissiveIntensity = Math.max(0.5, obj.material.emissiveIntensity + 0.4);
+  }
+}
+function hoverOut(obj) {
+  if (obj.material && obj.userData._origEmissive !== undefined) {
+    obj.material.emissiveIntensity = obj.userData._origEmissive;
   }
 }
 
-// ============ PUZZLE 2: SYMBOL CIPHER ============
-// ΒΗΤΑ έχει το κλειδί. ΑΛΦΑ βλέπει την κωδικοποιημένη λέξη και την πληκτρολογεί.
-const SYMBOL_KEY = { '☆': 'Φ', '◊': 'Υ', '♠': 'Γ', '♣': 'Η' };
-const SYMBOL_MESSAGE = '☆◊♠♣';
-const SYMBOL_ANSWER = 'ΦΥΓΗ';
+// =========================================================
+// DIAL LOGIC
+// =========================================================
+function updateDialReading() {
+  // Number under pointer = inverse of dial rotation
+  const seg = ((-dial.rotation.y / (Math.PI * 2)) * DIAL_SEGMENTS) % DIAL_SEGMENTS;
+  state.dialAngle = ((Math.round(seg) % DIAL_SEGMENTS) + DIAL_SEGMENTS) % DIAL_SEGMENTS;
+}
+function snapDial() {
+  const segAngle = (Math.PI * 2) / DIAL_SEGMENTS;
+  const snapped = Math.round(dial.rotation.y / segAngle) * segAngle;
+  tween(dial.rotation, 'y', snapped, 200, easeOutCubic, () => {
+    updateDialReading();
+    beep(440, 0.05, 'triangle', 0.05);
+  });
+}
 
-function renderPuzzle2() {
-  if (role === 'ΑΛΦΑ') {
-    return `
-      <h2>ΓΡΙΦΟΣ 2 — ΚΡΥΠΤΟΓΡΑΦΗΜΑ</h2>
-      <p>Βλέπεις μια χαραγμένη λέξη με παράξενα σύμβολα στον τοίχο.<br>
-      Ο <strong style="color:#44ccff">ΒΗΤΑ</strong> έχει το κλειδί αποκρυπτογράφησης.</p>
-      <div class="your-view" style="text-align:center;">
-        <strong>📜 ΛΕΞΗ ΣΤΟΝ ΤΟΙΧΟ:</strong>
-        <div style="font-size:4em; letter-spacing:0.3em; margin:20px 0; text-shadow:0 0 20px rgba(255,170,0,0.5);">${SYMBOL_MESSAGE}</div>
-      </div>
-      <input id="decode-input" placeholder="ΠΛΗΚΤΡΟΛΟΓΗΣΕ ΤΗ ΛΕΞΗ..." style="text-transform:uppercase; text-align:center; font-size:1.4em; letter-spacing:0.2em;" maxlength="4">
-      <button id="decode-submit" style="width:100%; margin-top:10px;">▶ ΥΠΟΒΟΛΗ</button>
-      <p id="decode-result" style="text-align:center; margin-top:10px; opacity:0.7;"></p>
-    `;
+function submitDialNumber() {
+  if (state.stage !== 2) return;
+  const num = state.dialAngle;
+  const step = state.dialSubmitted.length;
+  state.dialSubmitted.push(num);
+
+  // Light up LED
+  const expected = DIAL_SOLUTION[step];
+  const led = submitLeds[step];
+  if (num === expected) {
+    led.material.color.setHex(0x22ff44);
+    led.material.emissive.setHex(0x118822);
+    led.material.emissiveIntensity = 1;
+    beep(660, 0.15, 'sine', 0.1);
   } else {
-    return `
-      <h2>ΓΡΙΦΟΣ 2 — ΚΡΥΠΤΟΓΡΑΦΗΜΑ</h2>
-      <p>Βρήκες ένα σκισμένο σημειωματάριο με το κλειδί.<br>
-      Πες στον <strong style="color:#44ccff">ΑΛΦΑ</strong> τι σημαίνει κάθε σύμβολο.</p>
-      <div class="your-view">
-        <strong>🔑 ΚΛΕΙΔΙ ΑΠΟΚΡΥΠΤΟΓΡΑΦΗΣΗΣ:</strong>
-        <div class="cipher-key">
-          ${Object.entries(SYMBOL_KEY).map(([sym, letter]) =>
-            `<div><span class="symbol">${sym}</span><div style="margin-top:5px; font-size:1.3em;">= <strong style="color:#ffcc44;">${letter}</strong></div></div>`
-          ).join('')}
-        </div>
-      </div>
-      <p style="opacity:0.6; text-align:center;" class="blink">⏳ Περιμένεις τον ΑΛΦΑ να εισάγει τη λέξη...</p>
-    `;
+    led.material.color.setHex(0xff2222);
+    led.material.emissive.setHex(0x880000);
+    led.material.emissiveIntensity = 1;
+    buzz();
   }
-}
 
-// ============ PUZZLE 3: FINAL CODE ============
-// 4-ψήφιος. ΑΛΦΑ έχει στοιχεία για d1,d2. ΒΗΤΑ έχει για d3,d4.
-// Πλευρές εξαγώνου=6, εποχές=4, πλοκάμια χταποδιού=8, πόδια ανθρώπου=2 → 6482
-const FINAL_CODE = '6482';
+  // Animate lever press
+  tween(submitArm.rotation, 'x', 0.4, 120, easeOutCubic, () => {
+    tween(submitArm.rotation, 'x', 0, 200, easeOutBack);
+  });
 
-function renderPuzzle3() {
-  const clues = role === 'ΑΛΦΑ'
-    ? '<p>› Ψηφίο 1: <em>Πλευρές εξαγώνου</em></p><p>› Ψηφίο 2: <em>Εποχές του χρόνου</em></p>'
-    : '<p>› Ψηφίο 3: <em>Πλοκάμια χταποδιού</em></p><p>› Ψηφίο 4: <em>Πόδια ανθρώπου</em></p>';
-  const editable = role === 'ΑΛΦΑ' ? ['d1','d2'] : ['d3','d4'];
-  return `
-    <h2>ΓΡΙΦΟΣ 3 — ΤΕΛΙΚΟΣ ΚΩΔΙΚΟΣ</h2>
-    <p>Η εξώπορτα έχει 4-ψήφιο κωδικό. Έχεις στοιχεία για 2 ψηφία· ο συνεργάτης σου για τα άλλα 2.<br>
-    <strong>Συμπληρώστε ταυτόχρονα — όταν είναι σωστός ο κωδικός, ξεκλειδώνει.</strong></p>
-    <div class="your-view">
-      <strong>🔍 ΣΤΟΙΧΕΙΑ ΣΟΥ:</strong>
-      ${clues}
-    </div>
-    <div class="digit-input">
-      ${['d1','d2','d3','d4'].map(id => {
-        const isMine = editable.includes(id);
-        return `<input class="digit" id="${id}" maxlength="1" type="text" inputmode="numeric" ${isMine ? '' : 'readonly'}>`;
-      }).join('')}
-    </div>
-    <p id="lock-status" style="text-align:center; font-size:1.2em; min-height:1.5em;"></p>
-  `;
-}
-
-function renderVictory() {
-  return `
-    <div class="victory">
-      <h1>⚡ ΔΡΑΠΕΤΕΥΣΑΤΕ ⚡</h1>
-      <p style="margin-top:30px; font-size:1.2em; opacity:0.9;">Λύσατε όλους τους γρίφους.<br>Το εργαστήριο μένει πίσω.</p>
-      <p style="margin-top:40px; font-size:0.9em; opacity:0.5;">Πατήστε F5 για νέο παιχνίδι.</p>
-    </div>
-  `;
-}
-
-// ============ HANDLERS ============
-function attachPuzzleHandlers(num) {
-  if (num === 1 && role === 'ΒΗΤΑ') {
-    document.querySelectorAll('.wire-btn').forEach(btn => {
-      btn.onclick = () => {
-        selectedWire = btn.dataset.color;
-        document.querySelectorAll('.wire-btn').forEach(b => {
-          b.style.background = 'transparent';
-          b.style.color = WIRE_COLORS[b.dataset.color];
-        });
-        btn.style.background = WIRE_COLORS[selectedWire];
-        btn.style.color = '#0a0e1a';
-      };
-    });
-    document.querySelectorAll('.wire-slot').forEach(slot => {
-      slot.onclick = () => {
-        if (!selectedWire) {
-          addMessage('Επίλεξε πρώτα ένα καλώδιο.', 'sys');
-          return;
-        }
-        const slotNum = slot.dataset.slot;
-        wireState[slotNum] = selectedWire;
-        const slotEl = document.getElementById('slot-' + slotNum);
-        slotEl.innerHTML = `<span style="color:${WIRE_COLORS[selectedWire]}; font-weight:bold; text-shadow:0 0 8px ${WIRE_COLORS[selectedWire]};">${selectedWire}</span>`;
-        slot.classList.add('filled');
-        slot.style.borderColor = WIRE_COLORS[selectedWire];
-        send({ type: 'puzzle-action', puzzle: 1, slot: slotNum, color: selectedWire });
-        checkPuzzle1();
-      };
-    });
-  }
-  if (num === 2 && role === 'ΑΛΦΑ') {
-    const input = document.getElementById('decode-input');
-    const submit = () => {
-      const val = input.value.toUpperCase().trim();
-      if (val === SYMBOL_ANSWER) {
-        document.getElementById('decode-result').innerHTML = '<span style="color:#ffaa00;">✓ ΣΩΣΤΑ! Η πόρτα ανοίγει...</span>';
-        send({ type: 'puzzle-action', puzzle: 2, solved: true });
-        setTimeout(() => nextPuzzle(), 1200);
+  // Check completion
+  if (state.dialSubmitted.length === 3) {
+    const correct = state.dialSubmitted.every((v, i) => v === DIAL_SOLUTION[i]);
+    setTimeout(() => {
+      if (correct) {
+        completeStage2();
       } else {
-        document.getElementById('decode-result').innerHTML = '<span style="color:#ff4444;">✗ Λάθος. Δοκίμασε ξανά.</span>';
+        // Reset
+        state.dialSubmitted = [];
+        submitLeds.forEach(l => {
+          l.material.color.setHex(0x442200);
+          l.material.emissive.setHex(0x000000);
+          l.material.emissiveIntensity = 0;
+        });
+        setInstruction('Λάθος συνδυασμός. Δοκίμασε ξανά.');
+        buzz();
       }
-    };
-    document.getElementById('decode-submit').onclick = submit;
-    input.addEventListener('keypress', e => { if (e.key === 'Enter') submit(); });
-    input.focus();
-  }
-  if (num === 3) {
-    document.querySelectorAll('.digit').forEach(inp => {
-      if (!inp.readOnly) {
-        inp.oninput = e => {
-          const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 1);
-          e.target.value = v;
-          digitState[inp.id] = v;
-          send({ type: 'puzzle-action', puzzle: 3, field: inp.id, value: v });
-          checkPuzzle3();
-        };
-      }
-    });
-    const firstEditable = document.querySelector('.digit:not([readonly])');
-    if (firstEditable) firstEditable.focus();
+    }, 800);
   }
 }
 
-function handlePuzzleAction(data) {
-  if (data.puzzle === 1) {
-    if (role === 'ΑΛΦΑ') {
-      addMessage(`ΒΗΤΑ → ${data.color} στη θέση ${data.slot}`, 'sys');
-      wireState[data.slot] = data.color;
-      checkPuzzle1();
-    }
-  }
-  if (data.puzzle === 2 && data.solved) {
-    addMessage('Ο ΑΛΦΑ έλυσε το κρυπτογράφημα!', 'sys');
-    setTimeout(() => { if (currentPuzzle === 2) loadPuzzle(3); }, 1200);
-  }
-  if (data.puzzle === 3) {
-    digitState[data.field] = data.value;
-    const el = document.getElementById(data.field);
-    if (el) el.value = data.value;
-    checkPuzzle3();
-  }
-}
-
-function checkPuzzle1() {
-  const ok = Object.entries(WIRE_SOLUTION).every(([slot, color]) => wireState[slot] === color);
-  if (ok && currentPuzzle === 1) {
-    addMessage('✓ Καλώδια σωστά! Η πόρτα ξεκλειδώνει...', 'sys');
-    setTimeout(() => nextPuzzle(), 1500);
+// =========================================================
+// CLICK HANDLER
+// =========================================================
+function handleClick(obj) {
+  const t = obj.userData.type;
+  if (t === 'lever' && state.stage === 1) {
+    const idx = obj.userData.leverIndex;
+    state.levers[idx] = (state.levers[idx] + 1) % 3;
+    setLeverAngle(levers[idx], state.levers[idx]);
+    clunk();
+    checkStage1();
+  } else if (t === 'dial' && state.stage === 2) {
+    // ignored — handled by drag
+  } else if (t === 'submit' && state.stage === 2) {
+    submitDialNumber();
+  } else if (t === 'startBtn' && state.stage === 3) {
+    if (!state.buttonShowing) playButtonSequence();
+  } else if (t === 'button' && state.stage === 3) {
+    if (state.buttonShowing) return;
+    pressButton(obj.userData.index);
   }
 }
 
-function checkPuzzle3() {
-  const code = (digitState.d1 || '_') + (digitState.d2 || '_') + (digitState.d3 || '_') + (digitState.d4 || '_');
-  const status = document.getElementById('lock-status');
-  if (!status) return;
-  if (code === FINAL_CODE) {
-    status.innerHTML = '<span style="color:#ffaa00;">✓ ΞΕΚΛΕΙΔΩΘΗΚΕ ✓</span>';
-    setTimeout(() => { if (currentPuzzle === 3) nextPuzzle(); }, 1500);
-  } else if (!code.includes('_')) {
-    status.innerHTML = `<span style="color:#ff4444;">[ ${code.split('').join(' ')} ] — ΛΑΘΟΣ</span>`;
-  } else {
-    status.innerHTML = `<span style="opacity:0.6;">[ ${code.split('').join(' ')} ]</span>`;
+// =========================================================
+// STAGE 1: LEVERS
+// =========================================================
+function checkStage1() {
+  if (state.stage !== 1) return;
+  if (state.levers.every((v, i) => v === LEVER_TARGET[i])) {
+    setTimeout(completeStage1, 600);
+  }
+}
+function completeStage1() {
+  state.stage = 2;
+  document.getElementById('stage-num').textContent = '2';
+  setInstruction('Το καπάκι ανοίγει. Παρατήρησε μέσα στο κουτί.');
+  chime();
+  // Slide lid forward and tilt open
+  compartmentGroup.visible = true;
+  tween(lid.position, 'z', BOX_D * 0.4, 1400, easeInOutCubic);
+  tween(lid.rotation, 'x', -0.5, 1400, easeInOutCubic, () => {
+    setInstruction('Σύρε το καντράν για περιστροφή. Πάτα τον κόκκινο μοχλό για κάθε αριθμό.');
+    innerLight.intensity = 6;
+    // Move camera to look inside
+    flyCameraTo(new THREE.Vector3(0, 5.5, 4), new THREE.Vector3(0, bodyHeight, 0));
+  });
+}
+
+// =========================================================
+// STAGE 2: DIAL
+// =========================================================
+function completeStage2() {
+  state.stage = 3;
+  document.getElementById('stage-num').textContent = '3';
+  chime();
+  setInstruction('Τελευταίο στάδιο: γύρνα το κουτί. Στο πίσω μέρος βρίσκονται τα κουμπιά.');
+  // Reveal buttons on back face — animate compartment closing slightly
+  buttonsGroup.visible = true;
+  // Move camera around to the back
+  setTimeout(() => {
+    flyCameraTo(new THREE.Vector3(0, 3, -7), new THREE.Vector3(0, bodyHeight * 0.5, 0));
+    setInstruction('Πάτα τον ΛΕΥΚΟ μοχλό για την ακολουθία. Μετά πάτα τα χρωματιστά κουμπιά στη σωστή σειρά.');
+  }, 1500);
+}
+
+// =========================================================
+// STAGE 3: BUTTONS (SIMON)
+// =========================================================
+async function playButtonSequence() {
+  state.buttonShowing = true;
+  state.buttonInput = [];
+  // Flash start button
+  flashEmissive(startBtn, 1.2, 200);
+  await sleep(600);
+  for (const i of BUTTON_SEQUENCE) {
+    await flashColorButton(i);
+    await sleep(180);
+  }
+  state.buttonShowing = false;
+  setInstruction('Επανάλαβε την ακολουθία πατώντας τα κουμπιά.');
+}
+
+function flashColorButton(idx) {
+  return new Promise(resolve => {
+    const b = colorButtons[idx];
+    const origE = b.userData.originalEmissive;
+    b.material.emissiveIntensity = 1.5;
+    // Move button slightly out as press feedback
+    tween(b.position, 'z', 0.18, 120, easeOutCubic);
+    beep(220 + idx * 130, 0.25, 'sine', 0.1);
+    setTimeout(() => {
+      b.material.emissiveIntensity = origE;
+      tween(b.position, 'z', 0.05, 200, easeOutBack);
+      resolve();
+    }, 380);
+  });
+}
+
+function pressButton(idx) {
+  const b = colorButtons[idx];
+  // Visual press
+  flashEmissive(b, 1.5, 200);
+  tween(b.position, 'z', -0.05, 80, easeOutCubic, () => tween(b.position, 'z', 0.05, 180, easeOutBack));
+  beep(220 + idx * 130, 0.2, 'sine', 0.1);
+  state.buttonInput.push(idx);
+  const i = state.buttonInput.length - 1;
+  if (BUTTON_SEQUENCE[i] !== idx) {
+    // Fail
+    setTimeout(() => {
+      buzz();
+      state.buttonInput = [];
+      setInstruction('Λάθος. Πάτα τον λευκό μοχλό για νέα ακολουθία.');
+    }, 250);
+    return;
+  }
+  if (state.buttonInput.length === BUTTON_SEQUENCE.length) {
+    setTimeout(victory, 400);
   }
 }
 
-function nextPuzzle() {
-  const next = currentPuzzle < 3 ? currentPuzzle + 1 : 4;
-  if (next === currentPuzzle) return;
-  loadPuzzle(next);
-  send({ type: 'next-puzzle', num: next });
+function flashEmissive(mesh, intensity, duration) {
+  const orig = mesh.material.emissiveIntensity;
+  mesh.material.emissiveIntensity = intensity;
+  setTimeout(() => mesh.material.emissiveIntensity = orig, duration);
 }
 
-// ============ LOBBY EVENTS ============
-document.getElementById('host-btn').onclick = () => {
-  document.getElementById('lobby-buttons').style.display = 'none';
-  document.getElementById('host-section').style.display = 'block';
-  hostGame();
-};
-document.getElementById('join-btn').onclick = () => {
-  document.getElementById('lobby-buttons').style.display = 'none';
-  document.getElementById('join-section').style.display = 'block';
-  document.getElementById('join-code').focus();
-};
-document.getElementById('connect-btn').onclick = () => {
-  const code = document.getElementById('join-code').value.trim().toUpperCase();
-  if (!code) return;
-  document.getElementById('join-status').textContent = '⏳ Σύνδεση...';
-  joinGame(code);
-};
-document.getElementById('join-code').addEventListener('keypress', e => {
-  if (e.key === 'Enter') document.getElementById('connect-btn').click();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// =========================================================
+// VICTORY
+// =========================================================
+function victory() {
+  state.solved = true;
+  chime();
+  setTimeout(chime, 300);
+  setTimeout(chime, 600);
+  // Open entire box: lid flies off, golden glow
+  tween(lid.position, 'y', bodyHeight + 2.5, 2000, easeOutCubic);
+  tween(lid.rotation, 'x', -Math.PI * 0.3, 2000, easeOutCubic);
+  tween(lid.rotation, 'z', 0.3, 2000, easeOutCubic);
+  innerLight.intensity = 25;
+  innerLight.color.setHex(0xffd684);
+  tween(innerLight, 'distance', 12, 2000, easeOutCubic);
+
+  flyCameraTo(new THREE.Vector3(0, 5, 7), new THREE.Vector3(0, bodyHeight + 0.5, 0));
+
+  document.getElementById('instruction').style.display = 'none';
+  setTimeout(() => {
+    document.getElementById('victory').classList.add('show');
+  }, 1500);
+}
+
+// =========================================================
+// CAMERA FLY-TO
+// =========================================================
+function flyCameraTo(targetPos, targetLook, duration = 1500) {
+  const startPos = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const startTime = performance.now();
+  controls.enabled = false;
+  function step(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    const e = easeInOutCubic(t);
+    camera.position.lerpVectors(startPos, targetPos, e);
+    controls.target.lerpVectors(startTarget, targetLook, e);
+    if (t < 1) requestAnimationFrame(step);
+    else controls.enabled = true;
+  }
+  requestAnimationFrame(step);
+}
+
+// =========================================================
+// UI
+// =========================================================
+function setInstruction(text) {
+  document.getElementById('instruction').textContent = text;
+}
+
+document.getElementById('hint-btn').addEventListener('click', () => {
+  const p = document.getElementById('hint-popup');
+  const ht = document.getElementById('hint-text');
+  if (p.classList.contains('show')) {
+    p.classList.remove('show');
+    return;
+  }
+  const hints = {
+    1: 'Η πλάκα πάνω στο καπάκι δείχνει την κατεύθυνση κάθε μοχλού: <strong>◀ πίσω</strong>, <strong>▲ πάνω</strong>, <strong>▶ μπροστά</strong>. Πάτα κάθε κόκκινη χειρολαβή για να την αλλάξεις.',
+    2: 'Ο συνδυασμός βρίσκεται γραμμένος στο χαρτί μέσα στο κουτί. Σύρε το καντράν για να γυρίσει, και πάτα τον κόκκινο μοχλό για κάθε αριθμό.',
+    3: 'Πάτα πρώτα το <strong>λευκό</strong> κουμπί για να δεις την ακολουθία. Μετά πάτα τα χρωματιστά κουμπιά στην ίδια σειρά. Λάθος = ξεκινάς από την αρχή.'
+  };
+  ht.innerHTML = hints[state.stage] || '';
+  p.classList.add('show');
+  setTimeout(() => p.classList.remove('show'), 8000);
 });
-document.getElementById('chat-input').addEventListener('keypress', e => {
-  if (e.key === 'Enter') {
-    const text = e.target.value.trim();
-    if (!text) return;
-    addMessage(text, 'me');
-    send({ type: 'chat', text });
-    e.target.value = '';
-  }
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  flyCameraTo(new THREE.Vector3(5, 4, 6.5), new THREE.Vector3(0, 1.2, 0));
 });
+
+document.getElementById('sound-btn').addEventListener('click', e => {
+  state.soundOn = !state.soundOn;
+  e.target.textContent = state.soundOn ? '♪' : '♪̸';
+  if (state.soundOn) beep(660, 0.1);
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('intro').style.display = 'none';
+  // Unlock audio
+  audio();
+  beep(440, 0.05, 'sine', 0.05);
+});
+
+// =========================================================
+// RESIZE
+// =========================================================
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// =========================================================
+// RENDER LOOP
+// =========================================================
+function loop() {
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+loop();
 </script>
 </body>
 </html>
