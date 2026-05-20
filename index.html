@@ -6,1042 +6,261 @@
 <meta name="theme-color" content="#0a0612">
 <title>Chronos — Escape the Loop</title>
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #0a0612;
-    color: #e8d9c0;
-    touch-action: manipulation;
-    overscroll-behavior: none;
-  }
-  input { user-select: text; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #06040c;
+  color: #e8d9c0;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+input, textarea { user-select: text; -webkit-user-select: text; }
 
-  /* ---------- THEMES ---------- */
-  body.past {
-    background: radial-gradient(ellipse at center top, #3a2418 0%, #1a0e08 60%, #0a0604 100%);
-    color: #f0d9a8;
-  }
-  body.future {
-    background: radial-gradient(ellipse at center top, #0a1a2e 0%, #050c1c 60%, #02060f 100%);
-    color: #a8d4ff;
-  }
+body.past  { background: radial-gradient(ellipse at top, #3a2418 0%, #1a0e08 60%, #0a0604 100%); color: #f0d9a8; }
+body.future{ background: radial-gradient(ellipse at top, #0a1a2e 0%, #050c1c 60%, #02060f 100%); color: #b8d4ff; }
 
-  /* ---------- SCREENS ---------- */
-  .screen {
-    position: fixed; inset: 0;
-    display: none;
-    flex-direction: column;
-    padding: env(safe-area-inset-top, 12px) 16px env(safe-area-inset-bottom, 16px);
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-  .screen.active { display: flex; }
+.screen { position: fixed; inset: 0; display: none; flex-direction: column; padding: env(safe-area-inset-top, 12px) 14px env(safe-area-inset-bottom, 14px); overflow-y: auto; overflow-x: hidden; }
+.screen.active { display: flex; }
 
-  /* ---------- LOBBY ---------- */
-  #lobby {
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    background: radial-gradient(ellipse at center, #1a0e2a 0%, #0a0612 70%, #050208 100%);
-  }
-  .logo {
-    font-family: "Georgia", serif;
-    font-size: clamp(36px, 9vw, 56px);
-    letter-spacing: 4px;
-    font-weight: 300;
-    margin-bottom: 8px;
-    background: linear-gradient(135deg, #c9a25c 0%, #f0d9a8 35%, #87b8ff 65%, #4a7dc9 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: shimmer 6s ease-in-out infinite;
-  }
-  @keyframes shimmer {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(1.3); }
-  }
-  .tag {
-    font-size: 13px;
-    opacity: 0.6;
-    letter-spacing: 3px;
-    margin-bottom: 40px;
-    text-transform: uppercase;
-  }
-  .lobby-card {
-    background: rgba(20, 12, 30, 0.7);
-    border: 1px solid rgba(201, 162, 92, 0.2);
-    border-radius: 16px;
-    padding: 24px;
-    width: 100%;
-    max-width: 380px;
-    backdrop-filter: blur(8px);
-    margin-bottom: 16px;
-  }
-  .lobby-card h3 {
-    margin: 0 0 12px 0;
-    font-weight: 400;
-    font-size: 15px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    opacity: 0.7;
-  }
-  .btn {
-    display: block;
-    width: 100%;
-    padding: 16px;
-    font-size: 16px;
-    font-family: inherit;
-    border: 1px solid rgba(240, 217, 168, 0.3);
-    border-radius: 12px;
-    background: linear-gradient(180deg, rgba(60, 40, 80, 0.4), rgba(30, 20, 50, 0.6));
-    color: inherit;
-    cursor: pointer;
-    transition: all 0.2s;
-    letter-spacing: 1px;
-  }
-  .btn:active { transform: scale(0.98); background: rgba(80, 60, 120, 0.5); }
-  .btn.primary {
-    background: linear-gradient(180deg, #c9a25c, #8b6f3a);
-    color: #1a0e08;
-    border-color: #c9a25c;
-    font-weight: 600;
-  }
-  .btn.future-style {
-    background: linear-gradient(180deg, #4a7dc9, #2a4f8f);
-    color: #fff;
-    border-color: #87b8ff;
-    font-weight: 600;
-  }
-  .input {
-    width: 100%;
-    padding: 14px;
-    font-size: 18px;
-    letter-spacing: 4px;
-    text-align: center;
-    text-transform: uppercase;
-    border: 1px solid rgba(240, 217, 168, 0.3);
-    border-radius: 12px;
-    background: rgba(0,0,0,0.4);
-    color: inherit;
-    font-family: "Courier New", monospace;
-    margin-bottom: 12px;
-  }
-  .input:focus { outline: none; border-color: #c9a25c; }
-  .code-display {
-    font-size: 28px;
-    font-family: "Courier New", monospace;
-    letter-spacing: 8px;
-    padding: 16px;
-    background: rgba(0,0,0,0.5);
-    border-radius: 12px;
-    text-align: center;
-    color: #f0d9a8;
-    margin: 8px 0 16px 0;
-    border: 1px dashed rgba(240, 217, 168, 0.3);
-  }
-  .status {
-    font-size: 13px;
-    opacity: 0.7;
-    text-align: center;
-    margin-top: 8px;
-    min-height: 18px;
-  }
-  .small {
-    font-size: 12px;
-    opacity: 0.5;
-    margin-top: 20px;
-    line-height: 1.5;
-    max-width: 360px;
-  }
+#lobby { align-items: center; justify-content: center; text-align: center; background: radial-gradient(ellipse at center, #1a0e2a 0%, #06040c 80%); }
+.logo { font-family: Georgia, serif; font-size: clamp(38px, 10vw, 60px); letter-spacing: 6px; font-weight: 200; margin-bottom: 4px;
+  background: linear-gradient(135deg, #c9a25c 0%, #f0d9a8 40%, #87b8ff 65%, #4a7dc9 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  animation: shimmer 6s ease-in-out infinite;
+}
+@keyframes shimmer { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+.tag { font-size: 12px; opacity: 0.6; letter-spacing: 4px; margin-bottom: 36px; text-transform: uppercase; }
 
-  /* ---------- ROLE SELECT ---------- */
-  #role {
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-  }
-  .role-card {
-    width: 100%;
-    max-width: 360px;
-    padding: 28px 20px;
-    border-radius: 20px;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.3s;
-    border: 2px solid transparent;
-  }
-  .role-card.past-card {
-    background: linear-gradient(135deg, #3a2418, #1a0e08);
-    border-color: #c9a25c;
-    color: #f0d9a8;
-  }
-  .role-card.future-card {
-    background: linear-gradient(135deg, #0a1a2e, #051022);
-    border-color: #4a7dc9;
-    color: #a8d4ff;
-  }
-  .role-card:active { transform: scale(0.97); }
-  .role-card.taken { opacity: 0.3; pointer-events: none; }
-  .role-icon { font-size: 56px; margin-bottom: 12px; line-height: 1; }
-  .role-card h2 { margin: 0; font-weight: 300; letter-spacing: 4px; font-size: 22px; }
-  .role-card p { margin: 8px 0 0 0; font-size: 13px; opacity: 0.7; }
+.lobby-card { background: rgba(20,12,30,0.7); border: 1px solid rgba(201,162,92,0.2); border-radius: 16px; padding: 22px; width: 100%; max-width: 380px; margin-bottom: 14px; backdrop-filter: blur(8px); }
+.lobby-card h3 { margin: 0 0 12px 0; font-weight: 400; font-size: 14px; letter-spacing: 3px; text-transform: uppercase; opacity: 0.7; }
 
-  /* ---------- GAME ---------- */
-  #game {
-    padding: 0;
-  }
-  .top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: max(env(safe-area-inset-top, 8px), 8px) 12px 8px;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    flex-shrink: 0;
-    z-index: 10;
-  }
-  .era-badge {
-    font-size: 11px;
-    letter-spacing: 2px;
-    padding: 6px 10px;
-    border-radius: 6px;
-    text-transform: uppercase;
-  }
-  body.past .era-badge { background: #c9a25c; color: #1a0e08; }
-  body.future .era-badge { background: #4a7dc9; color: #fff; }
-  .puzzle-indicator {
-    display: flex;
-    gap: 6px;
-  }
-  .dot {
-    width: 24px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.1);
-  }
-  .dot.active { background: #c9a25c; }
-  body.future .dot.active { background: #4a7dc9; }
-  .dot.done { background: #4caf50; }
-  .icon-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.08);
-    border: none;
-    color: inherit;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+.btn { display: block; width: 100%; padding: 15px; font-size: 16px; font-family: inherit; border: 1px solid rgba(240,217,168,0.3); border-radius: 12px;
+  background: linear-gradient(180deg, rgba(60,40,80,0.4), rgba(30,20,50,0.6)); color: inherit; cursor: pointer; letter-spacing: 1px; transition: transform .15s, background .2s; }
+.btn:active { transform: scale(0.97); background: rgba(80,60,120,0.5); }
+.btn[disabled] { opacity: 0.4; pointer-events: none; }
+.btn.primary { background: linear-gradient(180deg, #c9a25c, #8b6f3a); color: #1a0e08; border-color: #c9a25c; font-weight: 600; }
+.btn.future-style { background: linear-gradient(180deg, #4a7dc9, #2a4f8f); color: #fff; border-color: #87b8ff; font-weight: 600; }
+.btn.ghost { background: transparent; border-color: rgba(255,255,255,0.15); }
+.input { width: 100%; padding: 14px; font-size: 18px; letter-spacing: 4px; text-align: center; text-transform: uppercase; border: 1px solid rgba(240,217,168,0.3); border-radius: 12px; background: rgba(0,0,0,0.4); color: inherit; font-family: "Courier New", monospace; margin-bottom: 12px; }
+.input:focus { outline: none; border-color: #c9a25c; }
+.code-display { font-size: 30px; font-family: "Courier New", monospace; letter-spacing: 10px; padding: 18px; background: rgba(0,0,0,0.5); border-radius: 12px; text-align: center; color: #f0d9a8; margin: 8px 0 16px; border: 1px dashed rgba(240,217,168,0.3); }
+.status { font-size: 13px; opacity: 0.7; text-align: center; margin-top: 8px; min-height: 18px; }
+.small { font-size: 11px; opacity: 0.5; margin-top: 24px; line-height: 1.5; max-width: 360px; }
 
-  .stage {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    -webkit-overflow-scrolling: touch;
-  }
+#role { align-items: center; justify-content: center; gap: 18px; }
+.role-card { width: 100%; max-width: 360px; padding: 30px 22px; border-radius: 20px; cursor: pointer; text-align: center; transition: transform .2s; border: 2px solid transparent; position: relative; overflow: hidden; }
+.role-card.past-card { background: linear-gradient(135deg, #3a2418, #1a0e08); border-color: #c9a25c; color: #f0d9a8; }
+.role-card.future-card { background: linear-gradient(135deg, #0a1a2e, #051022); border-color: #4a7dc9; color: #a8d4ff; }
+.role-card:active { transform: scale(0.97); }
+.role-card.taken { opacity: 0.3; pointer-events: none; }
+.role-icon { font-size: 56px; margin-bottom: 10px; line-height: 1; }
+.role-card h2 { margin: 0; font-weight: 200; letter-spacing: 5px; font-size: 22px; }
+.role-card p { margin: 8px 0 0 0; font-size: 12px; opacity: 0.6; font-style: italic; }
 
-  .scene-title {
-    text-align: center;
-    margin: 4px 0 20px;
-  }
-  .scene-title .era {
-    font-size: 11px;
-    letter-spacing: 3px;
-    opacity: 0.5;
-    text-transform: uppercase;
-  }
-  .scene-title h1 {
-    margin: 4px 0;
-    font-weight: 300;
-    font-size: 22px;
-    letter-spacing: 2px;
-  }
+#game { padding: 0; }
+.top-bar { display: flex; align-items: center; justify-content: space-between; padding: max(env(safe-area-inset-top, 8px), 8px) 12px 8px; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); z-index: 10; flex-shrink: 0; }
+.era-badge { font-size: 10px; letter-spacing: 3px; padding: 5px 10px; border-radius: 6px; text-transform: uppercase; font-family: Georgia, serif; font-style: italic; }
+body.past .era-badge { background: #c9a25c; color: #1a0e08; }
+body.future .era-badge { background: #4a7dc9; color: #fff; }
+.puzzle-indicator { display: flex; gap: 5px; }
+.dot { width: 22px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.15); }
+.dot.active { background: #c9a25c; box-shadow: 0 0 8px rgba(201,162,92,0.6); }
+body.future .dot.active { background: #4a7dc9; box-shadow: 0 0 8px rgba(74,125,201,0.6); }
+.dot.done { background: #4caf50; }
+.peer-status { font-size: 10px; padding: 4px 8px; border-radius: 8px; background: rgba(76,175,80,0.18); color: #8df0a8; display: inline-flex; align-items: center; gap: 5px; letter-spacing: 1px; }
+.peer-status::before { content: ""; width: 6px; height: 6px; background: #4caf50; border-radius: 50%; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+.peer-status.off { background: rgba(244,67,54,0.18); color: #ff9b95; }
+.peer-status.off::before { background: #f44336; animation: none; }
 
-  /* ---------- CARDS / OBJECTS ---------- */
-  .obj-card {
-    background: rgba(0,0,0,0.35);
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 14px;
-    border: 1px solid rgba(255,255,255,0.06);
-    position: relative;
-  }
-  body.past .obj-card { border-color: rgba(201, 162, 92, 0.15); }
-  body.future .obj-card { border-color: rgba(74, 125, 201, 0.2); }
+.stage { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; position: relative; }
+.scene {
+  position: relative; width: 100%;
+  display: flex; align-items: stretch; justify-content: center;
+}
+.scene svg { width: 100%; height: auto; max-height: 56vh; display: block; }
+.scene-title { text-align: center; padding: 14px 16px 6px; }
+.scene-title .chapter { font-size: 10px; letter-spacing: 5px; opacity: 0.55; text-transform: uppercase; font-family: Georgia, serif; font-style: italic; }
+.scene-title h1 { margin: 4px 0; font-weight: 200; font-size: 22px; letter-spacing: 2px; font-family: Georgia, serif; }
+.poem { padding: 4px 24px 14px; font-family: Georgia, serif; font-style: italic; font-size: 14px; line-height: 1.6; text-align: center; opacity: 0.8; max-width: 420px; margin: 0 auto; }
+.poem em { color: #f0d9a8; font-style: normal; letter-spacing: 1px; }
+body.future .poem em { color: #87b8ff; }
 
-  .obj-card h3 {
-    margin: 0 0 10px 0;
-    font-size: 14px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    opacity: 0.7;
-    font-weight: 400;
-  }
+.hot { cursor: pointer; transition: filter .2s; }
+.hot:active { filter: brightness(1.3); }
+.hot.dim { filter: brightness(0.65); opacity: 0.6; }
+.hot-ring { pointer-events: none; }
+@keyframes hotpulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.8; } }
+.hot-ring { animation: hotpulse 2.6s ease-in-out infinite; }
 
-  .scroll-text {
-    font-family: "Georgia", serif;
-    font-style: italic;
-    line-height: 1.6;
-    font-size: 14px;
-    padding: 12px;
-    background: rgba(50, 30, 10, 0.4);
-    border-left: 3px solid #c9a25c;
-    border-radius: 4px;
-    margin: 8px 0;
-  }
-  body.future .scroll-text {
-    background: rgba(10, 30, 50, 0.4);
-    border-left-color: #4a7dc9;
-    color: #c0e0ff;
-  }
+.actions { padding: 10px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.tile-btn { flex: 1 1 auto; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 12px; color: inherit; font-size: 13px; cursor: pointer; text-align: left; font-family: inherit; display: flex; align-items: center; gap: 10px; }
+.tile-btn:active { transform: scale(0.98); }
+.tile-btn .ic { font-size: 22px; }
+.tile-btn .nm { flex: 1; font-style: italic; }
+.tile-btn.solved { opacity: 0.65; }
+.tile-btn.solved::after { content: "✓"; color: #4caf50; }
 
-  /* ---------- PUZZLE 1: SUNDIAL ---------- */
-  .sundial-wrap {
-    aspect-ratio: 1;
-    max-width: 340px;
-    margin: 0 auto;
-    position: relative;
-  }
-  .sundial-svg { width: 100%; height: 100%; }
-  .stone {
-    cursor: pointer;
-    transition: transform 0.2s;
-  }
-  .stone:active { transform: scale(0.92); transform-origin: center; transform-box: fill-box; }
-  .stone-symbol {
-    font-size: 28px;
-    pointer-events: none;
-  }
-  .stone-label {
-    font-size: 11px;
-    fill: rgba(255,255,255,0.4);
-    letter-spacing: 2px;
-    pointer-events: none;
-  }
-  .rose-center {
-    transition: all 1s;
-  }
+#modal-layer { position: fixed; inset: 0; z-index: 200; display: none; background: rgba(5,3,8,0.88); backdrop-filter: blur(8px); padding: env(safe-area-inset-top, 12px) 14px env(safe-area-inset-bottom, 14px); overflow-y: auto; align-items: flex-start; justify-content: center; }
+#modal-layer.open { display: flex; }
+.modal-card { width: 100%; max-width: 460px; background: linear-gradient(180deg, #1a1424 0%, #0a0612 100%); border: 1px solid rgba(201,162,92,0.3); border-radius: 18px; padding: 16px; margin: 12px 0; position: relative; animation: modalin 0.3s ease-out; min-height: 100px; }
+body.future .modal-card { border-color: rgba(74,125,201,0.3); }
+@keyframes modalin { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.modal-close { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.5); color: inherit; border: 1px solid rgba(255,255,255,0.15); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
+.modal-title { font-family: Georgia, serif; font-style: italic; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.65; margin: 0 36px 12px 0; }
+.modal-body { font-size: 14px; line-height: 1.55; }
+.modal-body p { margin: 6px 0; }
+.modal-body em { color: #f0d9a8; font-style: italic; }
+body.future .modal-body em { color: #87b8ff; }
 
-  /* ---------- PUZZLE 2: BOOKS ---------- */
-  .shelf {
-    background: linear-gradient(180deg, #4a2818 0%, #2a1408 100%);
-    border-radius: 8px;
-    padding: 14px 8px 22px;
-    margin: 12px 0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.6) inset;
-    min-height: 180px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 6px;
-    position: relative;
-  }
-  body.future .shelf {
-    background: linear-gradient(180deg, #2a2a30 0%, #15151a 100%);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.8) inset;
-  }
-  .book {
-    width: 38px;
-    height: 130px;
-    border-radius: 3px 3px 1px 1px;
-    cursor: pointer;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-weight: 700;
-    font-size: 18px;
-    box-shadow: 2px 2px 6px rgba(0,0,0,0.4);
-    transition: all 0.3s ease;
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    letter-spacing: 4px;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
-    border: 1px solid rgba(0,0,0,0.3);
-    font-family: Georgia, serif;
-  }
-  .book.selected {
-    transform: rotate(180deg) translateY(-12px);
-    box-shadow: 0 0 20px gold, 2px 2px 6px rgba(0,0,0,0.4);
-  }
-  .book.ghost {
-    background: rgba(60,60,80,0.3) !important;
-    color: transparent;
-    border: 1px dashed rgba(255,255,255,0.2);
-    box-shadow: inset 0 0 12px rgba(0,0,0,0.6);
-  }
-  .book-slot {
-    width: 38px;
-    height: 130px;
-    border-radius: 3px;
-    position: relative;
-  }
-  .book-slot.shadow {
-    border: 1px dashed rgba(255,255,255,0.15);
-  }
+.page { background: linear-gradient(135deg, #f4e8c8 0%, #e0d0a0 100%); color: #3a2818; border-radius: 8px; padding: 16px 14px; margin: 8px 0; font-family: Georgia, serif; box-shadow: 0 2px 8px rgba(0,0,0,0.4); position: relative; min-height: 160px; }
+body.future .page { background: linear-gradient(135deg, #c8d0d8 0%, #a0a8b0 100%); color: #1a1820; }
+.page.aged { background: repeating-linear-gradient(0deg, #d4c090 0px, #c8b080 2px, #d4c090 4px), linear-gradient(135deg, #c8b080, #a09060); filter: sepia(0.25); }
+.page.burnt { background: radial-gradient(ellipse at 30% 50%, #c8b080 0%, #806040 70%, #2a1a08 95%); color: #2a1a08; }
+.page-title { font-style: italic; font-weight: 600; font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.2); padding-bottom: 6px; }
+.page-body { font-size: 13px; line-height: 1.7; }
+.page-body em { color: #5a2010; font-style: italic; font-weight: 600; }
+body.future .page-body em { color: #1a3a5a; }
+.page-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; opacity: 0.7; }
+.page-nav button { background: rgba(0,0,0,0.1); color: inherit; border: 1px solid rgba(0,0,0,0.3); border-radius: 8px; padding: 6px 14px; cursor: pointer; font-family: inherit; }
+.sketch { width: 100%; aspect-ratio: 1.4; background: rgba(0,0,0,0.15); border-radius: 8px; margin: 8px 0; padding: 8px; display: flex; align-items: center; justify-content: center; }
+.sketch svg { width: 100%; height: 100%; max-height: 180px; }
 
-  /* ---------- PUZZLE 3: WALL ---------- */
-  .wall-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    max-width: 320px;
-    margin: 14px auto;
-    aspect-ratio: 1;
-    padding: 8px;
-    background: linear-gradient(135deg, #3a2a1a, #1a1208);
-    border-radius: 8px;
-  }
-  body.future .wall-grid {
-    background: linear-gradient(135deg, #1a1a22, #0a0a14);
-  }
-  .wall-cell {
-    background: linear-gradient(135deg, #6a4828, #4a3018);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    cursor: pointer;
-    position: relative;
-    color: #f0d9a8;
-    transition: all 0.15s;
-    aspect-ratio: 1;
-  }
-  body.future .wall-cell {
-    background: linear-gradient(135deg, #3a3a48, #20202a);
-    color: #a8d4ff;
-  }
-  .wall-cell:active { transform: scale(0.95); }
-  .wall-cell.cracked {
-    background: repeating-linear-gradient(45deg, #2a1a08, #2a1a08 4px, #1a0e04 4px, #1a0e04 8px);
-    cursor: not-allowed;
-    color: rgba(255,255,255,0.15);
-  }
-  body.future .wall-cell.cracked {
-    background: repeating-linear-gradient(45deg, #0a0a14, #0a0a14 4px, #050508 4px, #050508 8px);
-  }
-  .wall-cell.cracked::after {
-    content: "✕";
-    color: rgba(255,255,255,0.25);
-    position: absolute;
-    font-size: 18px;
-  }
-  .wall-cell.faded { opacity: 0.4; }
+.inventory { display: flex; justify-content: center; gap: 8px; padding: 8px 14px; background: rgba(0,0,0,0.4); border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+.inv-slot { width: 50px; height: 44px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 22px; position: relative; padding: 4px; }
+.inv-slot.has { background: linear-gradient(135deg, #2a1814, #0a0604); border: 1px solid #c9a25c; box-shadow: 0 0 12px rgba(201,162,92,0.3); }
+body.future .inv-slot.has { border-color: #4a7dc9; box-shadow: 0 0 12px rgba(74,125,201,0.3); }
+.inv-slot svg { width: 100%; height: 100%; }
 
-  .symbol-palette {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin: 12px 0;
-    flex-wrap: wrap;
-  }
-  .palette-btn {
-    width: 50px;
-    height: 50px;
-    border-radius: 10px;
-    background: rgba(0,0,0,0.4);
-    border: 2px solid rgba(255,255,255,0.15);
-    color: inherit;
-    font-size: 26px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .palette-btn.selected {
-    border-color: #c9a25c;
-    background: rgba(201, 162, 92, 0.25);
-    box-shadow: 0 0 12px rgba(201, 162, 92, 0.4);
-  }
+.seed-shelf { display: flex; gap: 10px; justify-content: center; padding: 8px; }
+.seed-card { width: 70px; background: linear-gradient(135deg, #3a2818, #1a0e08); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; color: inherit; font-family: inherit; }
+.seed-card .seed-svg { width: 40px; height: 40px; }
+.seed-card .seed-svg svg { width: 100%; height: 100%; }
+.seed-card .seed-sub { font-size: 9px; opacity: 0.55; font-style: italic; letter-spacing: 1px; }
+.seed-card.selected { border-color: #c9a25c; box-shadow: 0 0 14px rgba(201,162,92,0.4); }
 
-  /* ---------- LOCK ---------- */
-  .lock-display {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin: 16px 0;
-  }
-  .digit-slot {
-    width: 56px;
-    height: 72px;
-    background: rgba(0,0,0,0.5);
-    border: 2px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
-    font-size: 36px;
-    font-family: "Courier New", monospace;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #c9a25c;
-    text-shadow: 0 0 10px rgba(201, 162, 92, 0.5);
-  }
-  body.future .digit-slot { color: #4a7dc9; text-shadow: 0 0 10px rgba(74, 125, 201, 0.5); }
-  .digit-slot.empty { color: rgba(255,255,255,0.2); }
-  .digit-keypad {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    max-width: 280px;
-    margin: 0 auto;
-  }
-  .key-btn {
-    height: 60px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: inherit;
-    font-size: 24px;
-    cursor: pointer;
-  }
-  .key-btn:active { background: rgba(255,255,255,0.15); }
+#win { align-items: center; justify-content: center; text-align: center; background: radial-gradient(ellipse at center, rgba(76,175,80,0.15), transparent 70%), #06040c; }
+.victory-title { font-size: 44px; font-family: Georgia, serif; font-weight: 200; letter-spacing: 10px; background: linear-gradient(135deg, #c9a25c, #87b8ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 12px; }
+.victory-sub { font-size: 13px; opacity: 0.65; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 30px; font-family: Georgia, serif; font-style: italic; }
 
-  /* ---------- CHAT ---------- */
-  #chat-toggle {
-    position: fixed;
-    bottom: max(env(safe-area-inset-bottom, 12px), 12px);
-    right: 12px;
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #c9a25c, #8b6f3a);
-    color: #1a0e08;
-    border: none;
-    font-size: 22px;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    z-index: 50;
-    display: none;
-  }
-  body.future #chat-toggle {
-    background: linear-gradient(135deg, #4a7dc9, #2a4f8f);
-    color: #fff;
-  }
-  #chat-toggle.has-unread::after {
-    content: "";
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 12px;
-    height: 12px;
-    background: #ff4444;
-    border-radius: 50%;
-    border: 2px solid #0a0612;
-  }
-  #chat-panel {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    max-height: 70vh;
-    background: rgba(10, 6, 18, 0.97);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(255,255,255,0.1);
-    transform: translateY(100%);
-    transition: transform 0.3s;
-    z-index: 100;
-    padding: env(safe-area-inset-top, 0) 12px env(safe-area-inset-bottom, 12px);
-    display: flex;
-    flex-direction: column;
-  }
-  #chat-panel.open { transform: translateY(0); }
-  .chat-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 4px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 4px;
-    min-height: 200px;
-    max-height: 50vh;
-  }
-  .msg {
-    margin: 6px 0;
-    padding: 8px 12px;
-    border-radius: 12px;
-    max-width: 80%;
-    font-size: 14px;
-    line-height: 1.4;
-    word-wrap: break-word;
-  }
-  .msg.mine {
-    background: rgba(201, 162, 92, 0.25);
-    margin-left: auto;
-    text-align: right;
-  }
-  body.future .msg.mine { background: rgba(74, 125, 201, 0.25); }
-  .msg.theirs {
-    background: rgba(255,255,255,0.06);
-    margin-right: auto;
-  }
-  .msg .who {
-    font-size: 10px;
-    opacity: 0.5;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: 2px;
-  }
-  .chat-input-row {
-    display: flex;
-    gap: 6px;
-    padding: 8px 0;
-  }
-  .chat-input-row input {
-    flex: 1;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.15);
-    background: rgba(0,0,0,0.4);
-    color: inherit;
-    font-size: 16px;
-  }
-  .chat-input-row button {
-    padding: 0 16px;
-    border-radius: 10px;
-    border: none;
-    background: #c9a25c;
-    color: #1a0e08;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  body.future .chat-input-row button { background: #4a7dc9; color: #fff; }
+.toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%) translateY(-20px); background: rgba(0,0,0,0.9); color: #fff; padding: 10px 18px; border-radius: 24px; font-size: 13px; z-index: 300; opacity: 0; transition: all 0.3s; pointer-events: none; max-width: 90%; text-align: center; border: 1px solid rgba(255,255,255,0.1); font-style: italic; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: #4caf50; }
+.toast.fail { border-color: #f44336; }
 
-  /* ---------- WIN ---------- */
-  #win {
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    background: radial-gradient(ellipse at center, rgba(76, 175, 80, 0.2), transparent 70%), #0a0612;
-  }
-  .victory-title {
-    font-size: 48px;
-    font-family: Georgia, serif;
-    font-weight: 300;
-    letter-spacing: 8px;
-    background: linear-gradient(135deg, #c9a25c, #87b8ff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 12px;
-  }
-  .victory-sub {
-    font-size: 14px;
-    opacity: 0.6;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-bottom: 40px;
-  }
+#chat-toggle { position: fixed; bottom: max(env(safe-area-inset-bottom, 12px), 12px); right: 12px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #c9a25c, #8b6f3a); color: #1a0e08; border: none; font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 50; display: none; }
+body.future #chat-toggle { background: linear-gradient(135deg, #4a7dc9, #2a4f8f); color: #fff; }
+#chat-toggle.has-unread::after { content: ""; position: absolute; top: 3px; right: 3px; width: 12px; height: 12px; background: #ff4444; border-radius: 50%; border: 2px solid #06040c; }
+#chat-panel { position: fixed; bottom: 0; left: 0; right: 0; max-height: 70vh; background: rgba(10,6,18,0.97); backdrop-filter: blur(12px); border-top: 1px solid rgba(255,255,255,0.1); transform: translateY(100%); transition: transform 0.3s; z-index: 100; padding: env(safe-area-inset-top, 0) 12px env(safe-area-inset-bottom, 12px); display: flex; flex-direction: column; }
+#chat-panel.open { transform: translateY(0); }
+.chat-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.chat-messages { flex: 1; overflow-y: auto; padding: 12px 4px; min-height: 200px; max-height: 50vh; }
+.msg { margin: 6px 0; padding: 8px 12px; border-radius: 12px; max-width: 80%; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+.msg.mine { background: rgba(201,162,92,0.25); margin-left: auto; text-align: right; }
+body.future .msg.mine { background: rgba(74,125,201,0.25); }
+.msg.theirs { background: rgba(255,255,255,0.06); margin-right: auto; }
+.msg .who { font-size: 10px; opacity: 0.5; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+.chat-input-row { display: flex; gap: 6px; padding: 8px 0; }
+.chat-input-row input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.4); color: inherit; font-size: 16px; }
+.chat-input-row button { padding: 0 16px; border-radius: 10px; border: none; background: #c9a25c; color: #1a0e08; font-weight: 600; cursor: pointer; }
+body.future .chat-input-row button { background: #4a7dc9; color: #fff; }
 
-  /* ---------- HINT / TOAST ---------- */
-  .toast {
-    position: fixed;
-    top: 60px;
-    left: 50%;
-    transform: translateX(-50%) translateY(-20px);
-    background: rgba(0,0,0,0.85);
-    color: #fff;
-    padding: 12px 20px;
-    border-radius: 24px;
-    font-size: 14px;
-    z-index: 200;
-    opacity: 0;
-    transition: all 0.3s;
-    pointer-events: none;
-    max-width: 90%;
-    text-align: center;
-    border: 1px solid rgba(255,255,255,0.1);
-  }
-  .toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  .toast.success { border-color: #4caf50; }
-  .toast.fail { border-color: #f44336; }
+.icon-btn { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.08); border: none; color: inherit; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.share-row { display: flex; gap: 8px; margin-top: 8px; }
+.share-row .btn { flex: 1; padding: 12px; font-size: 14px; }
 
-  /* ---------- RIPPLE ---------- */
-  @keyframes ripple {
-    0% { transform: scale(0.5); opacity: 0.8; }
-    100% { transform: scale(3); opacity: 0; }
-  }
-  .ripple-fx {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 100px;
-    height: 100px;
-    margin: -50px 0 0 -50px;
-    border-radius: 50%;
-    border: 3px solid #c9a25c;
-    animation: ripple 1.2s ease-out;
-    pointer-events: none;
-  }
-  body.future .ripple-fx { border-color: #4a7dc9; }
+.bottle-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 8px 0; }
+.bottle-pick { background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px; cursor: pointer; color: inherit; font-family: inherit; display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; }
+.bottle-pick.selected { border-color: #c9a25c; box-shadow: 0 0 12px rgba(201,162,92,0.4); }
+.bottle-pick svg { width: 28px; height: 56px; }
+.bottle-pick .b-name { font-size: 9px; opacity: 0.8; letter-spacing: 1px; font-style: italic; }
+.bottle-pick.broken { opacity: 0.55; cursor: not-allowed; }
+.bottle-pick.intact { border-color: rgba(140,255,140,0.5); box-shadow: 0 0 12px rgba(140,255,140,0.3); }
 
-  @keyframes fadein {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .obj-card { animation: fadein 0.4s ease-out; }
+.item-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 0; }
+.item-pick { background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 8px 4px; color: inherit; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.item-pick .item-emo { font-size: 22px; }
+.item-pick .item-name { font-size: 9px; font-style: italic; }
+.item-pick.selected { border-color: #c9a25c; box-shadow: 0 0 12px rgba(201,162,92,0.4); }
 
-  .glow { animation: glowpulse 2s ease-in-out infinite; }
-  @keyframes glowpulse {
-    0%, 100% { box-shadow: 0 0 4px rgba(201, 162, 92, 0.3); }
-    50% { box-shadow: 0 0 20px rgba(201, 162, 92, 0.8); }
-  }
-  body.future .glow {
-    animation: glowpulse-blue 2s ease-in-out infinite;
-  }
-  @keyframes glowpulse-blue {
-    0%, 100% { box-shadow: 0 0 4px rgba(74, 125, 201, 0.3); }
-    50% { box-shadow: 0 0 20px rgba(74, 125, 201, 0.8); }
-  }
-
-  .fragment-display {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    margin: 14px 0;
-  }
-  .fragment {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.4);
-    border: 2px dashed rgba(255,255,255,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    font-family: Georgia, serif;
-    color: rgba(255,255,255,0.2);
-  }
-  .fragment.filled {
-    background: radial-gradient(circle, #c9a25c, #8b6f3a);
-    color: #1a0e08;
-    border-color: #f0d9a8;
-    border-style: solid;
-    box-shadow: 0 0 16px rgba(201, 162, 92, 0.5);
-  }
-  body.future .fragment.filled {
-    background: radial-gradient(circle, #4a7dc9, #2a4f8f);
-    color: #fff;
-    border-color: #87b8ff;
-    box-shadow: 0 0 16px rgba(74, 125, 201, 0.5);
-  }
-
-  .helper-tag {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 6px;
-    background: rgba(255,255,255,0.06);
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    opacity: 0.7;
-    margin-bottom: 8px;
-  }
-  .helper-tag.peer { background: rgba(76, 175, 80, 0.2); color: #8df0a8; }
-
-  .step-list { margin: 8px 0; padding-left: 22px; }
-  .step-list li { font-size: 13px; line-height: 1.6; margin: 4px 0; opacity: 0.85; }
-  .step-list li.done { opacity: 0.4; text-decoration: line-through; }
-
-  .peer-status {
-    font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 8px;
-    background: rgba(76, 175, 80, 0.15);
-    color: #8df0a8;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .peer-status::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    background: #4caf50;
-    border-radius: 50%;
-    animation: pulse 1.5s infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-  .peer-status.off { background: rgba(244,67,54,0.15); color: #ff9b95; }
-  .peer-status.off::before { background: #f44336; animation: none; }
-
-  .share-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .share-row .btn { flex: 1; padding: 12px; font-size: 14px; }
-
-  /* ---------- GARDEN (Puzzle 1) ---------- */
-  .seed-palette { display: flex; gap: 10px; justify-content: center; }
-  .seed-btn {
-    flex: 1;
-    background: rgba(0,0,0,0.4);
-    border: 2px solid rgba(255,255,255,0.15);
-    border-radius: 12px;
-    padding: 10px 6px;
-    cursor: pointer;
-    color: inherit;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-  .seed-btn .seed-emoji { font-size: 28px; }
-  .seed-btn .seed-name { font-size: 12px; font-weight: 600; }
-  .seed-btn .seed-meta { font-size: 10px; opacity: 0.6; }
-  .seed-btn.selected { border-color: #c9a25c; background: rgba(201,162,92,0.2); box-shadow: 0 0 12px rgba(201,162,92,0.4); }
-  body.future .seed-btn.selected { border-color: #4a7dc9; background: rgba(74,125,201,0.2); box-shadow: 0 0 12px rgba(74,125,201,0.4); }
-
-  .house-strip {
-    background: linear-gradient(180deg, #2a1810, #1a0e08);
-    border-radius: 8px 8px 0 0;
-    padding: 8px;
-    text-align: center;
-    font-size: 12px;
-    opacity: 0.7;
-    margin-bottom: -2px;
-  }
-  body.future .house-strip { background: linear-gradient(180deg, #1a1a2a, #0a0a14); }
-  .house-icon { letter-spacing: 1px; }
-
-  .garden-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
-    padding: 8px;
-    background: linear-gradient(180deg, #4a3a1a, #2a1e10);
-    border-radius: 0 0 8px 8px;
-  }
-  body.future .garden-grid { background: linear-gradient(180deg, #1a1a22, #0a0a14); }
-  .garden-cell {
-    aspect-ratio: 1;
-    background: rgba(0,0,0,0.35);
-    border-radius: 6px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    cursor: pointer;
-    position: relative;
-    color: inherit;
-    border: 1px dashed rgba(255,255,255,0.08);
-  }
-  .garden-cell.near-balcony { border-color: rgba(255, 215, 106, 0.5); box-shadow: inset 0 0 8px rgba(255, 215, 106, 0.2); }
-  body.future .garden-cell.near-balcony { border-color: rgba(135, 184, 255, 0.5); box-shadow: inset 0 0 8px rgba(135, 184, 255, 0.3); }
-  .garden-cell .sprout { font-size: 28px; }
-  .garden-cell .sprout.big { font-size: 44px; }
-  .garden-cell .cell-label { font-size: 9px; opacity: 0.7; letter-spacing: 1px; }
-  .garden-cell .water-mark { position: absolute; top: 4px; right: 4px; font-size: 12px; }
-  .garden-cell .dirt { color: rgba(255,255,255,0.15); font-size: 24px; }
-  .garden-cell.mature { background: rgba(40,80,40,0.3); }
-
-  .tree-info { font-size: 13px; line-height: 1.8; }
-
-  /* ---------- BOTTLES (Puzzle 2) ---------- */
-  .bottle-row {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  .bottle {
-    background: rgba(0,0,0,0.4);
-    border: 2px solid rgba(255,255,255,0.15);
-    border-radius: 12px;
-    padding: 8px;
-    cursor: pointer;
-    color: inherit;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    width: 70px;
-  }
-  .bottle svg { width: 30px; height: 60px; }
-  .bottle-name { font-size: 10px; opacity: 0.8; letter-spacing: 1px; }
-  .bottle.selected { border-color: #c9a25c; box-shadow: 0 0 12px rgba(201,162,92,0.4); }
-  body.future .bottle.selected { border-color: #4a7dc9; box-shadow: 0 0 12px rgba(74,125,201,0.4); }
-  .bottle.broken { opacity: 0.5; cursor: not-allowed; }
-  .bottle.intact { border-color: #4caf50; box-shadow: 0 0 12px rgba(76,175,80,0.4); }
-  .note-input { font-size: 16px; }
-
-  /* ---------- FIELD/CITY (Puzzle 3) ---------- */
-  .item-palette {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-  }
-  .item-btn {
-    background: rgba(0,0,0,0.4);
-    border: 2px solid rgba(255,255,255,0.15);
-    border-radius: 10px;
-    padding: 8px 4px;
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-  }
-  .item-btn .item-emoji { font-size: 24px; }
-  .item-btn .item-name { font-size: 10px; }
-  .item-btn.selected { border-color: #c9a25c; background: rgba(201,162,92,0.2); }
-
-  .field-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 3px;
-    padding: 6px;
-    background: rgba(0,0,0,0.4);
-    border-radius: 8px;
-  }
-  .field-cell {
-    aspect-ratio: 1;
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    cursor: pointer;
-    position: relative;
-    color: inherit;
-  }
-  .field-cell .coord { color: rgba(255,255,255,0.3); font-size: 12px; }
-  .field-cell .cell-label { font-size: 9px; opacity: 0.6; }
-  .field-cell .mound { position: absolute; bottom: 2px; right: 2px; font-size: 10px; }
-  .field-cell.past-cell { background: linear-gradient(135deg, #5a4028, #3a2818); }
-  .field-cell.past-cell.buried { background: linear-gradient(135deg, #7a5a3a, #4a3520); border: 1px solid #c9a25c; }
-  .field-cell.future-cell.build { background: linear-gradient(135deg, #5a5a6a, #3a3a48); cursor: not-allowed; opacity: 0.7; }
-  .field-cell.future-cell.road { background: linear-gradient(135deg, #4a4a52, #2a2a32); }
-  .field-cell.future-cell.park { background: linear-gradient(135deg, #2a5a30, #1a3a20); }
-  .field-cell.future-cell.ruin { background: linear-gradient(135deg, #5a4838, #2a1a10); }
-  .field-cell.future-cell.dug { background: linear-gradient(135deg, #3a2818, #1a0e08); }
-  .field-cell.future-cell.found {
-    background: linear-gradient(135deg, #c9a25c, #8b6f3a);
-    color: #1a0e08;
-    box-shadow: 0 0 16px rgba(201, 162, 92, 0.7);
-  }
-
-  .legend-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 12px;
-    font-size: 10px;
-    opacity: 0.7;
-    margin-top: 8px;
-    justify-content: center;
-  }
-  .legend-row span { display: inline-flex; align-items: center; gap: 4px; }
-  .dot-build, .dot-road, .dot-park, .dot-ruin { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
-  .dot-build { background: #5a5a6a; }
-  .dot-road { background: #4a4a52; }
-  .dot-park { background: #2a5a30; }
-  .dot-ruin { background: #5a4838; }
+.cursive-input { font-family: Georgia, serif; font-style: italic; font-size: 20px; letter-spacing: 4px; text-align: center; padding: 12px; background: linear-gradient(180deg, #f4e8c8, #e0d0a0); color: #3a2818; border: 1px solid #8b6f3a; border-radius: 6px; width: 100%; }
 </style>
 </head>
 <body>
 
-<!-- ========== LOBBY ========== -->
 <div id="lobby" class="screen active">
   <div class="logo">CHRONOS</div>
   <div class="tag">ESCAPE · THE · LOOP</div>
-
-  <div class="lobby-card" id="create-card">
+  <div class="lobby-card">
     <h3>Δημιούργησε δωμάτιο</h3>
     <button class="btn primary" id="create-btn">Νέο παιχνίδι</button>
     <div id="created-info" style="display:none">
       <div class="code-display" id="my-code">------</div>
-      <div class="status" id="create-status">Αναμονή συνεργάτη…</div>
-      <div class="share-row">
-        <button class="btn" id="copy-btn">Αντιγραφή κωδικού</button>
-      </div>
+      <div class="status" id="create-status">Αναμονή…</div>
+      <div class="share-row"><button class="btn" id="copy-btn">Αντιγραφή κωδικού</button></div>
     </div>
   </div>
-
   <div class="lobby-card">
     <h3>Συμμετοχή σε δωμάτιο</h3>
     <input class="input" id="join-input" maxlength="6" placeholder="ΚΩΔΙΚΟΣ" autocapitalize="characters" autocomplete="off">
     <button class="btn future-style" id="join-btn">Σύνδεση</button>
     <div class="status" id="join-status"></div>
   </div>
-
-  <div class="small">
-    Παίξτε σε 2 κινητά. Ο ένας φτιάχνει δωμάτιο, ο άλλος μπαίνει με κωδικό.<br>
-    Χωρίς εφαρμογές — μόνο browser. WebRTC peer-to-peer.
-  </div>
+  <div class="small">Δύο κινητά. Δύο εποχές. Ένας βρόχος. WebRTC peer-to-peer χωρίς server.</div>
 </div>
 
-<!-- ========== ROLE SELECT ========== -->
 <div id="role" class="screen">
   <div style="text-align:center; margin-bottom: 20px;">
-    <div class="tag">ΕΠΕΛΕΞΕ ΕΠΟΧΗ</div>
-    <div style="font-size: 13px; opacity: 0.6;" id="role-hint">Ο ένας στο παρελθόν, ο άλλος στο μέλλον.</div>
+    <div class="tag">Πόσο μακρυά μπορείς να ταξιδέψεις;</div>
+    <div style="font-size: 12px; opacity: 0.6; font-style: italic;" id="role-hint">Διάλεξε εποχή. Ο σύντροφός σου θα πάρει την άλλη.</div>
   </div>
   <div class="role-card past-card" data-role="past">
     <div class="role-icon">🕯️</div>
     <h2>ΠΑΡΕΛΘΟΝ</h2>
-    <p>1872 · Το παλαιό αρχοντικό</p>
+    <p>1872 · «όσα φύτεψα μέσα στο σκοτάδι, θα τα θερίσει το φως αύριο»</p>
   </div>
   <div class="role-card future-card" data-role="future">
     <div class="role-icon">🛰️</div>
     <h2>ΜΕΛΛΟΝ</h2>
-    <p>2287 · Τα ερείπια</p>
+    <p>2287 · «κάθε ερείπιο έχει την ιστορία ενός σπόρου»</p>
   </div>
 </div>
 
-<!-- ========== GAME ========== -->
 <div id="game" class="screen">
   <div class="top-bar">
-    <div class="era-badge" id="era-badge">ΠΑΡΕΛΘΟΝ</div>
+    <div class="era-badge" id="era-badge">1872</div>
     <div class="puzzle-indicator">
       <div class="dot" data-d="1"></div>
       <div class="dot" data-d="2"></div>
       <div class="dot" data-d="3"></div>
     </div>
-    <div class="peer-status" id="peer-status">συνδεδεμένος</div>
+    <div class="peer-status" id="peer-status">live</div>
   </div>
   <div class="stage" id="stage"></div>
+  <div class="inventory" id="inventory"></div>
 </div>
 
-<!-- ========== WIN ========== -->
 <div id="win" class="screen">
-  <div style="font-size: 80px; margin-bottom: 20px;">⏳✨</div>
+  <div style="font-size: 70px; margin-bottom: 16px;">⏳✨</div>
   <div class="victory-title">ESCAPE</div>
-  <div class="victory-sub">Ο βρόχος του χρόνου έσπασε</div>
-  <div id="win-text" style="font-size: 14px; opacity: 0.8; max-width: 360px; line-height: 1.7; margin-bottom: 32px;"></div>
+  <div class="victory-sub">«Ο χρόνος σπάει όταν δύο εποχές ψιθυρίσουν την ίδια λέξη»</div>
+  <div id="win-text" style="font-size: 13px; opacity: 0.75; max-width: 360px; line-height: 1.7; margin-bottom: 28px; font-family: Georgia, serif; font-style: italic;"></div>
   <button class="btn" onclick="location.reload()" style="max-width: 280px;">Από την αρχή</button>
 </div>
 
-<!-- ========== CHAT ========== -->
+<div id="modal-layer"><div id="modal-content"></div></div>
+
 <button id="chat-toggle">💬</button>
 <div id="chat-panel">
   <div class="chat-header">
-    <span style="font-size: 13px; letter-spacing: 2px; opacity: 0.7;">ΣΥΝΕΡΓΑΤΗΣ</span>
+    <span style="font-size: 12px; letter-spacing: 3px; opacity: 0.7; font-style: italic;">ΨΙΘΥΡΟΙ ΑΠΟ ΤΗΝ ΑΛΛΗ ΕΠΟΧΗ</span>
     <button class="icon-btn" onclick="toggleChat(false)">✕</button>
   </div>
   <div class="chat-messages" id="chat-messages"></div>
   <div class="chat-input-row">
-    <input type="text" id="chat-input" placeholder="Πληκτρολόγησε μήνυμα…" maxlength="200">
+    <input type="text" id="chat-input" placeholder="ψιθύρισε στο χρόνο…" maxlength="200">
     <button onclick="sendChatMsg()">→</button>
   </div>
 </div>
@@ -1052,871 +271,860 @@
 <script>
 "use strict";
 
-// ===================== STATE =====================
-const ROOM_PREFIX = "chronos-loop-v1-";
-let peer = null;
-let conn = null;
-let isHost = false;
-let role = null; // 'past' | 'future'
-let otherRole = null;
-let myCode = "";
+const ROOM_PREFIX = "chronos-loop-v2-";
+let peer = null, conn = null, isHost = false;
+let role = null, myCode = "";
 
-// Shared world state — synced via PeerJS
 const initialState = () => ({
   puzzle: 1,
-  // P1: Garden & House — past plants seeds in a 3x3 garden, future climbs the grown tree
-  // garden cells: { type: 'oak'|'poplar'|'cherry'|null, watered: bool }
   garden: Array.from({length:9}, () => ({ type: null, watered: false })),
-  climbed: false,             // future climbed the tree
-  fragment1: null,
-  // P2: Carved Tree & Cemetery — past carves a name in a sapling, future reads on a mature tree
-  carvedName: "",             // string carved in past
-  graveOpened: false,         // future found the correct grave
-  fragment2: null,
-  // P3: Buried Treasure — past buries item at a cell, future digs in a city that grew over the field
-  buriedItem: null,           // 'key' | 'watch' | 'ruby' | 'ring' | null
-  buriedCell: null,           // 0..15
-  dugCells: [],               // cells dug by future
+  reachedBalcony: false,
+  bottleNote: "",
+  bottleColor: null,
+  bottleThrown: false,
+  bottleRetrieved: false,
+  buriedItem: null,
+  buriedCell: null,
+  dugCells: [],
   vaultOpened: false,
-  fragment3: null,
-  // Final
+  fragments: { p1: false, p2: false, p3: false },
   escaped: false,
 });
 let state = initialState();
 
-// ===================== HELPERS =====================
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
+let ui = {
+  modal: null, page: 0,
+  selSeed: null, selBottle: null, selItem: null,
+  hasWateringCan: false,
+  notebookFound: false, sketchFound: false, letterFound: false, logFound: false,
+  blueprintFound: false, testamentFound: false, photoFound: false, vaultFound: false,
+};
 
-function showScreen(id) {
-  $$(".screen").forEach(s => s.classList.remove("active"));
-  $("#"+id).classList.add("active");
-}
-
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+function showScreen(id) { $$(".screen").forEach(s => s.classList.remove("active")); $("#"+id).classList.add("active"); }
 function toast(msg, type) {
-  const t = $("#toast");
-  t.textContent = msg;
-  t.className = "toast show " + (type || "");
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove("show"), 2400);
+  const t = $("#toast"); t.textContent = msg; t.className = "toast show " + (type || "");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2400);
 }
+function genCode() { const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i=0; i<6; i++) s += chars[Math.floor(Math.random()*chars.length)]; return s; }
 
-function genCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let s = "";
-  for (let i=0; i<6; i++) s += chars[Math.floor(Math.random()*chars.length)];
-  return s;
-}
-
-// ===================== PEERJS =====================
 function makePeer(id) {
-  return new Peer(id, {
-    config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:global.stun.twilio.com:3478" }
-      ]
-    },
-    debug: 1
-  });
+  return new Peer(id, { config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:global.stun.twilio.com:3478" }] }, debug: 1 });
 }
-
 function host() {
-  myCode = genCode();
-  isHost = true;
-  $("#create-btn").style.display = "none";
-  $("#created-info").style.display = "block";
-  $("#my-code").textContent = myCode;
-  $("#create-status").textContent = "Σύνδεση στο σύστημα…";
-
+  myCode = genCode(); isHost = true;
+  $("#create-btn").style.display = "none"; $("#created-info").style.display = "block"; $("#my-code").textContent = myCode;
   peer = makePeer(ROOM_PREFIX + myCode);
-  peer.on("open", () => {
-    $("#create-status").textContent = "Αναμονή συνεργάτη… κωδικός: " + myCode;
-  });
-  peer.on("connection", (c) => {
-    conn = c;
-    wireConn();
-  });
-  peer.on("error", (e) => {
-    console.error(e);
-    $("#create-status").textContent = "Σφάλμα: " + e.type;
-  });
+  peer.on("open", () => $("#create-status").textContent = "Αναμονή… κωδικός: " + myCode);
+  peer.on("connection", (c) => { conn = c; wireConn(); });
+  peer.on("error", (e) => { $("#create-status").textContent = "Σφάλμα: " + e.type; });
 }
-
 function join() {
   const code = $("#join-input").value.trim().toUpperCase();
   if (code.length < 4) return toast("Άκυρος κωδικός", "fail");
-  isHost = false;
-  $("#join-status").textContent = "Σύνδεση…";
-
+  isHost = false; $("#join-status").textContent = "Σύνδεση…";
   peer = makePeer(ROOM_PREFIX + "j-" + genCode());
-  peer.on("open", () => {
-    conn = peer.connect(ROOM_PREFIX + code, { reliable: true });
-    wireConn();
-  });
-  peer.on("error", (e) => {
-    console.error(e);
-    $("#join-status").textContent = "Σφάλμα: " + (e.type === "peer-unavailable" ? "δωμάτιο δεν υπάρχει" : e.type);
-  });
+  peer.on("open", () => { conn = peer.connect(ROOM_PREFIX + code, { reliable: true }); wireConn(); });
+  peer.on("error", (e) => { $("#join-status").textContent = "Σφάλμα: " + (e.type === "peer-unavailable" ? "δωμάτιο δεν υπάρχει" : e.type); });
 }
-
 function wireConn() {
   conn.on("open", () => {
     if (isHost) $("#create-status").textContent = "Συνεργάτης συνδέθηκε!";
-    else $("#join-status").textContent = "Σύνδεση επιτυχής!";
-    setTimeout(() => {
-      if (isHost) {
-        // Host pre-claims past by default but lets user choose
-      }
-      showScreen("role");
-    }, 600);
+    else $("#join-status").textContent = "Συνδέθηκες.";
+    setTimeout(() => showScreen("role"), 600);
   });
   conn.on("data", onRecv);
-  conn.on("close", () => {
-    setPeerStatus(false);
-    toast("Συνεργάτης αποσυνδέθηκε", "fail");
-  });
+  conn.on("close", () => { setPeerStatus(false); toast("Συνεργάτης αποσυνδέθηκε", "fail"); });
 }
-
-function send(type, payload) {
-  if (!conn || !conn.open) return;
-  try { conn.send({ type, payload }); } catch(e) { console.warn(e); }
-}
-
-function setPeerStatus(online) {
-  const el = $("#peer-status");
-  if (!el) return;
-  el.textContent = online ? "συνδεδεμένος" : "off-line";
-  el.classList.toggle("off", !online);
-}
-
-// ===================== ROLE PICK =====================
-$$(".role-card").forEach(card => {
-  card.addEventListener("click", () => {
-    if (card.classList.contains("taken")) return;
-    const picked = card.dataset.role;
-    role = picked;
-    otherRole = picked === "past" ? "future" : "past";
-    send("role-claim", role);
-    enterGame();
-  });
-});
-
-function enterGame() {
-  document.body.classList.add(role);
-  $("#era-badge").textContent = role === "past" ? "ΠΑΡΕΛΘΟΝ · 1872" : "ΜΕΛΛΟΝ · 2287";
-  $("#chat-toggle").style.display = "flex";
-  showScreen("game");
+function send(type, payload) { if (!conn || !conn.open) return; try { conn.send({ type, payload }); } catch(e) { console.warn(e); } }
+function setPeerStatus(online) { const el = $("#peer-status"); if (!el) return; el.textContent = online ? "live" : "off-line"; el.classList.toggle("off", !online); }
+function syncState(ripple) {
+  const shared = {}; for (const k in state) if (!k.startsWith("_")) shared[k] = state[k];
+  send("state", shared);
+  if (ripple) send("ripple", true);
   render();
 }
-
-// ===================== MESSAGE HANDLING =====================
 function onRecv(msg) {
   if (!msg || !msg.type) return;
   setPeerStatus(true);
-
   switch(msg.type) {
     case "role-claim": {
       const theirs = msg.payload;
       const card = document.querySelector(`.role-card[data-role="${theirs}"]`);
       if (card) card.classList.add("taken");
       const hint = $("#role-hint");
-      if (hint && !role) hint.textContent = `Ο συνεργάτης διάλεξε ${theirs === "past" ? "ΠΑΡΕΛΘΟΝ" : "ΜΕΛΛΟΝ"}. Διάλεξε το άλλο.`;
+      if (hint && !role) hint.textContent = `Ο σύντροφος ξύπνησε στο ${theirs === "past" ? "1872" : "2287"}. Διάλεξε την άλλη εποχή.`;
       break;
     }
-    case "state": {
-      Object.assign(state, msg.payload);
-      render();
+    case "state": Object.assign(state, msg.payload); render(); break;
+    case "ripple":
+      if (role === "future") toast("⌛ κάτι αλλάζει στο παρελθόν…");
+      else toast("⌛ κάτι αλλάζει στο μέλλον…");
       break;
-    }
-    case "ripple": {
-      // visual notification when a past action propagates to future
-      if (role === "future") {
-        toast("⌛ Κάτι αλλάζει στο παρελθόν…", "");
-      }
-      break;
-    }
-    case "chat": {
+    case "chat":
       addChatMsg(msg.payload, "theirs");
-      if (!$("#chat-panel").classList.contains("open")) {
-        $("#chat-toggle").classList.add("has-unread");
-      }
+      if (!$("#chat-panel").classList.contains("open")) $("#chat-toggle").classList.add("has-unread");
       break;
-    }
-    case "request-state": {
-      send("state", state);
-      break;
-    }
-    case "toast": {
-      toast(msg.payload.text, msg.payload.kind || "");
-      break;
-    }
   }
 }
 
-function syncState(triggerRipple) {
-  // strip local-only fields (prefixed with _) before sending
-  const shared = {};
-  for (const k in state) if (!k.startsWith("_")) shared[k] = state[k];
-  send("state", shared);
-  if (triggerRipple) send("ripple", true);
-  render();
+$$(".role-card").forEach(card => {
+  card.addEventListener("click", () => {
+    if (card.classList.contains("taken")) return;
+    role = card.dataset.role;
+    send("role-claim", role);
+    enterGame();
+  });
+});
+function enterGame() {
+  document.body.classList.add(role);
+  $("#era-badge").textContent = role === "past" ? "1872" : "2287";
+  $("#chat-toggle").style.display = "flex";
+  showScreen("game"); render();
 }
 
-// ===================== PUZZLE CONTENT =====================
-// ---- Puzzle 1: Garden & House ----
-// Tree types: each with seed, sapling, mature emoji and height ('tall' | 'medium' | 'short')
-const TREES = {
-  oak:    { seed: "🌰", sapling: "🌱", mature: "🌳", height: "medium", el: "Βελανιδιά" },
-  poplar: { seed: "🟢", sapling: "🌱", mature: "🌲", height: "tall",   el: "Λεύκη" },
-  cherry: { seed: "🔴", sapling: "🌱", mature: "🌸", height: "short",  el: "Κερασιά" },
-};
-// 3x3 garden — index 0..8 (row*3+col). The house is north (top) center, so the cell
-// directly in front of the house's balcony is index 1 (row 0, col 1).
-const GARDEN_W = 3, GARDEN_H = 3;
-const BALCONY_CELL = 1; // poplar (tall) here = reachable balcony
-const KEY_ON_BALCONY_LABEL = "ΟΡΕΙΧΑΛΚΙΝΟ ΚΛΕΙΔΙ";
-const FRAGMENT_1_VALUE = 4;
-
-// ---- Puzzle 2: Bottle at Sea ----
-const BOTTLES = [
-  { id: "green",  color: "#3a8a4a", el: "Πράσινο" },
-  { id: "amber",  color: "#a87030", el: "Μελί"    },
-  { id: "blue",   color: "#3a5fa8", el: "Μπλε"    },
-  { id: "clear",  color: "#a8c0d0", el: "Διαφανές"},
-];
-const BOTTLE_SURVIVOR = "amber";
-const BOTTLE_TARGET_NUMBER = "1872";
-const FRAGMENT_2_VALUE = 7;
-
-// ---- Puzzle 3: Buried Treasure ----
-// 4x4 grid. In 1872 all open ground. In 2287, the city grew:
-//  road = uncovered (asphalt — can dig)
-//  build = building (can NOT dig)
-//  park = park (can dig)
-//  ruin = ruined house (can dig)
-// Buried treasure survives only if its cell is "diggable" in 2287
-const FUTURE_MAP = [
-  // 0..3
-  "build","road","build","ruin",
-  // 4..7
-  "road","build","park","road",
-  // 8..11
-  "build","road","park","build",
-  // 12..15
-  "ruin","build","road","build",
-];
-const ITEMS = {
-  key:   { emoji: "🗝️", el: "Κλειδί" },
-  watch: { emoji: "⌚", el: "Ρολόι" },
-  ruby:  { emoji: "💎", el: "Ρουμπίνι" },
-  ring:  { emoji: "💍", el: "Δαχτυλίδι" },
-};
-// Future vault needs a brass key, buried under the park.
-const VAULT_NEEDS_ITEM = "key";
-const VAULT_NEEDS_CELL = 6; // park
-const FRAGMENT_3_VALUE = 2;
-
-// ===================== RENDER =====================
 function render() {
-  // dots
   $$(".dot").forEach(d => {
     const n = parseInt(d.dataset.d);
     d.classList.toggle("active", n === state.puzzle && !state.escaped);
     d.classList.toggle("done", n < state.puzzle || state.escaped);
   });
-
-  if (state.escaped) {
-    renderWin();
-    return;
-  }
-
-  const stage = $("#stage");
-  stage.innerHTML = "";
-  if (state.puzzle === 1) renderPuzzle1(stage);
-  else if (state.puzzle === 2) renderPuzzle2(stage);
-  else if (state.puzzle === 3) renderPuzzle3(stage);
+  if (state.escaped) { renderWin(); return; }
+  const stage = $("#stage"); stage.innerHTML = "";
+  if (state.puzzle === 1) renderP1(stage);
+  else if (state.puzzle === 2) renderP2(stage);
+  else if (state.puzzle === 3) renderP3(stage);
   else if (state.puzzle === 4) renderFinal(stage);
+  renderInventory();
 }
 
-
-// ============ PUZZLE 1: GARDEN — plant seed, grow tree, climb to balcony ============
-function renderPuzzle1(stage) {
-  const title = document.createElement("div");
-  title.className = "scene-title";
-  title.innerHTML = `<div class="era">Αίνιγμα I</div><h1>Ο Κήπος και το Μπαλκόνι</h1>`;
-  stage.appendChild(title);
-
-  if (role === "past") {
-    const intro = document.createElement("div");
-    intro.className = "obj-card";
-    intro.innerHTML = `
-      <span class="helper-tag">Παρελθόν · 1872</span>
-      <div class="scroll-text">«Ο κήπος μπροστά στο σπίτι μου περιμένει σπόρους. Έχω τρία είδη — αλλά κάποιος από το μέλλον θα χρειαστεί ένα συγκεκριμένο δέντρο σε συγκεκριμένη θέση…»</div>
-      <p style="font-size: 12px; opacity: 0.7;">1) Διάλεξε σπόρο. 2) Άγγιξε κελί για φύτευση. 3) Πότισε. Ο συνεργάτης σου ξέρει τι χρειάζεται.</p>
-    `;
-    stage.appendChild(intro);
-
-    // Seed palette
-    const palette = document.createElement("div");
-    palette.className = "obj-card";
-    palette.innerHTML = `<h3>🌱 Σπόροι</h3>`;
-    const pwrap = document.createElement("div");
-    pwrap.className = "seed-palette";
-    Object.entries(TREES).forEach(([k, t]) => {
-      const b = document.createElement("button");
-      b.className = "seed-btn";
-      if (state._selSeed === k) b.classList.add("selected");
-      b.innerHTML = `<span class="seed-emoji">${t.seed}</span><span class="seed-name">${t.el}</span><span class="seed-meta">${t.height === 'tall' ? 'Ψηλό' : t.height === 'medium' ? 'Μεσαίο' : 'Κοντό'}</span>`;
-      b.onclick = () => { state._selSeed = k; render(); };
-      pwrap.appendChild(b);
-    });
-    palette.appendChild(pwrap);
-    stage.appendChild(palette);
-
-    // Garden grid 3x3
-    const card = document.createElement("div");
-    card.className = "obj-card";
-    card.innerHTML = `<h3>🌍 Ο κήπος μπροστά από το σπίτι</h3>`;
-    const houseHint = document.createElement("div");
-    houseHint.className = "house-strip";
-    houseHint.innerHTML = `<div class="house-icon">🏠 Σπίτι · μπαλκόνι 2ου ορόφου</div>`;
-    card.appendChild(houseHint);
-    const grid = document.createElement("div");
-    grid.className = "garden-grid";
-    for (let i = 0; i < 9; i++) {
-      const cell = document.createElement("div");
-      cell.className = "garden-cell";
-      const c = state.garden[i];
-      if (i === BALCONY_CELL) cell.classList.add("near-balcony");
-      if (c.type) {
-        cell.classList.add("planted");
-        cell.innerHTML = `<span class="sprout">${TREES[c.type].sapling}</span><span class="cell-label">${TREES[c.type].el}</span>${c.watered ? '<span class="water-mark">💧</span>' : ''}`;
-      } else {
-        cell.innerHTML = `<span class="dirt">·</span>`;
-      }
-      cell.onclick = () => onPlant(i);
-      grid.appendChild(cell);
-    }
-    card.appendChild(grid);
-    stage.appendChild(card);
-
-    // Water all
-    const anyPlanted = state.garden.some(c => c.type);
-    const anyUnwatered = state.garden.some(c => c.type && !c.watered);
-    if (anyPlanted) {
-      const water = document.createElement("button");
-      water.className = "btn " + (anyUnwatered ? "primary glow" : "");
-      water.textContent = anyUnwatered ? "💧 Πότισε όλα τα φυτά" : "💧 Όλα ποτισμένα";
-      water.disabled = !anyUnwatered;
-      water.onclick = () => {
-        state.garden.forEach(c => { if (c.type) c.watered = true; });
-        toast("💧 Πότισμα — ο χρόνος αρχίζει να ρέει");
-        syncState(true);
-      };
-      stage.appendChild(water);
-    }
-
-    if (state.climbed) {
-      const done = document.createElement("div");
-      done.className = "obj-card";
-      done.innerHTML = `<h3>✨ Ολοκληρώθηκε</h3>
-        <p>Ένας ταξιδιώτης από το μέλλον σκαρφάλωσε στο δέντρο και πήρε το κλειδί.</p>`;
-      stage.appendChild(done);
-      const next = document.createElement("button");
-      next.className = "btn primary";
-      next.textContent = "Επόμενο αίνιγμα →";
-      next.onclick = () => { state.puzzle = 2; syncState(); };
-      stage.appendChild(next);
-    }
-  } else {
-    // FUTURE
-    const intro = document.createElement("div");
-    intro.className = "obj-card";
-    intro.innerHTML = `
-      <span class="helper-tag">Μέλλον · 2287</span>
-      <div class="scroll-text">«Στέκομαι μπροστά στα ερείπια ενός παλιού σπιτιού. Στο μπαλκόνι του 2ου ορόφου διακρίνω ένα μικρό ορειχάλκινο κλειδί. Δεν φτάνω. Αν είχε φυτευτεί δέντρο μπροστά στο σπίτι, ίσως μπορούσα να σκαρφαλώσω.»</div>
-      <p style="font-size: 12px; opacity: 0.7;">Πες στον συνεργάτη σου ποιος σπόρος και πού.</p>
-    `;
-    stage.appendChild(intro);
-
-    // House illustration with key
-    const houseCard = document.createElement("div");
-    houseCard.className = "obj-card";
-    houseCard.innerHTML = `<h3>🏚️ Το παλιό σπίτι</h3>`;
-    houseCard.appendChild(buildHouseSVG());
-    stage.appendChild(houseCard);
-
-    // Tree height legend
-    const legend = document.createElement("div");
-    legend.className = "obj-card";
-    legend.innerHTML = `
-      <h3>📓 Σημειώσεις βοτανικής</h3>
-      <div class="tree-info">
-        <div>🌳 <strong>${TREES.oak.el}</strong> — μεσαίο ύψος, δεν φτάνει το μπαλκόνι.</div>
-        <div>🌲 <strong>${TREES.poplar.el}</strong> — ΨΗΛΟ. Φτάνει 2ο όροφο.</div>
-        <div>🌸 <strong>${TREES.cherry.el}</strong> — κοντό, ανθίζει αλλά δεν αντέχει βάρος.</div>
-      </div>
-    `;
-    stage.appendChild(legend);
-
-    // Live garden snapshot from past
-    const live = document.createElement("div");
-    live.className = "obj-card";
-    live.innerHTML = `<h3>🔮 Ζωντανή εικόνα από το παρελθόν</h3>`;
-    const liveStrip = document.createElement("div");
-    liveStrip.className = "house-strip";
-    liveStrip.innerHTML = `<div class="house-icon">🏠 Θέση σπιτιού (μπαλκόνι)</div>`;
-    live.appendChild(liveStrip);
-    const grid = document.createElement("div");
-    grid.className = "garden-grid";
-    for (let i = 0; i < 9; i++) {
-      const cell = document.createElement("div");
-      cell.className = "garden-cell";
-      if (i === BALCONY_CELL) cell.classList.add("near-balcony");
-      const c = state.garden[i];
-      if (c.type) {
-        const mature = c.watered;
-        cell.classList.add("planted");
-        if (mature) cell.classList.add("mature");
-        cell.innerHTML = `<span class="sprout ${mature?'big':''}">${mature ? TREES[c.type].mature : TREES[c.type].sapling}</span><span class="cell-label">${TREES[c.type].el}${mature?' (ώριμο)':''}</span>`;
-      } else {
-        cell.innerHTML = `<span class="dirt">·</span>`;
-      }
-      grid.appendChild(cell);
-    }
-    live.appendChild(grid);
-    stage.appendChild(live);
-
-    // Climb button if conditions met
-    const balconyCell = state.garden[BALCONY_CELL];
-    const canClimb = balconyCell.type === "poplar" && balconyCell.watered;
-    const climbBtn = document.createElement("button");
-    climbBtn.className = "btn " + (canClimb ? "future-style glow" : "");
-    climbBtn.disabled = !canClimb || state.climbed;
-    climbBtn.textContent = state.climbed ? "🗝️ Έχεις το κλειδί" : canClimb ? "🪜 Σκαρφάλωσε στο δέντρο" : "Δεν μπορώ να σκαρφαλώσω…";
-    climbBtn.onclick = () => {
-      if (!canClimb || state.climbed) return;
-      state.climbed = true;
-      state.fragment1 = FRAGMENT_1_VALUE;
-      toast("🗝️ Πήρες το ορειχάλκινο κλειδί!", "success");
-      syncState(true);
-    };
-    stage.appendChild(climbBtn);
-
-    if (state.climbed) {
-      const win = document.createElement("div");
-      win.className = "obj-card";
-      win.innerHTML = `<h3>🗝️ Πρώτο θραύσμα</h3>
-        <p>Στο κλειδί που πήρες, είναι χαραγμένος ένας αριθμός:</p>
-        <div class="fragment-display"><div class="fragment filled">${state.fragment1}</div></div>`;
-      stage.appendChild(win);
-      const next = document.createElement("button");
-      next.className = "btn future-style";
-      next.textContent = "Επόμενο αίνιγμα →";
-      next.onclick = () => { state.puzzle = 2; syncState(); };
-      stage.appendChild(next);
-    }
-  }
+function renderInventory() {
+  const inv = $("#inventory"); inv.innerHTML = "";
+  const slots = [
+    { key: "p1", svg: keyFragSVG(1) },
+    { key: "p2", svg: keyFragSVG(2) },
+    { key: "p3", svg: keyFragSVG(3) },
+  ];
+  slots.forEach(s => {
+    const el = document.createElement("div");
+    el.className = "inv-slot" + (state.fragments[s.key] ? " has" : "");
+    el.innerHTML = state.fragments[s.key] ? s.svg : `<span style="opacity:0.3; font-size:18px;">?</span>`;
+    inv.appendChild(el);
+  });
+}
+function keyFragSVG(part) {
+  if (part === 1) return `<svg viewBox="0 0 60 24"><circle cx="10" cy="12" r="8" fill="#c9a25c" stroke="#3a2818" stroke-width="1"/><circle cx="10" cy="12" r="3" fill="#1a0e08"/><rect x="16" y="9" width="14" height="6" fill="#c9a25c" stroke="#3a2818" stroke-width="0.5"/></svg>`;
+  if (part === 2) return `<svg viewBox="0 0 60 24"><rect x="2" y="9" width="32" height="6" fill="#87b8ff" stroke="#1a3050" stroke-width="0.5"/><rect x="2" y="3" width="3" height="18" fill="#87b8ff"/></svg>`;
+  return `<svg viewBox="0 0 60 24"><rect x="0" y="9" width="22" height="6" fill="#7adb7a" stroke="#1a3a1a" stroke-width="0.5"/><rect x="22" y="3" width="3" height="6" fill="#7adb7a"/><rect x="27" y="9" width="3" height="6" fill="#7adb7a"/></svg>`;
 }
 
-function onPlant(i) {
-  if (role !== "past") return;
-  const sel = state._selSeed;
-  if (!sel) { toast("Διάλεξε σπόρο πρώτα"); return; }
-  if (state.garden[i].type === sel) {
-    // Tap same seed on same cell: clear (only if not watered)
-    if (state.garden[i].watered) { toast("Έχει ποτιστεί. Δεν μπορείς να το βγάλεις."); return; }
-    state.garden[i] = { type: null, watered: false };
-  } else {
-    if (state.garden[i].watered) { toast("Αυτό το κελί έχει ποτιστεί ήδη."); return; }
-    state.garden[i] = { type: sel, watered: false };
-  }
-  syncState(true);
+function openModal(id) { ui.modal = id; ui.page = 0; $("#modal-layer").classList.add("open"); renderModal(); }
+function closeModal() { ui.modal = null; $("#modal-layer").classList.remove("open"); render(); }
+function renderModal() {
+  const c = $("#modal-content");
+  if (!ui.modal) { c.innerHTML = ""; return; }
+  c.innerHTML = "";
+  const card = document.createElement("div");
+  card.className = "modal-card";
+  card.innerHTML = `<button class="modal-close" onclick="closeModal()">✕</button>`;
+  c.appendChild(card);
+  const r = MODALS[ui.modal];
+  if (r) r(card);
 }
 
-function buildHouseSVG() {
-  // SVG showing 2-story house with balcony and a glinting key
-  const wrap = document.createElement("div");
-  wrap.style.cssText = "background: linear-gradient(180deg, #1a2a3a, #050a14); border-radius: 10px; padding: 14px; text-align:center;";
-  wrap.innerHTML = `
-    <svg viewBox="0 0 200 220" style="width: 90%; max-width: 260px;">
-      <defs>
-        <radialGradient id="keyGlow"><stop offset="0%" stop-color="#ffd76a" stop-opacity="0.9"/><stop offset="100%" stop-color="#ffd76a" stop-opacity="0"/></radialGradient>
-      </defs>
-      <!-- ground -->
-      <rect x="0" y="190" width="200" height="30" fill="#1a1a22"/>
-      <!-- house body (ruined) -->
-      <polygon points="40,90 100,40 160,90" fill="#3a2820"/>
-      <rect x="50" y="90" width="100" height="100" fill="#2a1e18"/>
-      <!-- crack lines -->
-      <line x1="60" y1="100" x2="80" y2="180" stroke="#0a0604" stroke-width="0.6"/>
-      <line x1="140" y1="95" x2="120" y2="180" stroke="#0a0604" stroke-width="0.6"/>
-      <!-- balcony -->
-      <rect x="78" y="120" width="44" height="6" fill="#5a4530"/>
-      <rect x="78" y="120" width="44" height="20" fill="none" stroke="#8a6f4a" stroke-width="0.8"/>
-      <!-- key on balcony -->
-      <circle cx="100" cy="128" r="14" fill="url(#keyGlow)"/>
-      <text x="100" y="133" font-size="14" text-anchor="middle">🗝️</text>
-      <!-- windows -->
-      <rect x="58" y="110" width="10" height="14" fill="#0a0a14"/>
-      <rect x="132" y="110" width="10" height="14" fill="#0a0a14"/>
-      <rect x="58" y="150" width="10" height="14" fill="#0a0a14"/>
-      <rect x="132" y="150" width="10" height="14" fill="#0a0a14"/>
-      <!-- door -->
-      <rect x="92" y="160" width="16" height="30" fill="#0a0604"/>
-      <!-- arrow pointing where past must plant -->
-      <text x="100" y="210" font-size="9" text-anchor="middle" fill="#87b8ff">↓ θέση φύτευσης ↓</text>
-    </svg>
-  `;
-  return wrap;
-}
+const MODALS = {};
 
-// ============ PUZZLE 2: BOTTLE AT SEA ============
-function renderPuzzle2(stage) {
-  const title = document.createElement("div");
-  title.className = "scene-title";
-  title.innerHTML = `<div class="era">Αίνιγμα II</div><h1>Το Μπουκάλι στη Θάλασσα</h1>`;
-  stage.appendChild(title);
+// ============ P1 PAST ============
+MODALS["p1-notebook"] = (card) => {
+  ui.notebookFound = true;
+  card.innerHTML += `<div class="modal-title">σημειωματάριο του παππού</div>`;
+  const pages = [
+    { title: "1 Σεπτεμβρίου", body: `<p>Πέρασε ο γιατρός. Είπε ότι ίσως δεν προλάβω τη νέα άνοιξη. Άνοιξα το παλιό μπαούλο και βρήκα τα τρία σπορεία του πατέρα. Δεν έγραψα ποτέ τι είναι το καθένα. Μόνο τα ζωγράφισα.</p>`, sk: null },
+    { title: "Σκίτσο Α", body: `<p><em>«Βαρύ σαν χάλκινο νόμισμα. Ρίξτο και χορεύει στο χώμα. Δίνει δάσος αργό, πλατύ, που τους κόκκους του ζητούν τα σκίουρα.»</em></p>`, sk: `<svg viewBox="0 0 80 80"><ellipse cx="40" cy="42" rx="20" ry="22" fill="#7a4a20"/><ellipse cx="40" cy="42" rx="15" ry="17" fill="#5a3010"/><path d="M40 20 L42 28 L38 28 Z" fill="#3a2010"/></svg>` },
+    { title: "Σκίτσο Β", body: `<p><em>«Μικρός σπόρος, ανάλαφρος, σχεδόν διάφανος. Μα ό,τι μεγαλώνει από αυτόν φτάνει τα σύννεφα — λεπτό, αργυρόφυλλο, ψηλό σαν πύργος. Θα μου χρειαστεί να ακουμπώ πάνω του.»</em></p>`, sk: `<svg viewBox="0 0 80 80"><ellipse cx="40" cy="40" rx="6" ry="14" fill="#a8d4a0" stroke="#5a8a4a" stroke-width="1.2"/><line x1="40" y1="26" x2="40" y2="54" stroke="#3a6a2a" stroke-width="0.8"/></svg>` },
+    { title: "Σκίτσο Γ", body: `<p><em>«Ροδαλός μέσα στο χέρι. Σαν να κρατάς το λυκόφως. Φέρνει την πιο νωρίτερη άνοιξη — μα ξύλο τόσο λεπτό που δεν θα κράταγε ούτε πουλί στις φούσκες του.»</em></p>`, sk: `<svg viewBox="0 0 80 80"><circle cx="40" cy="42" r="14" fill="#e8a0b8"/><circle cx="40" cy="42" r="10" fill="#d080a0"/><path d="M40 26 L42 32 L38 32 Z" fill="#7a3050"/></svg>` },
+    { title: "12 Σεπτεμβρίου", body: `<p>Ο μάστορας ήρθε. Έκλεισε με σιδερένιο μάνταλο το μπαούλο στο μπαλκόνι του 2ου ορόφου. Μέσα έβαλα το <em>πρώτο κομμάτι</em> από το κλειδί που μου εμπιστεύτηκε εκείνος ο παράξενος ταξιδιώτης.</p><p>Δεν θα φτάνουν τα ίδια χέρια. <em>Πρέπει να φυτευτεί κάτι ψηλό μπροστά μου</em>, ώστε ένας άγνωστος να μπορέσει να αναρριχηθεί.</p>`, sk: null },
+  ];
+  const p = ui.page % pages.length, pg = pages[p];
+  const el = document.createElement("div");
+  el.className = "page aged";
+  el.innerHTML = `<div class="page-title">${pg.title}</div><div class="page-body">${pg.body}</div>${pg.sk ? `<div class="sketch">${pg.sk}</div>` : ""}
+    <div class="page-nav"><button onclick="prevPage(${pages.length})">← προηγ.</button><span>${p+1}/${pages.length}</span><button onclick="nextPage(${pages.length})">επόμ. →</button></div>`;
+  card.appendChild(el);
+};
+window.prevPage = (n) => { ui.page = (ui.page - 1 + n) % n; renderModal(); };
+window.nextPage = (n) => { ui.page = (ui.page + 1) % n; renderModal(); };
 
-  if (role === "past") {
-    const intro = document.createElement("div");
-    intro.className = "obj-card";
-    intro.innerHTML = `
-      <span class="helper-tag">Παρελθόν · 1872</span>
-      <div class="scroll-text">«Στέκομαι στο μώλο. Έχω 4 μπουκάλια διαφορετικού χρώματος και ένα χαρτί. Λένε πως ο χρόνος είναι ωκεανός. Ίσως κάποιο μπουκάλι φτάσει εκεί που χρειάζεται.»</div>
-      <p style="font-size: 12px; opacity: 0.7;">1) Γράψε αριθμό στο χαρτί. 2) Διάλεξε χρώμα μπουκαλιού. 3) Πέτα το.</p>
-    `;
-    stage.appendChild(intro);
+MODALS["p1-seeds"] = (card) => {
+  card.innerHTML += `<div class="modal-title">σακούλα με σπόρους</div><p class="modal-body" style="font-style:italic; opacity:0.75;">Τρεις σπόροι. Καμία ετικέτα. Μόνο σχήμα και χρώμα.</p>`;
+  const seeds = [
+    { id: "oak",    svg: `<svg viewBox="0 0 80 80"><ellipse cx="40" cy="42" rx="20" ry="22" fill="#7a4a20"/><ellipse cx="40" cy="42" rx="15" ry="17" fill="#5a3010"/><path d="M40 20 L42 28 L38 28 Z" fill="#3a2010"/></svg>`, sub: "βαρύς" },
+    { id: "poplar", svg: `<svg viewBox="0 0 80 80"><ellipse cx="40" cy="40" rx="6" ry="14" fill="#a8d4a0" stroke="#5a8a4a" stroke-width="1.2"/></svg>`, sub: "διάφανος" },
+    { id: "cherry", svg: `<svg viewBox="0 0 80 80"><circle cx="40" cy="42" r="14" fill="#e8a0b8"/><circle cx="40" cy="42" r="10" fill="#d080a0"/></svg>`, sub: "ροδαλός" },
+  ];
+  const shelf = document.createElement("div"); shelf.className = "seed-shelf";
+  seeds.forEach(s => {
+    const b = document.createElement("button");
+    b.className = "seed-card" + (ui.selSeed === s.id ? " selected" : "");
+    b.innerHTML = `<div class="seed-svg">${s.svg}</div><div class="seed-sub">${s.sub}</div>`;
+    b.onclick = () => { ui.selSeed = s.id; renderModal(); toast(`Διάλεξες τον ${s.sub} σπόρο`); };
+    shelf.appendChild(b);
+  });
+  card.appendChild(shelf);
+  if (ui.selSeed) card.innerHTML += `<p style="font-size:12px; opacity:0.7; text-align:center; font-style:italic; margin-top:10px;">Κλείσε και άγγιξε ένα κελί στον κήπο για να φυτέψεις.</p>`;
+};
 
-    // Note input
-    const noteCard = document.createElement("div");
-    noteCard.className = "obj-card";
-    noteCard.innerHTML = `
-      <h3>📜 Το χαρτί</h3>
-      <p style="font-size: 12px; opacity: 0.7;">Ο συνεργάτης σου στο μέλλον έχει ένα ναυάγιο. Πρέπει να συμφωνήσετε σε έναν αριθμό από εκεί.</p>
-    `;
-    const input = document.createElement("input");
-    input.className = "input note-input";
-    input.placeholder = "ΠΛΗΚΤΡΟΛΟΓΗΣΕ ΑΡΙΘΜΟ";
-    input.maxLength = 5;
-    input.value = state.bottleNote || "";
-    input.oninput = e => {
-      state.bottleNote = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"");
-      syncState();
-    };
-    noteCard.appendChild(input);
-    stage.appendChild(noteCard);
-
-    // Bottles
-    const bottles = document.createElement("div");
-    bottles.className = "obj-card";
-    bottles.innerHTML = `<h3>🍾 Μπουκάλια</h3>`;
-    const row = document.createElement("div");
-    row.className = "bottle-row";
-    BOTTLES.forEach(b => {
-      const el = document.createElement("button");
-      el.className = "bottle";
-      el.style.setProperty("--c", b.color);
-      if (state._selBottle === b.id) el.classList.add("selected");
-      el.innerHTML = `<svg viewBox="0 0 30 60"><path d="M12 4 L12 14 Q8 18 8 26 L8 54 Q8 58 15 58 Q22 58 22 54 L22 26 Q22 18 18 14 L18 4 Z" fill="${b.color}" stroke="#000" stroke-width="0.6" opacity="0.85"/><rect x="11" y="2" width="8" height="4" fill="#3a2818"/></svg><div class="bottle-name">${b.el}</div>`;
-      el.onclick = () => { state._selBottle = b.id; render(); };
-      row.appendChild(el);
-    });
-    bottles.appendChild(row);
-    stage.appendChild(bottles);
-
-    if (!state.bottleThrown) {
-      const throwBtn = document.createElement("button");
-      throwBtn.className = "btn primary";
-      throwBtn.textContent = "🌊 Πέτα στο πέλαγος";
-      throwBtn.disabled = !state._selBottle || !state.bottleNote;
-      throwBtn.onclick = () => {
-        if (!state._selBottle || !state.bottleNote) return toast("Διάλεξε χρώμα ΚΑΙ γράψε αριθμό", "fail");
-        state.bottleColor = state._selBottle;
-        state.bottleThrown = true;
-        toast("🌊 Το μπουκάλι έφυγε…", "success");
-        syncState(true);
-      };
-      stage.appendChild(throwBtn);
-    } else {
-      const status = document.createElement("div");
-      status.className = "obj-card";
-      status.innerHTML = `<p style="text-align: center;">Το <strong>${BOTTLES.find(b=>b.id===state.bottleColor).el}</strong> μπουκάλι ταξιδεύει στον χρόνο…</p>
-        <p style="text-align:center; font-size: 12px; opacity: 0.7;">Μήνυμα: <strong>${state.bottleNote}</strong></p>`;
-      stage.appendChild(status);
-      // Allow re-throw if not yet retrieved
-      if (!state.bottleRetrieved) {
-        const redo = document.createElement("button");
-        redo.className = "btn";
-        redo.textContent = "↺ Πάρε πίσω το μπουκάλι";
-        redo.onclick = () => {
-          state.bottleThrown = false;
-          state.bottleColor = null;
-          syncState(true);
-        };
-        stage.appendChild(redo);
-      } else {
-        const done = document.createElement("div");
-        done.className = "obj-card";
-        done.innerHTML = `<h3>✨ Ολοκληρώθηκε</h3><p>Το σωστό μπουκάλι ξεβράστηκε στο μέλλον.</p>`;
-        stage.appendChild(done);
-        const next = document.createElement("button");
-        next.className = "btn primary";
-        next.textContent = "Επόμενο αίνιγμα →";
-        next.onclick = () => { state.puzzle = 3; syncState(); };
-        stage.appendChild(next);
-      }
-    }
-  } else {
-    // FUTURE
-    const intro = document.createElement("div");
-    intro.className = "obj-card";
-    intro.innerHTML = `
-      <span class="helper-tag">Μέλλον · 2287</span>
-      <div class="scroll-text">«Σε ερημικό νησί. 4 μπουκάλια έχουν ξεβραστεί στην άμμο εδώ και αιώνες. Μόνο ένα χρώμα γυαλιού άντεξε το αλάτι — τα άλλα έχουν θρυμματιστεί.»</div>
-    `;
-    stage.appendChild(intro);
-
-    // Beach with 4 bottle states (3 broken + 1 intact)
-    const beach = document.createElement("div");
-    beach.className = "obj-card";
-    beach.innerHTML = `<h3>🏝️ Το ναυάγιο</h3>`;
-    const row = document.createElement("div");
-    row.className = "bottle-row";
-    BOTTLES.forEach(b => {
-      const el = document.createElement("button");
-      el.className = "bottle";
-      const isSurvivor = b.id === BOTTLE_SURVIVOR;
-      if (!isSurvivor) el.classList.add("broken");
-      el.innerHTML = `
-        <svg viewBox="0 0 30 60">
-          ${isSurvivor
-            ? `<path d="M12 4 L12 14 Q8 18 8 26 L8 54 Q8 58 15 58 Q22 58 22 54 L22 26 Q22 18 18 14 L18 4 Z" fill="${b.color}" stroke="#000" stroke-width="0.6"/>
-               <rect x="11" y="2" width="8" height="4" fill="#3a2818"/>`
-            : `<polygon points="10,8 14,5 18,8 16,18 19,20 14,32 17,40 8,45 12,55 7,58" fill="${b.color}" opacity="0.45" stroke="#000" stroke-width="0.3"/>
-               <polygon points="20,12 24,16 22,24 20,30 24,38 21,48" fill="${b.color}" opacity="0.35"/>`
-          }
-        </svg>
-        <div class="bottle-name">${b.el}${isSurvivor ? '' : ' (σπασμένο)'}</div>
-      `;
-      if (isSurvivor) {
-        el.classList.add("intact");
-        el.onclick = () => onOpenBottle(b.id);
-      }
-      row.appendChild(el);
-    });
-    beach.appendChild(row);
-    stage.appendChild(beach);
-
-    // Library scroll giving the number
-    const scroll = document.createElement("div");
-    scroll.className = "obj-card";
-    scroll.innerHTML = `
-      <h3>📜 Σπαρμένο ημερολόγιο ναυτικού</h3>
-      <div class="scroll-text">«…σώθηκε μόνο το <strong>${BOTTLES.find(b=>b.id===BOTTLE_SURVIVOR).el.toLowerCase()}</strong> γυαλί. Αν περιέχει το μήνυμα, ο αριθμός μέσα δείχνει την πύλη.»</div>
-      <p style="font-size: 11px; opacity: 0.7;">Πες στον σύντροφό σου ποιο χρώμα να διαλέξει. Ο αριθμός που θα γράψει: <strong style="font-family:monospace;letter-spacing:3px;">${BOTTLE_TARGET_NUMBER}</strong></p>
-    `;
-    stage.appendChild(scroll);
-
-    // Status of past
-    const status = document.createElement("div");
-    status.className = "obj-card";
-    if (state.bottleThrown) {
-      const b = BOTTLES.find(x => x.id === state.bottleColor);
-      status.innerHTML = `<h3>🔮 Παρατήρηση</h3>
-        <p>Ο σύντροφός σου έριξε στη θάλασσα το <strong>${b.el}</strong> μπουκάλι με μήνυμα: <strong style="font-family:monospace;">${state.bottleNote || '?'}</strong>.</p>`;
-    } else {
-      status.innerHTML = `<p style="text-align:center; opacity: 0.7;">Περιμένεις τον σύντροφό σου να στείλει μπουκάλι…</p>`;
-    }
-    stage.appendChild(status);
-
-    if (state.bottleRetrieved) {
-      const result = document.createElement("div");
-      result.className = "obj-card";
-      result.innerHTML = `<h3>📜 Δεύτερο θραύσμα</h3>
-        <p>Έσπασες το μπουκάλι και διάβασες το μήνυμα:</p>
-        <div class="fragment-display"><div class="fragment filled">${state.fragment2}</div></div>`;
-      stage.appendChild(result);
-      const next = document.createElement("button");
-      next.className = "btn future-style";
-      next.textContent = "Επόμενο αίνιγμα →";
-      next.onclick = () => { state.puzzle = 3; syncState(); };
-      stage.appendChild(next);
-    }
-  }
-}
-
-function onOpenBottle(id) {
-  if (!state.bottleThrown) return toast("Δεν έχει φτάσει μπουκάλι ακόμα.", "fail");
-  if (state.bottleColor !== id) return toast("Λάθος χρώμα — δεν το έστειλε εδώ.", "fail");
-  if (state.bottleNote !== BOTTLE_TARGET_NUMBER) return toast(`Το μήνυμα λέει "${state.bottleNote}" — δεν είναι ο σωστός αριθμός.`, "fail");
-  state.bottleRetrieved = true;
-  state.fragment2 = FRAGMENT_2_VALUE;
-  toast("📜 Διάβασες το μήνυμα!", "success");
-  syncState(true);
-}
-
-// ============ PUZZLE 3: BURY & DIG IN GROWN CITY ============
-function renderPuzzle3(stage) {
-  const title = document.createElement("div");
-  title.className = "scene-title";
-  title.innerHTML = `<div class="era">Αίνιγμα III</div><h1>Ο Θαμμένος Θησαυρός</h1>`;
-  stage.appendChild(title);
-
-  if (role === "past") {
-    const intro = document.createElement("div");
-    intro.className = "obj-card";
-    intro.innerHTML = `
-      <span class="helper-tag">Παρελθόν · 1872</span>
-      <div class="scroll-text">«Στέκομαι σε ένα ανοιχτό χωράφι. Έχω φτυάρι και τέσσερα μικρά αντικείμενα στην τσέπη μου. Πρέπει να θάψω ένα — αλλά το χωράφι θα γίνει πόλη και πολλά σημεία θα χτιστούν…»</div>
-      <p style="font-size: 12px; opacity: 0.7;">1) Διάλεξε αντικείμενο. 2) Άγγιξε κελί στον χάρτη. 3) Θάψε. Ο σύντροφός σου ξέρει ποια κελιά μπορούν να σκαφτούν στο 2287.</p>
-    `;
-    stage.appendChild(intro);
-
-    // Item palette
-    const items = document.createElement("div");
-    items.className = "obj-card";
-    items.innerHTML = `<h3>🎒 Αντικείμενα</h3>`;
-    const itemRow = document.createElement("div");
-    itemRow.className = "item-palette";
-    Object.entries(ITEMS).forEach(([k, v]) => {
-      const b = document.createElement("button");
-      b.className = "item-btn";
-      if (state._selItem === k) b.classList.add("selected");
-      b.innerHTML = `<span class="item-emoji">${v.emoji}</span><span class="item-name">${v.el}</span>`;
-      b.onclick = () => { state._selItem = k; render(); };
-      itemRow.appendChild(b);
-    });
-    items.appendChild(itemRow);
-    stage.appendChild(items);
-
-    // Field 4x4
-    const fieldCard = document.createElement("div");
-    fieldCard.className = "obj-card";
-    fieldCard.innerHTML = `<h3>🌾 Το χωράφι (1872)</h3>`;
-    const grid = document.createElement("div");
-    grid.className = "field-grid";
-    for (let i = 0; i < 16; i++) {
-      const cell = document.createElement("div");
-      cell.className = "field-cell past-cell";
-      if (state.buriedCell === i && state.buriedItem) {
-        cell.classList.add("buried");
-        cell.innerHTML = `<span>${ITEMS[state.buriedItem].emoji}</span><span class="mound">⛰</span>`;
-      } else {
-        cell.innerHTML = `<span class="coord">${i+1}</span>`;
-      }
-      cell.onclick = () => onBury(i);
-      grid.appendChild(cell);
-    }
-    fieldCard.appendChild(grid);
-    stage.appendChild(fieldCard);
-
-    if (state.buriedItem) {
-      const info = document.createElement("div");
-      info.className = "obj-card";
-      info.innerHTML = `<p style="text-align: center;">Έθαψες <strong>${ITEMS[state.buriedItem].el}</strong> στο κελί <strong>${state.buriedCell+1}</strong>. Άγγιξε άλλο κελί για να μετακινήσεις.</p>`;
-      stage.appendChild(info);
-    }
-
-    if (state.vaultOpened) {
-      const next = document.createElement("button");
-      next.className = "btn primary";
-      next.textContent = "Τελική απόδραση →";
-      next.onclick = () => { state.puzzle = 4; syncState(); };
-      stage.appendChild(next);
-    }
-  } else {
-    // FUTURE
-    const intro = document.createElement("div");
-    intro.className = "obj-card";
-    intro.innerHTML = `
-      <span class="helper-tag">Μέλλον · 2287</span>
-      <div class="scroll-text">«Στέκομαι μπροστά σε ένα κλειδωμένο χρονοθάλαμο. Χρειάζεται «ορειχάλκινο κλειδί από το 1872». Πάνω από το χωράφι έχει χτιστεί πόλη — μπορώ να σκάψω μόνο σε δρόμους, πάρκα και ερείπια.»</div>
-    `;
-    stage.appendChild(intro);
-
-    // The 4x4 city
-    const cityCard = document.createElement("div");
-    cityCard.className = "obj-card";
-    cityCard.innerHTML = `<h3>🏙️ Η πόλη (2287)</h3>`;
-    const grid = document.createElement("div");
-    grid.className = "field-grid";
-    for (let i = 0; i < 16; i++) {
-      const cell = document.createElement("div");
-      const type = FUTURE_MAP[i];
-      cell.className = "field-cell future-cell " + type;
-      const dug = state.dugCells.includes(i);
-      const label = type === "build" ? "🏢" : type === "road" ? "🛣️" : type === "park" ? "🌳" : "🗿";
-      if (dug && state.buriedCell === i && state.buriedItem === VAULT_NEEDS_ITEM) {
-        cell.innerHTML = `<span>${ITEMS[state.buriedItem].emoji}</span><span class="cell-label">βρέθηκε!</span>`;
-        cell.classList.add("found");
-      } else if (dug) {
-        cell.innerHTML = `<span>🕳️</span><span class="cell-label">τίποτα</span>`;
-        cell.classList.add("dug");
-      } else {
-        cell.innerHTML = `<span>${label}</span><span class="cell-label">${i+1}</span>`;
-      }
-      cell.onclick = () => onDig(i, type);
-      grid.appendChild(cell);
-    }
-    cityCard.appendChild(grid);
-    cityCard.innerHTML += `<div class="legend-row">
-      <span><span class="dot-build"></span>Κτίριο (δεν σκάβεται)</span>
-      <span><span class="dot-road"></span>Δρόμος</span>
-      <span><span class="dot-park"></span>Πάρκο</span>
-      <span><span class="dot-ruin"></span>Ερείπιο</span>
+MODALS["p1-sketch"] = (card) => {
+  ui.sketchFound = true;
+  card.innerHTML += `<div class="modal-title">σχέδιο στον τοίχο του στάβλου</div>`;
+  const el = document.createElement("div"); el.className = "page aged";
+  el.innerHTML = `<div class="page-title">Κάτοψη του κήπου · 1872</div>
+    <div style="text-align:center;">
+      <svg viewBox="0 0 200 200" style="width:80%; max-width:280px;">
+        <rect x="20" y="20" width="160" height="160" fill="none" stroke="#3a2010" stroke-width="1.5"/>
+        <line x1="20" y1="73" x2="180" y2="73" stroke="#3a2010" stroke-width="0.6"/>
+        <line x1="20" y1="127" x2="180" y2="127" stroke="#3a2010" stroke-width="0.6"/>
+        <line x1="73" y1="20" x2="73" y2="180" stroke="#3a2010" stroke-width="0.6"/>
+        <line x1="127" y1="20" x2="127" y2="180" stroke="#3a2010" stroke-width="0.6"/>
+        <text x="100" y="13" text-anchor="middle" font-style="italic" font-size="9" fill="#3a2010">προς το σπίτι</text>
+        <circle cx="100" cy="46" r="14" fill="none" stroke="#aa3030" stroke-width="2" stroke-dasharray="3,2"/>
+        <text x="100" y="200" text-anchor="middle" font-style="italic" font-size="8" fill="#3a2010">«εκεί που πέφτει η σκιά του μπαλκονιού»</text>
+      </svg>
     </div>`;
-    stage.appendChild(cityCard);
+  card.appendChild(el);
+};
 
-    // Notebook clue
-    const note = document.createElement("div");
-    note.className = "obj-card";
-    note.innerHTML = `
-      <h3>📓 Σημείωμα του φύλακα</h3>
-      <div class="scroll-text">«Ο χρονοθάλαμος ανοίγει με <strong>${ITEMS[VAULT_NEEDS_ITEM].el.toLowerCase()}</strong>. Όποιος βρει το σωστό αντικείμενο σε σκάψιμο μέσα στο πράσινο πάρκο, θα ακούσει το τικ-τακ του χρόνου.»</div>
-      <p style="font-size: 11px; opacity: 0.7;">Πες στον σύντροφό σου: ${ITEMS[VAULT_NEEDS_ITEM].el} στο πάρκο.</p>
-    `;
-    stage.appendChild(note);
+MODALS["p1-well"] = (card) => {
+  card.innerHTML += `<div class="modal-title">το πηγάδι</div><p class="modal-body"><em>Σκούρο νερό. Στην άκρη ένα τσίγκινο ποτιστήρι.</em></p>`;
+  const btn = document.createElement("button");
+  btn.className = "btn primary";
+  btn.textContent = ui.hasWateringCan ? "✓ Έχεις ήδη το ποτιστήρι" : "Πάρε το ποτιστήρι";
+  btn.disabled = ui.hasWateringCan;
+  btn.onclick = () => { ui.hasWateringCan = true; toast("🪣 Πήρες το ποτιστήρι"); closeModal(); };
+  card.appendChild(btn);
+};
 
-    if (state.vaultOpened) {
-      const result = document.createElement("div");
-      result.className = "obj-card";
-      result.innerHTML = `<h3>🗝️ Τρίτο θραύσμα</h3>
-        <p>Έβαλες το ${ITEMS[VAULT_NEEDS_ITEM].el.toLowerCase()} στον χρονοθάλαμο. Άνοιξε και έδειξε αριθμό:</p>
-        <div class="fragment-display"><div class="fragment filled">${state.fragment3}</div></div>`;
-      stage.appendChild(result);
-      const next = document.createElement("button");
-      next.className = "btn future-style";
-      next.textContent = "Τελική απόδραση →";
-      next.onclick = () => { state.puzzle = 4; syncState(); };
-      stage.appendChild(next);
-    }
+// ============ P1 FUTURE ============
+MODALS["p1-photo"] = (card) => {
+  ui.photoFound = true;
+  card.innerHTML += `<div class="modal-title">σπασμένη κορνίζα</div>`;
+  const el = document.createElement("div"); el.className = "page burnt";
+  el.innerHTML = `<div class="page-title">Φωτογραφία · γύρω στα 1900</div>
+    <div style="text-align:center; margin:10px 0;">
+      <svg viewBox="0 0 200 160" style="width:90%; max-width:280px; background:#3a2818; border-radius:6px;">
+        <polygon points="60,80 100,40 140,80" fill="#5a3818"/>
+        <rect x="70" y="80" width="60" height="60" fill="#3a2010"/>
+        <rect x="92" y="100" width="16" height="6" fill="#8a6f3a"/>
+        <rect x="78" y="92" width="8" height="10" fill="#0a0604"/>
+        <rect x="114" y="92" width="8" height="10" fill="#0a0604"/>
+        <ellipse cx="100" cy="115" rx="9" ry="40" fill="#3a6a2a"/>
+        <line x1="100" y1="80" x2="100" y2="140" stroke="#2a4a1a" stroke-width="2"/>
+        <circle cx="40" cy="118" r="3" fill="#d4b890"/>
+        <rect x="38" y="120" width="4" height="14" fill="#3a2010"/>
+        <text x="100" y="158" text-anchor="middle" font-size="7" font-style="italic" fill="#d4b890">«ο παππούς και το δέντρο του»</text>
+      </svg>
+    </div>
+    <div class="page-body"><em>Στην πίσω όψη με κόκκινο μελάνι:</em> «έβαλα τον αργυρό σπόρο μπροστά στην εξώπορτα και φύτρωσε ψηλότερα από κάθε άλλο.»</div>`;
+  card.appendChild(el);
+};
+
+MODALS["p1-note"] = (card) => {
+  ui.letterFound = true;
+  card.innerHTML += `<div class="modal-title">σημείωμα του βιβλιοθηκάριου</div>`;
+  const el = document.createElement("div"); el.className = "page";
+  el.innerHTML = `<div class="page-title">Ημερολόγιο · 2287, Φθινόπωρο</div>
+    <div class="page-body">
+      <p>Στο μπαλκόνι του παλιού σπιτιού υπάρχει ένα σιδερένιο μπαούλο. Ποτέ κανείς δεν το άνοιξε — οι σκάλες έχουν καταρρεύσει εδώ και αιώνες.</p>
+      <p>Στις σημειώσεις μας λέει ότι ο ιδιοκτήτης φύτεψε <em>«κάτι που θα μεγάλωνε όσο εκείνος δεν θα μπορούσε»</em>.</p>
+      <p style="opacity:0.6; font-size:11px;">Όποιος καταφέρει να ανέβει: μέσα στο μπαούλο, λένε, ένα <em>πρώτο κομμάτι κλειδιού</em>.</p>
+    </div>`;
+  card.appendChild(el);
+};
+
+MODALS["p1-climb"] = (card) => {
+  card.innerHTML += `<div class="modal-title">σκαρφάλωμα</div>`;
+  const b = state.garden[1];
+  if (!b.type) {
+    card.innerHTML += `<p class="modal-body"><em>Τίποτα δεν υψώνεται μπροστά μου. Μόνο γυμνό χώμα κάτω από το μπαλκόνι.</em></p>`;
+  } else if (!b.watered) {
+    card.innerHTML += `<p class="modal-body"><em>Ένα νεαρό βλασταράκι μόλις. Δεν αντέχει βάρος.</em></p>`;
+  } else if (b.type === "cherry") {
+    card.innerHTML += `<p class="modal-body"><em>Η κερασιά είναι γεμάτη άνθη. Κάθε κλαδί κρακ-σπάει στα δάχτυλά μου.</em></p>`;
+  } else if (b.type === "oak") {
+    card.innerHTML += `<p class="modal-body"><em>Η βελανιδιά είναι γεροδεμένη μα κοντή. Στέκομαι στην κορυφή και το μπαλκόνι παραμένει δύο μέτρα ψηλότερα.</em></p>`;
+  } else {
+    card.innerHTML += `<p class="modal-body"><em>Η ψηλή λεύκη αγκαλιάζει το μπαλκόνι. Ανεβαίνω. Το σιδερένιο μπαούλο τρίζει μετά από 400 χρόνια.</em></p>
+      <button class="btn future-style" onclick="grabKey1()">🔓 Άνοιξε το μπαούλο</button>`;
   }
+};
+window.grabKey1 = () => { state.fragments.p1 = true; state.reachedBalcony = true; toast("🗝️ Πρώτο κομμάτι κλειδιού!", "success"); closeModal(); syncState(true); };
+
+// ============ P2 ============
+const BOTTLES = [
+  { id: "green", color: "#3a8a4a", el: "Πράσινο" },
+  { id: "amber", color: "#a87030", el: "Μελί" },
+  { id: "blue",  color: "#3a5fa8", el: "Μπλε" },
+  { id: "clear", color: "#a8c0d0", el: "Διαφανές" },
+];
+const BOTTLE_SURVIVOR = "amber";
+
+MODALS["p2-bottles"] = (card) => {
+  card.innerHTML += `<div class="modal-title">τα μπουκάλια στο ράφι</div><p class="modal-body" style="font-style:italic; opacity:0.7;">Τέσσερα γυαλιά. Διαφορετικά χρώματα.</p>`;
+  const row = document.createElement("div"); row.className = "bottle-row";
+  BOTTLES.forEach(b => {
+    const btn = document.createElement("button");
+    btn.className = "bottle-pick" + (ui.selBottle === b.id ? " selected" : "");
+    btn.innerHTML = `${bottleSVG(b.color)}<div class="b-name">${b.el}</div>`;
+    btn.onclick = () => { ui.selBottle = b.id; renderModal(); toast(`Διάλεξες το ${b.el.toLowerCase()} γυαλί`); };
+    row.appendChild(btn);
+  });
+  card.appendChild(row);
+};
+MODALS["p2-paper"] = (card) => {
+  card.innerHTML += `<div class="modal-title">το χαρτί</div><p class="modal-body" style="font-style:italic; opacity:0.7;">Πέννα. Μελάνι μαύρο. Γράψε αριθμό.</p>`;
+  const inp = document.createElement("input"); inp.className = "cursive-input"; inp.value = state.bottleNote || ""; inp.placeholder = "____"; inp.maxLength = 5;
+  inp.oninput = e => { state.bottleNote = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); syncState(); };
+  card.appendChild(inp);
+};
+MODALS["p2-keeper"] = (card) => {
+  ui.logFound = true;
+  card.innerHTML += `<div class="modal-title">ημερολόγιο του φαροφύλακα</div>`;
+  const el = document.createElement("div"); el.className = "page aged";
+  el.innerHTML = `<div class="page-title">15 Ιανουαρίου 1872 · Φάρος της Άνδρου</div>
+    <div class="page-body">
+      <p>Είδα τέταρτο πλοίο να χάνεται. Τα κορίτσια τους θα ψάχνουν τα γράμματά τους στις παραλίες — μα η θάλασσα φέρνει πίσω <em>μόνο το μελί γυαλί</em>. Τα άλλα τα τρώει η άλμη σε λίγες δεκαετίες.</p>
+      <p style="font-size:11px; opacity:0.6;">Για όποιον γράψει σε μπουκάλι: το μελί γυαλί είναι το μόνο που θα φτάσει αυτόν που περιμένει — ακόμα και 400 χρόνια μετά.</p>
+    </div>`;
+  card.appendChild(el);
+};
+MODALS["p2-throw"] = (card) => {
+  card.innerHTML += `<div class="modal-title">πέταγμα στο πέλαγος</div>`;
+  const ok = ui.selBottle && state.bottleNote;
+  if (state.bottleThrown) {
+    const b = BOTTLES.find(x => x.id === state.bottleColor);
+    card.innerHTML += `<p class="modal-body"><em>Έριξες το ${b.el.toLowerCase()} μπουκάλι. Μήνυμα: «${state.bottleNote}». Φεύγει τώρα στον αιώνα.</em></p>
+      <button class="btn ghost" onclick="retractBottle()">↺ Τράβα το πίσω</button>`;
+  } else {
+    card.innerHTML += `<p class="modal-body"><em>Χρειάζεσαι μπουκάλι και χαρτί με γραμμένο αριθμό.</em></p>
+      <button class="btn primary" ${ok?'':'disabled'} onclick="throwBottle()">🌊 Ρίξτο</button>`;
+  }
+};
+window.throwBottle = () => {
+  if (!ui.selBottle || !state.bottleNote) return toast("Δεν είσαι έτοιμος", "fail");
+  state.bottleColor = ui.selBottle; state.bottleThrown = true;
+  closeModal(); toast("🌊 Το μπουκάλι ταξιδεύει…", "success"); syncState(true);
+};
+window.retractBottle = () => { state.bottleThrown = false; state.bottleColor = null; syncState(true); };
+
+MODALS["p2-shore"] = (card) => {
+  card.innerHTML += `<div class="modal-title">τα ξεβραστά μπουκάλια</div>`;
+  const row = document.createElement("div"); row.className = "bottle-row";
+  BOTTLES.forEach(b => {
+    const survived = b.id === BOTTLE_SURVIVOR;
+    const btn = document.createElement("button");
+    btn.className = "bottle-pick " + (survived ? "intact" : "broken");
+    btn.innerHTML = survived ? `${bottleSVG(b.color)}<div class="b-name">${b.el}</div>` : `${brokenBottleSVG(b.color)}<div class="b-name">${b.el} (σπασμένο)</div>`;
+    if (survived) btn.onclick = () => openBottleAttempt();
+    row.appendChild(btn);
+  });
+  card.appendChild(row);
+  card.innerHTML += `<p class="modal-body" style="font-size:11px; opacity:0.65; font-style:italic;">Μόνο ένα χρώμα γυαλιού έχει αντέξει 400 χρόνια.</p>`;
+};
+function openBottleAttempt() {
+  if (!state.bottleThrown) return toast("Δεν έχει φτάσει μπουκάλι.", "fail");
+  if (state.bottleColor !== BOTTLE_SURVIVOR) return toast("Το σωστό χρώμα δεν ταξίδεψε.", "fail");
+  state.bottleRetrieved = true; state.fragments.p2 = true;
+  toast("📜 Δεύτερο κομμάτι κλειδιού.", "success"); closeModal(); syncState(true);
+}
+MODALS["p2-vault"] = (card) => {
+  ui.vaultFound = true;
+  card.innerHTML += `<div class="modal-title">η σιδερένια θύρα στην παραλία</div>`;
+  const el = document.createElement("div"); el.className = "page";
+  el.innerHTML = `<div class="page-title">Επιγραφή στο μέταλλο</div>
+    <div class="page-body"><p><em>«Όποιος βρει το μήνυμα μέσα στο μελί γυαλί, να γράψει στο μπουκάλι τη χρονιά που εστάλη — και θα ανοίξει.»</em></p>
+    <p style="opacity:0.6; font-size:11px;">Δίπλα στη θύρα ένα φύλλο εφημερίδας: «12 Νοεμβρίου 1872 — η μεγάλη καταιγίδα».</p></div>`;
+  card.appendChild(el);
+};
+
+// ============ P3 ============
+const ITEMS = {
+  key:   { emoji: "🗝️", el: "ορειχάλκινο κλειδί" },
+  watch: { emoji: "⌚", el: "ρολόι τσέπης" },
+  ruby:  { emoji: "💎", el: "ρουμπίνι" },
+  ring:  { emoji: "💍", el: "δαχτυλίδι" },
+};
+const FUTURE_MAP = ["build","road","build","ruin","road","build","park","road","build","road","park","build","ruin","build","road","build"];
+const VAULT_NEEDS_ITEM = "key";
+
+MODALS["p3-pouch"] = (card) => {
+  card.innerHTML += `<div class="modal-title">η τσέπη σου</div><p class="modal-body" style="font-style:italic; opacity:0.7;">Τέσσερα μικρά αντικείμενα. Μόνο ένα θα αφήσεις στο χώμα.</p>`;
+  const row = document.createElement("div"); row.className = "item-row";
+  Object.entries(ITEMS).forEach(([k, v]) => {
+    const b = document.createElement("button");
+    b.className = "item-pick" + (ui.selItem === k ? " selected" : "");
+    b.innerHTML = `<div class="item-emo">${v.emoji}</div><div class="item-name">${v.el}</div>`;
+    b.onclick = () => { ui.selItem = k; renderModal(); toast(`Διάλεξες: ${v.el}`); };
+    row.appendChild(b);
+  });
+  card.appendChild(row);
+};
+MODALS["p3-stranger"] = (card) => {
+  ui.testamentFound = true;
+  card.innerHTML += `<div class="modal-title">η επιστολή του ξένου</div>`;
+  const el = document.createElement("div"); el.className = "page aged";
+  el.innerHTML = `<div class="page-title">«Στον αγαπητό μου αύριο»</div>
+    <div class="page-body">
+      <p>Σου εμπιστεύομαι το <em>τρίτο και τελευταίο κομμάτι του κλειδιού της Πύλης</em>. Θάψε το εδώ — αλλά πρόσεξε. Οι άνθρωποι θα χτίσουν πάνω από αυτό το χωράφι.</p>
+      <p>Μόνο εκεί που <em>θα υψωθούν φύλλα αντί για πέτρα</em>, εκεί που η πόλη θα αφήσει χώμα ελεύθερο.</p>
+      <p style="opacity:0.65; font-size:11px;">Πες του να ψάξει εκεί που μυρίζει χλωρό φύλλο μέσα σε τσιμέντο.</p>
+    </div>`;
+  card.appendChild(el);
+};
+MODALS["p3-blueprint"] = (card) => {
+  ui.blueprintFound = true;
+  card.innerHTML += `<div class="modal-title">τοπογραφικό 2287</div>`;
+  const el = document.createElement("div"); el.className = "page";
+  el.innerHTML = `<div class="page-title">Σχεδιασμός Πόλης · Τμήμα Δ</div>
+    <div style="text-align:center;">
+      <svg viewBox="0 0 200 200" style="width:90%; max-width:280px;">
+        ${FUTURE_MAP.map((t, i) => {
+          const r = Math.floor(i/4), c = i%4;
+          const x = 10 + c*46, y = 10 + r*46;
+          const fill = t === "build" ? "#5a5a6a" : t === "road" ? "#3a3a44" : t === "park" ? "#3a6a3a" : "#5a4838";
+          const sym = t === "build" ? "▢" : t === "road" ? "─" : t === "park" ? "❋" : "✕";
+          return `<g><rect x="${x}" y="${y}" width="42" height="42" fill="${fill}" stroke="#1a1820" stroke-width="0.5"/><text x="${x+21}" y="${y+26}" text-anchor="middle" font-size="11" fill="#fff" opacity="0.7">${sym}</text></g>`;
+        }).join("")}
+      </svg>
+    </div>
+    <p class="page-body" style="font-size:11px; opacity:0.65;">▢ κτίρια · ─ δρόμοι · ❋ πάρκα · ✕ ερείπια</p>
+    <p class="page-body" style="font-size:11px;"><em>«Χλωρό φύλλο μέσα σε τσιμέντο»</em> — οι κήποι των πάρκων.</p>`;
+  card.appendChild(el);
+};
+
+// ============ RENDER P1 ============
+function renderP1(stage) { if (role === "past") renderP1Past(stage); else renderP1Future(stage); }
+
+function renderP1Past(stage) {
+  stage.innerHTML += `<div class="scene-title"><div class="chapter">Κεφάλαιο Α · 1872</div><h1>Ο Σιωπηλός Κήπος</h1></div>
+    <div class="poem">«φύτεψα κάτι μέσα στο σκοτάδι — <em>για να το θερίσει το φως ενός αιώνα μετά</em>»</div>`;
+  const scene = document.createElement("div"); scene.className = "scene";
+  scene.innerHTML = buildP1PastSVG(); stage.appendChild(scene);
+  const svg = scene.querySelector("svg");
+  bindHot(svg, "door", () => openModal("p1-notebook"));
+  bindHot(svg, "well", () => openModal("p1-well"));
+  bindHot(svg, "stable", () => openModal("p1-sketch"));
+  bindHot(svg, "seedbag", () => openModal("p1-seeds"));
+  for (let i = 0; i < 9; i++) bindHot(svg, `tile-${i}`, () => onPlantPast(i));
+
+  const actions = document.createElement("div"); actions.className = "actions";
+  actions.innerHTML = `<div class="action-row">
+    <button class="tile-btn ${ui.notebookFound?'solved':''}" onclick="openModal('p1-notebook')"><span class="ic">📖</span><span class="nm">σημειωματάριο</span></button>
+    <button class="tile-btn ${ui.selSeed?'solved':''}" onclick="openModal('p1-seeds')"><span class="ic">🌱</span><span class="nm">σπόροι</span></button>
+  </div><div class="action-row">
+    <button class="tile-btn ${ui.sketchFound?'solved':''}" onclick="openModal('p1-sketch')"><span class="ic">📜</span><span class="nm">σχέδιο</span></button>
+    <button class="tile-btn ${ui.hasWateringCan?'solved':''}" onclick="openModal('p1-well')"><span class="ic">🪣</span><span class="nm">πηγάδι</span></button>
+  </div>`;
+  const anyUnwatered = state.garden.some(c => c.type && !c.watered);
+  if (anyUnwatered && ui.hasWateringCan) {
+    const w = document.createElement("button"); w.className = "btn primary"; w.textContent = "💧 Πότισε όλα τα φυτά";
+    w.onclick = () => { state.garden.forEach(c => { if (c.type) c.watered = true; }); toast("Ο χρόνος ρέει σαν νερό…", "success"); syncState(true); };
+    actions.appendChild(w);
+  }
+  stage.appendChild(actions);
+  if (state.reachedBalcony) {
+    const nx = document.createElement("button"); nx.className = "btn"; nx.textContent = "Επόμενο κεφάλαιο →";
+    nx.onclick = () => { state.puzzle = 2; syncState(); };
+    actions.appendChild(nx);
+  }
+}
+
+function buildP1PastSVG() {
+  const tiles = [];
+  for (let i = 0; i < 9; i++) {
+    const r = Math.floor(i/3), c = i%3;
+    const x = 70 + c*38, y = 130 + r*30;
+    const t = state.garden[i];
+    let plant = "";
+    if (t.type === "oak") plant = `<circle cx="${x+18}" cy="${y+8}" r="5" fill="#7a4a20"/>`;
+    if (t.type === "poplar") plant = `<line x1="${x+18}" y1="${y+22}" x2="${x+18}" y2="${y+4}" stroke="#5a8a4a" stroke-width="1.5"/><ellipse cx="${x+18}" cy="${y+6}" rx="2.5" ry="6" fill="#a8d4a0"/>`;
+    if (t.type === "cherry") plant = `<line x1="${x+18}" y1="${y+22}" x2="${x+18}" y2="${y+12}" stroke="#7a3050" stroke-width="1"/><circle cx="${x+18}" cy="${y+10}" r="4" fill="#e8a0b8"/>`;
+    tiles.push(`<g class="hot" data-hot="tile-${i}"><rect x="${x}" y="${y}" width="36" height="26" rx="3" fill="#5a3a1a" stroke="#3a2010" stroke-width="0.6"/>${plant}</g>`);
+  }
+  return `<svg viewBox="0 0 280 280">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f8d090"/><stop offset="60%" stop-color="#e8a878"/><stop offset="100%" stop-color="#9a6850"/></linearGradient>
+      <linearGradient id="house" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a87850"/><stop offset="100%" stop-color="#6a4828"/></linearGradient>
+    </defs>
+    <rect width="280" height="280" fill="url(#sky)"/>
+    <circle cx="220" cy="50" r="22" fill="#ffd690" opacity="0.7"/>
+    <circle cx="220" cy="50" r="15" fill="#fff0c0"/>
+    <path d="M0 130 Q70 110 140 125 Q210 135 280 115 L280 280 L0 280 Z" fill="#5a4030"/>
+    <polygon points="60,90 130,40 200,90" fill="#5a3818"/>
+    <rect x="70" y="90" width="120" height="40" fill="url(#house)"/>
+    <rect x="110" y="78" width="40" height="6" fill="#3a2010"/>
+    <rect x="120" y="74" width="20" height="6" fill="#1a0e08" stroke="#5a3818" stroke-width="0.4"/>
+    <rect x="80" y="100" width="14" height="14" fill="#0a0604"/>
+    <rect x="166" y="100" width="14" height="14" fill="#0a0604"/>
+    <g class="hot" data-hot="door">
+      <rect x="120" y="105" width="20" height="25" fill="#3a2010" stroke="#1a0e08"/>
+      <circle cx="135" cy="118" r="1.2" fill="#ffd76a"/>
+      <circle class="hot-ring" cx="130" cy="118" r="14" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    <path d="M125 130 L120 280" stroke="#8a6a4a" stroke-width="3" opacity="0.4"/>
+    <g class="hot" data-hot="seedbag">
+      <ellipse cx="155" cy="135" rx="8" ry="5" fill="#a8804a"/>
+      <text x="155" y="138" text-anchor="middle" font-size="6">🌱</text>
+      <circle class="hot-ring" cx="155" cy="135" r="14" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    <g class="hot" data-hot="stable">
+      <rect x="220" y="180" width="40" height="50" fill="#4a3018" stroke="#1a0e08"/>
+      <text x="240" y="208" text-anchor="middle" font-size="6" fill="#d4b890">📜</text>
+      <circle class="hot-ring" cx="240" cy="205" r="14" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    <g class="hot" data-hot="well">
+      <rect x="28" y="200" width="24" height="20" fill="#5a4030"/>
+      <rect x="28" y="196" width="24" height="6" fill="#3a2010"/>
+      <text x="40" y="216" text-anchor="middle" font-size="6">🪣</text>
+      <circle class="hot-ring" cx="40" cy="210" r="14" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    ${tiles.join("")}
+    <text x="140" y="270" font-size="6" text-anchor="middle" font-style="italic" fill="#3a2010" opacity="0.5">«ο κήπος μπροστά από το σπίτι»</text>
+  </svg>`;
+}
+
+function onPlantPast(i) {
+  if (!ui.selSeed) { toast("Διάλεξε σπόρο πρώτα (η σακούλα)"); return; }
+  const c = state.garden[i];
+  if (c.watered) { toast("Έχει ποτιστεί ήδη."); return; }
+  if (c.type === ui.selSeed) state.garden[i] = { type: null, watered: false };
+  else state.garden[i] = { type: ui.selSeed, watered: false };
+  syncState(true);
+}
+
+function bindHot(svg, name, fn) {
+  if (!svg) return;
+  const el = svg.querySelector(`[data-hot="${name}"]`);
+  if (el) el.addEventListener("click", fn);
+}
+
+function renderP1Future(stage) {
+  stage.innerHTML += `<div class="scene-title"><div class="chapter">Κεφάλαιο Α · 2287</div><h1>Ένα Σπίτι που Δεν Μιλάει</h1></div>
+    <div class="poem">«κάτι γυαλίζει στο μπαλκόνι · <em>μα η σκάλα τραγουδάει σαν νεκρή</em>»</div>`;
+  const scene = document.createElement("div"); scene.className = "scene";
+  scene.innerHTML = buildP1FutureSVG(); stage.appendChild(scene);
+  const svg = scene.querySelector("svg");
+  bindHot(svg, "window", () => openModal("p1-photo"));
+  bindHot(svg, "frame", () => openModal("p1-note"));
+  bindHot(svg, "tree", () => openModal("p1-climb"));
+  bindHot(svg, "balcony", () => openModal("p1-climb"));
+
+  const actions = document.createElement("div"); actions.className = "actions";
+  actions.innerHTML = `<div class="action-row">
+    <button class="tile-btn ${ui.photoFound?'solved':''}" onclick="openModal('p1-photo')"><span class="ic">🖼️</span><span class="nm">φωτογραφία</span></button>
+    <button class="tile-btn ${ui.letterFound?'solved':''}" onclick="openModal('p1-note')"><span class="ic">📜</span><span class="nm">σημείωμα</span></button>
+  </div><div class="action-row">
+    <button class="tile-btn" onclick="openModal('p1-climb')"><span class="ic">🪜</span><span class="nm">σκαρφάλωσε</span></button>
+  </div>`;
+  stage.appendChild(actions);
+  if (state.reachedBalcony) {
+    const nx = document.createElement("button"); nx.className = "btn future-style"; nx.textContent = "Επόμενο κεφάλαιο →";
+    nx.onclick = () => { state.puzzle = 2; syncState(); }; actions.appendChild(nx);
+  }
+}
+
+function buildP1FutureSVG() {
+  const trees = [];
+  for (let i = 0; i < 9; i++) {
+    const r = Math.floor(i/3), c = i%3;
+    const x = 70 + c*38, y = 130 + r*30;
+    const t = state.garden[i];
+    if (!t.type || !t.watered) continue;
+    let tree = "";
+    if (t.type === "oak") tree = `<ellipse cx="${x+18}" cy="${y-4}" rx="14" ry="16" fill="#3a3a2a"/><rect x="${x+16}" y="${y+5}" width="4" height="14" fill="#2a1a10"/>`;
+    else if (t.type === "poplar") tree = `<ellipse cx="${x+18}" cy="${y-30}" rx="10" ry="50" fill="#3a4a2a"/><line x1="${x+18}" y1="${y+15}" x2="${x+18}" y2="${y-45}" stroke="#1a2010" stroke-width="2"/>`;
+    else tree = `<circle cx="${x+18}" cy="${y-2}" r="11" fill="#b88090"/><rect x="${x+16}" y="${y+8}" width="4" height="10" fill="#5a2030"/>`;
+    const hot = (i === 1) ? `<g class="hot" data-hot="tree"><rect x="${x}" y="${y-60}" width="36" height="80" fill="transparent"/></g>` : "";
+    trees.push(tree + hot);
+  }
+  return `<svg viewBox="0 0 280 280">
+    <defs>
+      <linearGradient id="skyF" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a2a4a"/><stop offset="60%" stop-color="#1a1a32"/><stop offset="100%" stop-color="#0a0a18"/></linearGradient>
+      <radialGradient id="chestGlow"><stop offset="0%" stop-color="#ffd76a" stop-opacity="0.9"/><stop offset="100%" stop-color="#ffd76a" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="280" height="280" fill="url(#skyF)"/>
+    ${Array.from({length:30}).map(() => `<circle cx="${Math.random()*280}" cy="${Math.random()*120}" r="0.6" fill="#e0e8ff" opacity="${0.3+Math.random()*0.6}"/>`).join("")}
+    <circle cx="220" cy="50" r="18" fill="#d0d8e8"/>
+    <path d="M0 130 L40 130 L42 110 L60 110 L62 130 L100 130 L102 105 L120 105 L122 130 L280 130 L280 280 L0 280 Z" fill="#0a0a14" opacity="0.6"/>
+    <polygon points="60,92 130,42 200,92" fill="#1a1a20"/>
+    <rect x="70" y="92" width="120" height="40" fill="#0e0e14"/>
+    <line x1="78" y1="95" x2="84" y2="130" stroke="#000" stroke-width="0.5"/>
+    <line x1="155" y1="100" x2="148" y2="130" stroke="#000" stroke-width="0.5"/>
+    <rect x="110" y="80" width="40" height="6" fill="#2a2a3a"/>
+    <g class="hot" data-hot="balcony">
+      <circle cx="130" cy="74" r="14" fill="url(#chestGlow)"/>
+      <rect x="120" y="71" width="20" height="6" fill="#3a2010"/>
+      <rect x="121" y="68" width="18" height="3" fill="#c9a25c"/>
+      <circle class="hot-ring" cx="130" cy="72" r="14" fill="none" stroke="#ffd76a" stroke-width="0.6"/>
+    </g>
+    <g class="hot" data-hot="window">
+      <rect x="80" y="100" width="14" height="14" fill="#0a0a14" stroke="#3a3a4a" stroke-width="0.4"/>
+      <line x1="80" y1="100" x2="94" y2="114" stroke="#3a3a4a" stroke-width="0.3"/>
+      <circle class="hot-ring" cx="87" cy="107" r="11" fill="none" stroke="#87b8ff" stroke-width="0.6"/>
+    </g>
+    <g class="hot" data-hot="frame">
+      <rect x="220" y="200" width="30" height="25" fill="#1a1820" stroke="#3a3848" stroke-width="0.6"/>
+      <text x="235" y="218" text-anchor="middle" font-size="8">📜</text>
+      <circle class="hot-ring" cx="235" cy="212" r="14" fill="none" stroke="#87b8ff" stroke-width="0.5"/>
+    </g>
+    ${trees.join("")}
+  </svg>`;
+}
+
+// ============ RENDER P2 ============
+function renderP2(stage) { if (role === "past") renderP2Past(stage); else renderP2Future(stage); }
+
+function bottleSVG(color) { return `<svg viewBox="0 0 30 60"><path d="M12 4 L12 14 Q8 18 8 26 L8 54 Q8 58 15 58 Q22 58 22 54 L22 26 Q22 18 18 14 L18 4 Z" fill="${color}" stroke="#000" stroke-width="0.6" opacity="0.85"/><rect x="11" y="2" width="8" height="4" fill="#3a2818"/></svg>`; }
+function brokenBottleSVG(color) { return `<svg viewBox="0 0 30 60"><polygon points="10,8 14,5 18,8 16,18 19,20 14,32 17,40 8,45 12,55 7,58" fill="${color}" opacity="0.45"/><polygon points="20,12 24,16 22,24 20,30 24,38 21,48" fill="${color}" opacity="0.35"/></svg>`; }
+
+function renderP2Past(stage) {
+  stage.innerHTML += `<div class="scene-title"><div class="chapter">Κεφάλαιο Β · 1872</div><h1>Το Μώλο που Έγραψε στον Χρόνο</h1></div>
+    <div class="poem">«έγραψα · έριξα στο νερό. <em>η θάλασσα είναι ωκεανός χρόνου</em>»</div>`;
+  const scene = document.createElement("div"); scene.className = "scene";
+  scene.innerHTML = buildP2PastSVG(); stage.appendChild(scene);
+  const svg = scene.querySelector("svg");
+  bindHot(svg, "bottles", () => openModal("p2-bottles"));
+  bindHot(svg, "paper", () => openModal("p2-paper"));
+  bindHot(svg, "lighthouse", () => openModal("p2-keeper"));
+  bindHot(svg, "sea", () => openModal("p2-throw"));
+
+  const actions = document.createElement("div"); actions.className = "actions";
+  actions.innerHTML = `<div class="action-row">
+    <button class="tile-btn ${ui.selBottle?'solved':''}" onclick="openModal('p2-bottles')"><span class="ic">🍾</span><span class="nm">μπουκάλια</span></button>
+    <button class="tile-btn ${state.bottleNote?'solved':''}" onclick="openModal('p2-paper')"><span class="ic">📝</span><span class="nm">χαρτί</span></button>
+  </div><div class="action-row">
+    <button class="tile-btn ${ui.logFound?'solved':''}" onclick="openModal('p2-keeper')"><span class="ic">🗒️</span><span class="nm">ημερολόγιο φάρου</span></button>
+    <button class="tile-btn ${state.bottleThrown?'solved':''}" onclick="openModal('p2-throw')"><span class="ic">🌊</span><span class="nm">πέταγμα</span></button>
+  </div>`;
+  stage.appendChild(actions);
+  if (state.bottleRetrieved) {
+    const nx = document.createElement("button"); nx.className = "btn primary"; nx.textContent = "Επόμενο κεφάλαιο →";
+    nx.onclick = () => { state.puzzle = 3; syncState(); }; actions.appendChild(nx);
+  }
+}
+
+function buildP2PastSVG() {
+  return `<svg viewBox="0 0 280 280">
+    <defs>
+      <linearGradient id="seaSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f0c890"/><stop offset="60%" stop-color="#d09060"/><stop offset="100%" stop-color="#9a4838"/></linearGradient>
+      <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3a4a6a"/><stop offset="100%" stop-color="#1a2030"/></linearGradient>
+    </defs>
+    <rect width="280" height="280" fill="url(#seaSky)"/>
+    <circle cx="200" cy="130" r="30" fill="#ffd070" opacity="0.7"/>
+    <g class="hot" data-hot="lighthouse">
+      <rect x="38" y="60" width="14" height="80" fill="#e8e0d0"/>
+      <rect x="38" y="80" width="14" height="6" fill="#aa3030"/>
+      <rect x="38" y="100" width="14" height="6" fill="#aa3030"/>
+      <rect x="35" y="56" width="20" height="6" fill="#3a3030"/>
+      <rect x="40" y="48" width="10" height="10" fill="#ffd070" opacity="0.8"/>
+      <circle class="hot-ring" cx="45" cy="100" r="20" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    <rect x="60" y="180" width="160" height="14" fill="#5a3a20"/>
+    <rect x="60" y="194" width="160" height="6" fill="#3a2010"/>
+    <g class="hot" data-hot="bottles">
+      <rect x="78" y="160" width="60" height="20" fill="#3a2010"/>
+      ${BOTTLES.map((b, i) => `<rect x="${82+i*14}" y="148" width="8" height="14" rx="2" fill="${b.color}"/>`).join("")}
+      <circle class="hot-ring" cx="108" cy="160" r="22" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    <g class="hot" data-hot="paper">
+      <rect x="160" y="166" width="30" height="14" fill="#f0e8c8" stroke="#3a2010" stroke-width="0.4"/>
+      <line x1="164" y1="170" x2="186" y2="170" stroke="#3a2010" stroke-width="0.4"/>
+      <line x1="164" y1="174" x2="186" y2="174" stroke="#3a2010" stroke-width="0.4"/>
+      <circle class="hot-ring" cx="175" cy="173" r="14" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    <rect x="0" y="200" width="280" height="80" fill="url(#sea)"/>
+    <path d="M0 210 Q20 207 40 210 Q60 213 80 210 Q100 207 120 210 Q140 213 160 210 Q180 207 200 210 Q220 213 240 210 Q260 207 280 210" stroke="#5a6a8a" stroke-width="0.6" fill="none"/>
+    <g class="hot" data-hot="sea">
+      <rect x="0" y="220" width="280" height="60" fill="transparent"/>
+      ${state.bottleThrown ? `<rect x="140" y="240" width="6" height="10" fill="${BOTTLES.find(b=>b.id===state.bottleColor).color}" opacity="0.8" transform="rotate(20 143 245)"/>` : ""}
+    </g>
+  </svg>`;
+}
+
+function renderP2Future(stage) {
+  stage.innerHTML += `<div class="scene-title"><div class="chapter">Κεφάλαιο Β · 2287</div><h1>Η Άκρη του Κόσμου που Ξέβρασε</h1></div>
+    <div class="poem">«ο χρόνος είναι θάλασσα · <em>επιβιώνει μόνο το συγκεκριμένο γυαλί</em>»</div>`;
+  const scene = document.createElement("div"); scene.className = "scene";
+  scene.innerHTML = buildP2FutureSVG(); stage.appendChild(scene);
+  const svg = scene.querySelector("svg");
+  bindHot(svg, "shore", () => openModal("p2-shore"));
+  bindHot(svg, "vault", () => openModal("p2-vault"));
+
+  const actions = document.createElement("div"); actions.className = "actions";
+  actions.innerHTML = `<div class="action-row">
+    <button class="tile-btn" onclick="openModal('p2-shore')"><span class="ic">🏝️</span><span class="nm">τα μπουκάλια</span></button>
+    <button class="tile-btn ${ui.vaultFound?'solved':''}" onclick="openModal('p2-vault')"><span class="ic">🚪</span><span class="nm">σιδερένια θύρα</span></button>
+  </div>`;
+  stage.appendChild(actions);
+  if (state.bottleRetrieved) {
+    const nx = document.createElement("button"); nx.className = "btn future-style"; nx.textContent = "Επόμενο κεφάλαιο →";
+    nx.onclick = () => { state.puzzle = 3; syncState(); }; actions.appendChild(nx);
+  }
+}
+
+function buildP2FutureSVG() {
+  return `<svg viewBox="0 0 280 280">
+    <defs><linearGradient id="nightSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a2a4a"/><stop offset="100%" stop-color="#06101a"/></linearGradient></defs>
+    <rect width="280" height="280" fill="url(#nightSky)"/>
+    ${Array.from({length:25}).map(() => `<circle cx="${Math.random()*280}" cy="${Math.random()*150}" r="0.5" fill="#e0e8ff" opacity="${0.3+Math.random()*0.6}"/>`).join("")}
+    <circle cx="220" cy="55" r="18" fill="#d0d8e8"/>
+    <rect x="38" y="70" width="14" height="70" fill="#3a3838"/>
+    <rect x="36" y="68" width="18" height="4" fill="#1a1818"/>
+    <rect x="0" y="180" width="280" height="100" fill="#0a1a2a"/>
+    <g class="hot" data-hot="shore">
+      <ellipse cx="100" cy="220" rx="80" ry="10" fill="#3a3a44"/>
+      ${BOTTLES.map((b, i) => {
+        const x = 60 + i*22;
+        const ok = b.id === BOTTLE_SURVIVOR;
+        return ok ? `<rect x="${x}" y="208" width="8" height="14" rx="2" fill="${b.color}" stroke="#ffd76a" stroke-width="0.5"/><circle class="hot-ring" cx="${x+4}" cy="215" r="10" fill="none" stroke="#87b8ff" stroke-width="0.4"/>`
+                  : `<polygon points="${x},218 ${x+2},212 ${x+5},220 ${x+8},216" fill="${b.color}" opacity="0.5"/>`;
+      }).join("")}
+    </g>
+    <g class="hot" data-hot="vault">
+      <rect x="200" y="150" width="36" height="50" fill="#2a2828" stroke="#0a0a0a" stroke-width="0.6"/>
+      <circle cx="218" cy="175" r="6" fill="#5a5a5a"/>
+      <circle cx="218" cy="175" r="3" fill="#3a3a3a"/>
+      <circle class="hot-ring" cx="218" cy="175" r="20" fill="none" stroke="#87b8ff" stroke-width="0.5"/>
+    </g>
+  </svg>`;
+}
+
+// ============ RENDER P3 ============
+function renderP3(stage) { if (role === "past") renderP3Past(stage); else renderP3Future(stage); }
+
+function renderP3Past(stage) {
+  stage.innerHTML += `<div class="scene-title"><div class="chapter">Κεφάλαιο Γ · 1872</div><h1>Ένα Χωράφι Πριν Γίνει Πόλη</h1></div>
+    <div class="poem">«ο ξένος μου άφησε το <em>τελευταίο κομμάτι</em>· έπρεπε μόνο να βρω χώμα που θα ζούσε»</div>`;
+  const scene = document.createElement("div"); scene.className = "scene";
+  scene.innerHTML = buildP3PastSVG(); stage.appendChild(scene);
+  const svg = scene.querySelector("svg");
+  bindHot(svg, "pouch", () => openModal("p3-pouch"));
+  bindHot(svg, "letter", () => openModal("p3-stranger"));
+  for (let i = 0; i < 16; i++) bindHot(svg, `field-${i}`, () => onBury(i));
+
+  const actions = document.createElement("div"); actions.className = "actions";
+  actions.innerHTML = `<div class="action-row">
+    <button class="tile-btn ${ui.selItem?'solved':''}" onclick="openModal('p3-pouch')"><span class="ic">🎒</span><span class="nm">η τσέπη</span></button>
+    <button class="tile-btn ${ui.testamentFound?'solved':''}" onclick="openModal('p3-stranger')"><span class="ic">📜</span><span class="nm">επιστολή</span></button>
+  </div>`;
+  stage.appendChild(actions);
+  if (state.buriedItem) {
+    const info = document.createElement("div");
+    info.style.cssText = "text-align:center; font-size:12px; opacity:0.7; font-style:italic; padding:0 14px;";
+    info.textContent = `Έθαψες ${ITEMS[state.buriedItem].el} στο κελί ${state.buriedCell + 1}.`;
+    actions.appendChild(info);
+  }
+  if (state.vaultOpened) {
+    const nx = document.createElement("button"); nx.className = "btn primary"; nx.textContent = "Τελική απόδραση →";
+    nx.onclick = () => { state.puzzle = 4; syncState(); }; actions.appendChild(nx);
+  }
+}
+
+function buildP3PastSVG() {
+  const tiles = [];
+  for (let i = 0; i < 16; i++) {
+    const r = Math.floor(i/4), c = i%4;
+    const x = 20 + c*60, y = 130 + r*30;
+    const buried = (state.buriedCell === i);
+    tiles.push(`<g class="hot" data-hot="field-${i}">
+      <rect x="${x}" y="${y}" width="54" height="24" rx="2" fill="${buried ? '#7a5a3a' : '#5a4030'}" stroke="#3a2010" stroke-width="0.4"/>
+      ${buried ? `<text x="${x+27}" y="${y+16}" font-size="11" text-anchor="middle">${ITEMS[state.buriedItem].emoji}</text>` : `<text x="${x+27}" y="${y+16}" font-size="6" text-anchor="middle" fill="#8a6a4a" opacity="0.4">${i+1}</text>`}
+    </g>`);
+  }
+  return `<svg viewBox="0 0 280 280">
+    <defs><linearGradient id="dawn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d0b070"/><stop offset="100%" stop-color="#7a5028"/></linearGradient></defs>
+    <rect width="280" height="280" fill="url(#dawn)"/>
+    <path d="M0 130 Q40 110 80 130 Q120 145 160 125 Q200 115 240 130 Q260 135 280 130 L280 130 L0 130 Z" fill="#3a2818" opacity="0.6"/>
+    <g class="hot" data-hot="pouch">
+      <ellipse cx="40" cy="245" rx="20" ry="14" fill="#7a5028"/>
+      <text x="40" y="250" text-anchor="middle" font-size="10">🎒</text>
+      <circle class="hot-ring" cx="40" cy="245" r="22" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    <g class="hot" data-hot="letter">
+      <rect x="220" y="240" width="44" height="22" fill="#f0e8c8" stroke="#3a2010" stroke-width="0.4" transform="rotate(-8 242 251)"/>
+      <line x1="226" y1="248" x2="258" y2="248" stroke="#3a2010" stroke-width="0.3"/>
+      <line x1="226" y1="252" x2="258" y2="252" stroke="#3a2010" stroke-width="0.3"/>
+      <circle class="hot-ring" cx="240" cy="251" r="22" fill="none" stroke="#ffd76a" stroke-width="0.5"/>
+    </g>
+    ${tiles.join("")}
+  </svg>`;
 }
 
 function onBury(i) {
-  if (!state._selItem) return toast("Διάλεξε αντικείμενο πρώτα");
-  state.buriedItem = state._selItem;
-  state.buriedCell = i;
-  // Reset future dig if past changes burial
-  state.dugCells = [];
-  state.vaultOpened = false;
-  state.fragment3 = null;
-  toast(`Έθαψες ${ITEMS[state._selItem].el} στο κελί ${i+1}`);
-  syncState(true);
+  if (!ui.selItem) return toast("Διάλεξε αντικείμενο πρώτα");
+  state.buriedItem = ui.selItem; state.buriedCell = i; state.dugCells = []; state.vaultOpened = false;
+  toast(`Έθαψες ${ITEMS[ui.selItem].el} στο κελί ${i+1}`); syncState(true);
 }
 
-function onDig(i, type) {
-  if (type === "build") return toast("Κτίριο. Δεν μπορείς να σκάψεις εδώ.", "fail");
+function renderP3Future(stage) {
+  stage.innerHTML += `<div class="scene-title"><div class="chapter">Κεφάλαιο Γ · 2287</div><h1>Η Πόλη Πάνω από το Χωράφι</h1></div>
+    <div class="poem">«το ίδιο χώμα · <em>τέσσερις αιώνες αργότερα</em>»</div>`;
+  const scene = document.createElement("div"); scene.className = "scene";
+  scene.innerHTML = buildP3FutureSVG(); stage.appendChild(scene);
+  const svg = scene.querySelector("svg");
+  bindHot(svg, "blueprint", () => openModal("p3-blueprint"));
+  for (let i = 0; i < 16; i++) bindHot(svg, `city-${i}`, () => onDig(i));
+
+  const actions = document.createElement("div"); actions.className = "actions";
+  actions.innerHTML = `<div class="action-row">
+    <button class="tile-btn ${ui.blueprintFound?'solved':''}" onclick="openModal('p3-blueprint')"><span class="ic">📐</span><span class="nm">τοπογραφικό</span></button>
+  </div>`;
+  stage.appendChild(actions);
+  if (state.vaultOpened) {
+    const nx = document.createElement("button"); nx.className = "btn future-style"; nx.textContent = "Τελική απόδραση →";
+    nx.onclick = () => { state.puzzle = 4; syncState(); }; actions.appendChild(nx);
+  }
+}
+
+function buildP3FutureSVG() {
+  const tiles = [];
+  for (let i = 0; i < 16; i++) {
+    const r = Math.floor(i/4), c = i%4;
+    const x = 20 + c*60, y = 110 + r*36;
+    const t = FUTURE_MAP[i];
+    const dug = state.dugCells.includes(i);
+    const found = dug && state.buriedCell === i && state.buriedItem === VAULT_NEEDS_ITEM;
+    const fillMap = { build: "#3a3a48", road: "#2a2a32", park: "#1a3a20", ruin: "#3a2820" };
+    const fill = found ? "#c9a25c" : dug ? "#1a0e08" : fillMap[t];
+    const icon = found ? ITEMS[VAULT_NEEDS_ITEM].emoji : dug ? "🕳️" : (t==="build"?"🏢":t==="road"?"":t==="park"?"🌳":"🗿");
+    tiles.push(`<g class="hot ${t === 'build' ? 'dim' : ''}" data-hot="city-${i}">
+      <rect x="${x}" y="${y}" width="54" height="30" fill="${fill}" stroke="#000" stroke-width="0.5"/>
+      <text x="${x+27}" y="${y+20}" text-anchor="middle" font-size="13">${icon}</text>
+    </g>`);
+  }
+  return `<svg viewBox="0 0 280 280">
+    <defs><linearGradient id="urb" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a1a24"/><stop offset="100%" stop-color="#06060a"/></linearGradient></defs>
+    <rect width="280" height="280" fill="url(#urb)"/>
+    <path d="M0 90 L20 90 L20 70 L40 70 L40 88 L60 88 L60 60 L80 60 L80 92 L120 92 L120 78 L160 78 L160 92 L200 92 L200 65 L240 65 L240 92 L280 92 L280 280 L0 280 Z" fill="#0a0a14" opacity="0.7"/>
+    <g class="hot" data-hot="blueprint">
+      <rect x="220" y="20" width="44" height="32" fill="#1a3a4a" stroke="#3a7aaa" stroke-width="0.6"/>
+      <text x="242" y="40" text-anchor="middle" font-size="8" fill="#87b8ff">📐</text>
+      <circle class="hot-ring" cx="242" cy="36" r="22" fill="none" stroke="#87b8ff" stroke-width="0.5"/>
+    </g>
+    ${tiles.join("")}
+  </svg>`;
+}
+
+function onDig(i) {
+  const t = FUTURE_MAP[i];
+  if (t === "build") return toast("Κτίριο. Δεν μπορείς να σκάψεις εδώ.", "fail");
   if (state.dugCells.includes(i)) return;
   state.dugCells = [...state.dugCells, i];
   if (state.buriedCell === i && state.buriedItem === VAULT_NEEDS_ITEM) {
-    state.vaultOpened = true;
-    state.fragment3 = FRAGMENT_3_VALUE;
-    toast("🗝️ Βρέθηκε το σωστό αντικείμενο!", "success");
+    state.vaultOpened = true; state.fragments.p3 = true;
+    toast("🗝️ Τρίτο κομμάτι κλειδιού!", "success");
   } else if (state.buriedCell === i) {
-    toast(`Βρήκες ${ITEMS[state.buriedItem].el} — λάθος αντικείμενο.`, "fail");
+    toast(`Βρήκες ${ITEMS[state.buriedItem].el}. Δεν είναι κλειδί.`, "fail");
   } else {
     toast("Τίποτα σε αυτό το σημείο.", "fail");
   }
@@ -1925,157 +1133,76 @@ function onDig(i, type) {
 
 // ============ FINAL ============
 function renderFinal(stage) {
-  const title = document.createElement("div");
-  title.className = "scene-title";
-  title.innerHTML = `<div class="era">Τελική Απόδραση</div><h1>Η Πύλη του Χρόνου</h1>`;
-  stage.appendChild(title);
-
-  const intro = document.createElement("div");
-  intro.className = "obj-card";
-  intro.innerHTML = `
-    <span class="helper-tag">${role === "past" ? "Παρελθόν" : "Μέλλον"}</span>
-    <div class="scroll-text">«Τρία θραύσματα. Ένας κωδικός. Η πόρτα που στέκεται έξω από τον χρόνο περιμένει.»</div>
-  `;
-  stage.appendChild(intro);
-
-  const frags = document.createElement("div");
-  frags.className = "obj-card";
-  frags.innerHTML = `<h3>Τα τρία θραύσματα</h3>
-    <div class="fragment-display">
-      <div class="fragment ${state.fragment1!=null?'filled':''}">${state.fragment1 ?? '?'}</div>
-      <div class="fragment ${state.fragment2!=null?'filled':''}">${state.fragment2 ?? '?'}</div>
-      <div class="fragment ${state.fragment3!=null?'filled':''}">${state.fragment3 ?? '?'}</div>
-    </div>`;
-  stage.appendChild(frags);
-
-  const lock = document.createElement("div");
-  lock.className = "obj-card";
-  lock.innerHTML = `<h3>🔐 Τελική κλειδαριά</h3>`;
-  const display = document.createElement("div");
-  display.className = "lock-display";
-  state._lockInput = state._lockInput || "";
-  for (let i = 0; i < 3; i++) {
-    const d = document.createElement("div");
-    d.className = "digit-slot";
-    if (state._lockInput[i]) d.textContent = state._lockInput[i];
-    else { d.classList.add("empty"); d.textContent = "·"; }
-    display.appendChild(d);
+  stage.innerHTML += `<div class="scene-title"><div class="chapter">Τελική Σκηνή</div><h1>Η Πύλη του Χρόνου</h1></div>
+    <div class="poem">«τρία κομμάτια συναρμολογούνται σε μία λάμα · <em>όταν το κλειδί είναι ένα, η πύλη ξυπνά</em>»</div>`;
+  const all = state.fragments.p1 && state.fragments.p2 && state.fragments.p3;
+  const scene = document.createElement("div"); scene.className = "scene";
+  scene.innerHTML = `<svg viewBox="0 0 280 280">
+    <defs><radialGradient id="doorGlow"><stop offset="0%" stop-color="${all?'#ffd76a':'#3a3848'}" stop-opacity="0.8"/><stop offset="100%" stop-color="${all?'#ffd76a':'#3a3848'}" stop-opacity="0"/></radialGradient></defs>
+    <rect width="280" height="280" fill="#06040c"/>
+    <circle cx="140" cy="140" r="100" fill="url(#doorGlow)"/>
+    <rect x="100" y="80" width="80" height="160" rx="40" fill="#1a1018" stroke="${all?'#c9a25c':'#3a2818'}" stroke-width="2"/>
+    <circle cx="140" cy="160" r="6" fill="#0a0604"/>
+    <rect x="138" y="160" width="4" height="10" fill="#0a0604"/>
+    ${all ? `<g transform="translate(50, 250)">
+      <circle cx="0" cy="0" r="8" fill="#c9a25c"/>
+      <rect x="6" y="-3" width="50" height="6" fill="#c9a25c"/>
+      <rect x="56" y="-6" width="4" height="12" fill="#c9a25c"/>
+      <rect x="62" y="-3" width="4" height="6" fill="#c9a25c"/>
+    </g>` : ""}
+  </svg>`;
+  stage.appendChild(scene);
+  const status = document.createElement("div"); status.className = "actions";
+  if (!all) {
+    status.innerHTML = `<p style="text-align:center; opacity:0.7; font-style:italic;">Λείπουν κομμάτια. Χρειάζονται και τα τρία.</p>`;
+  } else {
+    const btn = document.createElement("button");
+    btn.className = role === "past" ? "btn primary" : "btn future-style";
+    btn.textContent = "🔓 Γύρισε το κλειδί";
+    btn.onclick = () => { state.escaped = true; syncState(true); };
+    status.appendChild(btn);
   }
-  lock.appendChild(display);
-
-  const kp = document.createElement("div");
-  kp.className = "digit-keypad";
-  const keys = ["1","2","3","4","5","6","7","8","9","⌫","0","✓"];
-  keys.forEach(k => {
-    const b = document.createElement("button");
-    b.className = "key-btn";
-    b.textContent = k;
-    b.onclick = () => onKey(k);
-    kp.appendChild(b);
-  });
-  lock.appendChild(kp);
-  stage.appendChild(lock);
-}
-
-function onKey(k) {
-  state._lockInput = state._lockInput || "";
-  if (k === "⌫") {
-    state._lockInput = state._lockInput.slice(0, -1);
-  } else if (k === "✓") {
-    const target = `${state.fragment1}${state.fragment2}${state.fragment3}`;
-    if (state._lockInput === target) {
-      state.escaped = true;
-      syncState(true);
-      toast("🎉 ΑΠΕΔΡΑΣΑΤΕ!", "success");
-    } else {
-      toast("Λάθος κωδικός…", "fail");
-      state._lockInput = "";
-    }
-  } else if (state._lockInput.length < 3) {
-    state._lockInput += k;
-  }
-  render();
+  stage.appendChild(status);
 }
 
 function renderWin() {
   showScreen("win");
-  $("#win-text").innerHTML = `
-    Λύσατε τα τρία αινίγματα του χρόνου.<br>
-    Ένα δέντρο φύτρωσε για να σκαρφαλώσει ο σύντροφος.<br>
-    Ένα μπουκάλι ταξίδεψε στον ωκεανό 400 χρόνια.<br>
-    Ένα κλειδί περίμενε θαμμένο μέσα σε μια πόλη.<br><br>
-    <em>«Δύο εποχές, μία απόδραση.»</em>
-  `;
+  $("#win-text").innerHTML = `Η λεύκη φύτρωσε ψηλή για τον άγνωστο · το μελί γυαλί επέζησε τέσσερις αιώνες θαλασσινό αλάτι · η πόλη άφησε ένα πάρκο να σκαφτεί.<br><br>«Δύο εποχές, ένα κλειδί.»`;
 }
 
-
-// ===================== CHAT =====================
+// ============ CHAT ============
 $("#chat-toggle").addEventListener("click", () => toggleChat());
 $("#chat-input").addEventListener("keydown", e => { if (e.key === "Enter") sendChatMsg(); });
-
 function toggleChat(force) {
   const p = $("#chat-panel");
-  if (force === false) p.classList.remove("open");
-  else p.classList.toggle("open");
-  if (p.classList.contains("open")) {
-    $("#chat-toggle").classList.remove("has-unread");
-    setTimeout(() => $("#chat-input").focus(), 100);
-  }
+  if (force === false) p.classList.remove("open"); else p.classList.toggle("open");
+  if (p.classList.contains("open")) { $("#chat-toggle").classList.remove("has-unread"); setTimeout(() => $("#chat-input").focus(), 100); }
 }
-
 function sendChatMsg() {
-  const inp = $("#chat-input");
-  const txt = inp.value.trim();
+  const txt = $("#chat-input").value.trim();
   if (!txt) return;
-  send("chat", txt);
-  addChatMsg(txt, "mine");
-  inp.value = "";
+  send("chat", txt); addChatMsg(txt, "mine"); $("#chat-input").value = "";
 }
-
 function addChatMsg(txt, side) {
-  const m = document.createElement("div");
-  m.className = "msg " + side;
-  const who = document.createElement("div");
-  who.className = "who";
-  who.textContent = side === "mine" ? "Εσύ" : (role === "past" ? "Μέλλον" : "Παρελθόν");
+  const m = document.createElement("div"); m.className = "msg " + side;
+  const who = document.createElement("div"); who.className = "who";
+  who.textContent = side === "mine" ? "εσύ" : (role === "past" ? "από το μέλλον" : "από το παρελθόν");
   m.appendChild(who);
-  const body = document.createElement("div");
-  body.textContent = txt;
+  const body = document.createElement("div"); body.textContent = txt;
   m.appendChild(body);
   $("#chat-messages").appendChild(m);
   $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
 }
 
-// ===================== UTIL =====================
-function shade(hex, percent) {
-  const f = parseInt(hex.slice(1), 16);
-  const t = percent < 0 ? 0 : 255;
-  const p = Math.abs(percent) / 100;
-  const R = f >> 16, G = (f >> 8) & 0xff, B = f & 0xff;
-  return "#" + (
-    0x1000000 +
-    (Math.round((t - R) * p) + R) * 0x10000 +
-    (Math.round((t - G) * p) + G) * 0x100 +
-    (Math.round((t - B) * p) + B)
-  ).toString(16).slice(1);
-}
-
-// ===================== WIRE UI =====================
+// ============ WIRE ============
 $("#create-btn").addEventListener("click", host);
 $("#join-btn").addEventListener("click", join);
 $("#copy-btn").addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(myCode);
-    toast("Κωδικός αντιγράφηκε", "success");
-  } catch(e) { toast("Πάτα παρατεταμένα τον κωδικό για αντιγραφή"); }
+  try { await navigator.clipboard.writeText(myCode); toast("Κωδικός αντιγράφηκε", "success"); }
+  catch(e) { toast("Πάτα παρατεταμένα τον κωδικό"); }
 });
-$("#join-input").addEventListener("input", e => {
-  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"");
-});
-
-// Prevent iOS zoom on double-tap
+$("#join-input").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""); });
 document.addEventListener("dblclick", e => e.preventDefault());
-
 </script>
 </body>
 </html>
