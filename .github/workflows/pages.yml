@@ -5,6 +5,7 @@ on:
     branches:
       - claude/time-travel-escape-game-UyiDO
       - main
+      - add-cipher-lab
   workflow_dispatch:
 
 permissions:
