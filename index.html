@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0a0612">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Chronos — Escape the Loop</title>
 <style>
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
@@ -310,7 +313,21 @@ function toast(msg, type) {
 function genCode() { const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i=0; i<6; i++) s += chars[Math.floor(Math.random()*chars.length)]; return s; }
 
 function makePeer(id) {
-  return new Peer(id, { config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:global.stun.twilio.com:3478" }] }, debug: 1 });
+  return new Peer(id, {
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" },
+        { urls: "turn:openrelay.metered.ca:80",  username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:standard.relay.metered.ca:80",  username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:standard.relay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      ],
+      iceCandidatePoolSize: 4,
+    },
+    debug: 2
+  });
 }
 function host() {
   myCode = genCode(); isHost = true;
@@ -325,8 +342,25 @@ function join() {
   if (code.length < 4) return toast("Άκυρος κωδικός", "fail");
   isHost = false; $("#join-status").textContent = "Σύνδεση…";
   peer = makePeer(ROOM_PREFIX + "j-" + genCode());
-  peer.on("open", () => { conn = peer.connect(ROOM_PREFIX + code, { reliable: true }); wireConn(); });
-  peer.on("error", (e) => { $("#join-status").textContent = "Σφάλμα: " + (e.type === "peer-unavailable" ? "δωμάτιο δεν υπάρχει" : e.type); });
+  peer.on("open", () => {
+    $("#join-status").textContent = "Αναζήτηση δωματίου…";
+    conn = peer.connect(ROOM_PREFIX + code, { reliable: true });
+    wireConn();
+    // Hard timeout: if data channel not open in 20s, surface diagnostic
+    setTimeout(() => {
+      if (!conn || !conn.open) {
+        $("#join-status").innerHTML = "Δεν συνδέθηκε. Πιθανώς το δίκτυο μπλοκάρει WebRTC.<br><span style='font-size:11px; opacity:0.7;'>Δοκίμασε: ίδιο WiFi · Wi-Fi αντί για 4G/5G · Chrome/Safari όχι in-app browser</span>";
+      }
+    }, 20000);
+  });
+  peer.on("error", (e) => {
+    console.error("Peer error:", e);
+    let msg = e.type;
+    if (e.type === "peer-unavailable") msg = "δωμάτιο δεν υπάρχει (ή cache — refresh με Ctrl+Shift+R)";
+    if (e.type === "network") msg = "πρόβλημα δικτύου";
+    if (e.type === "server-error") msg = "broker server down — δοκίμασε σε λίγο";
+    $("#join-status").textContent = "Σφάλμα: " + msg;
+  });
 }
 function wireConn() {
   conn.on("open", () => {
@@ -335,6 +369,7 @@ function wireConn() {
     setTimeout(() => showScreen("role"), 600);
   });
   conn.on("data", onRecv);
+  conn.on("error", (e) => { console.error("Conn error:", e); });
   conn.on("close", () => { setPeerStatus(false); toast("Συνεργάτης αποσυνδέθηκε", "fail"); });
 }
 function send(type, payload) { if (!conn || !conn.open) return; try { conn.send({ type, payload }); } catch(e) { console.warn(e); } }
