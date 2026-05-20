@@ -2,1510 +2,1870 @@
 <html lang="el">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MECHANO — 3D Escape Rooms</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0612">
+<title>Chronos — Escape the Loop</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: #e8d6a8; font-family: 'Georgia', serif; }
-  #canvas { display: block; width: 100%; height: 100%; cursor: grab; }
-  #canvas:active { cursor: grabbing; }
-  #canvas.pointing { cursor: pointer; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0a0612;
+    color: #e8d9c0;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+  }
+  input { user-select: text; }
 
-  #lobby {
-    position: fixed; inset: 0; z-index: 200;
-    background: radial-gradient(circle, #1a1410 0%, #000 80%);
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    padding: 20px; text-align: center;
+  /* ---------- THEMES ---------- */
+  body.past {
+    background: radial-gradient(ellipse at center top, #3a2418 0%, #1a0e08 60%, #0a0604 100%);
+    color: #f0d9a8;
   }
-  #lobby h1 {
-    font-size: clamp(2em, 6vw, 4em);
-    letter-spacing: 0.4em;
-    color: #d4af6a;
-    text-shadow: 0 0 30px #d4af6a, 0 0 60px rgba(212,175,106,0.4);
-    margin-bottom: 12px;
-    animation: glow 3s ease-in-out infinite;
+  body.future {
+    background: radial-gradient(ellipse at center top, #0a1a2e 0%, #050c1c 60%, #02060f 100%);
+    color: #a8d4ff;
   }
-  #lobby h2 { letter-spacing: 0.3em; font-size: 0.9em; color: #8a6f3d; opacity: 0.8; margin-bottom: 28px; }
-  @keyframes glow {
-    0%, 100% { text-shadow: 0 0 30px #d4af6a, 0 0 60px rgba(212,175,106,0.4); }
-    50% { text-shadow: 0 0 40px #ffd684, 0 0 80px rgba(255,214,132,0.6); }
-  }
-  #lobby p { margin: 10px 0; max-width: 620px; line-height: 1.6; opacity: 0.85; }
-  #lobby p.small { opacity: 0.5; font-size: 0.85em; font-family: monospace; letter-spacing: 0.1em; margin-top: 12px; }
-  .panel {
-    background: rgba(20, 14, 8, 0.85);
-    border: 1px solid #8a6f3d;
-    border-radius: 6px;
-    padding: 22px; margin: 14px;
-    max-width: 460px; width: 100%;
-    box-shadow: 0 0 25px rgba(212,175,106,0.12);
-  }
-  .row-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-  .lobby-btn {
-    background: transparent; color: #d4af6a; border: 2px solid #d4af6a;
-    padding: 11px 26px; font-size: 1em; letter-spacing: 0.2em;
-    cursor: pointer; transition: all 0.25s; font-family: inherit; min-width: 170px;
-  }
-  .lobby-btn:hover:not(:disabled) { background: #d4af6a; color: #1a0e05; box-shadow: 0 0 25px rgba(212,175,106,0.5); }
-  .lobby-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  input.text-input {
-    background: #0e0805; color: #d4af6a; border: 1px solid #8a6f3d;
-    padding: 12px; font-family: monospace; font-size: 1.1em;
-    width: 100%; margin: 10px 0; outline: none;
-    text-transform: uppercase; letter-spacing: 0.2em; text-align: center;
-  }
-  input.text-input:focus { box-shadow: 0 0 15px rgba(212,175,106,0.4); }
-  .code-display {
-    font-size: 1.8em; background: #0e0805; padding: 14px;
-    border: 1px dashed #d4af6a; text-align: center;
-    margin: 12px 0; letter-spacing: 0.3em; cursor: pointer; color: #ffd684;
-  }
-  .code-display:hover { background: rgba(212,175,106,0.08); }
-  .lobby-status { opacity: 0.7; font-size: 0.9em; margin-top: 8px; min-height: 1.2em; }
-  .blink { animation: blink 1.4s infinite; }
-  @keyframes blink { 50% { opacity: 0.3; } }
 
-  #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
-  #ui.show { display: block; }
-  #ui > * { pointer-events: auto; }
-
-  #top-bar {
-    position: absolute; top: 0; left: 0; right: 0;
-    padding: 14px 22px;
-    display: flex; justify-content: space-between; align-items: center;
-    background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent);
-    flex-wrap: wrap; gap: 10px;
-  }
-  #title-bar { display: flex; align-items: center; gap: 14px; }
-  #game-title { font-size: 1.2em; letter-spacing: 0.4em; color: #d4af6a; text-shadow: 0 0 10px rgba(212,175,106,0.5); }
-  #role-badge {
-    background: rgba(212,175,106,0.15); border: 1px solid #d4af6a;
-    padding: 4px 12px; border-radius: 3px;
-    font-size: 0.85em; color: #ffd684; letter-spacing: 0.2em;
-  }
-  #room-indicator { font-size: 0.95em; letter-spacing: 0.15em; color: #8a6f3d; }
-  #room-indicator strong { color: #ffd684; }
-
-  #clue-panel {
-    position: absolute; top: 70px; left: 16px;
-    max-width: 290px;
-    background: rgba(20, 14, 8, 0.94);
-    border: 1px solid #8a6f3d; border-left: 4px solid #ffd684;
-    padding: 14px 18px; border-radius: 4px;
-    font-size: 0.92em; line-height: 1.55;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-    transition: transform 0.3s, opacity 0.3s;
-  }
-  #clue-panel.collapsed { transform: translateX(calc(-100% - 32px)); opacity: 0; pointer-events: none; }
-  #clue-panel h3 { font-size: 0.78em; color: #ffd684; letter-spacing: 0.25em; margin-bottom: 8px; text-transform: uppercase; padding-right: 22px; }
-  #clue-panel-close {
-    position: absolute; top: 6px; right: 8px;
-    background: transparent; color: #8a6f3d; border: none;
-    font-size: 1.2em; cursor: pointer; padding: 2px 6px; font-family: inherit; line-height: 1;
-  }
-  #clue-panel-close:hover { color: #ffd684; }
-  #clue-panel .symbol-row { font-size: 1.6em; letter-spacing: 0.2em; margin: 8px 0; color: #ffd684; }
-  #clue-panel code { background: #0e0805; padding: 2px 6px; border-radius: 2px; color: #ffd684; font-family: monospace; }
-  #clue-panel .key-list { padding-left: 20px; margin: 8px 0; }
-  #clue-panel .digit-block { display: flex; gap: 6px; justify-content: center; margin: 10px 0; font-family: monospace; font-size: 1.3em; }
-  #clue-panel .digit-block span { background: #0e0805; border: 1px solid #5a4a2a; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 2px; }
-  #clue-panel .digit-block span.filled { color: #ffd684; border-color: #ffd684; }
-  #clue-panel .digit-block span.hidden { color: #5a4a2a; }
-  #clue-panel .color-chip { display: inline-block; width: 16px; height: 16px; border-radius: 50%; margin: 0 4px; vertical-align: middle; box-shadow: 0 0 6px currentColor; }
-  #clue-reopen {
-    position: absolute; top: 70px; left: 16px;
-    background: rgba(20, 14, 8, 0.92); color: #ffd684;
-    border: 1px solid #8a6f3d; width: 42px; height: 42px;
-    border-radius: 50%; cursor: pointer; font-size: 1em; font-family: inherit;
-    display: none; align-items: center; justify-content: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-  }
-  #clue-reopen.show { display: flex; }
-  #clue-reopen:hover { background: #d4af6a; color: #1a0e05; }
-
-  #instruction {
-    position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
-    max-width: 600px; width: calc(100% - 40px);
-    padding: 12px 20px;
-    background: rgba(20, 14, 8, 0.92);
-    border: 1px solid #8a6f3d;
-    border-radius: 4px; text-align: center; font-size: 0.95em; line-height: 1.5;
-    backdrop-filter: blur(6px);
-  }
-  #controls {
-    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 10px;
-  }
-  .icon-btn {
-    background: rgba(20, 14, 8, 0.92); color: #d4af6a; border: 1px solid #8a6f3d;
-    width: 42px; height: 42px; border-radius: 50%; font-size: 1.1em;
-    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
-    font-family: inherit;
-  }
-  .icon-btn:hover { background: #d4af6a; color: #1a0e05; transform: scale(1.05); }
-
-  #chat {
-    position: absolute; bottom: 80px; right: 16px;
-    width: 280px;
-    background: rgba(10, 6, 3, 0.94);
-    border: 1px solid #8a6f3d; border-radius: 4px;
-    transition: transform 0.3s;
-  }
-  #chat.collapsed { transform: translateY(calc(100% - 38px)); }
-  #chat-header { padding: 8px 12px; background: rgba(212,175,106,0.1); cursor: pointer; font-size: 0.85em; letter-spacing: 0.15em; display: flex; justify-content: space-between; }
-  #chat-messages { height: 140px; overflow-y: auto; padding: 8px 12px; font-size: 0.85em; }
-  #chat-messages > div { margin: 3px 0; line-height: 1.4; }
-  .msg-me { color: #ffd684; }
-  .msg-them { color: #88ccff; }
-  .msg-sys { color: #888; font-style: italic; font-size: 0.85em; }
-  #chat-input-row { display: flex; padding: 4px; border-top: 1px solid #5a4a2a; }
-  #chat-input { background: #0e0805; color: #d4af6a; border: none; padding: 8px; flex: 1; font-family: inherit; font-size: 0.9em; outline: none; }
-
-  #fade {
+  /* ---------- SCREENS ---------- */
+  .screen {
     position: fixed; inset: 0;
-    background: #000;
-    opacity: 0;
-    pointer-events: none;
-    z-index: 80;
-    transition: opacity 0.9s ease;
-    display: flex; align-items: center; justify-content: center;
-    color: #d4af6a;
-    font-size: 1.6em;
-    letter-spacing: 0.4em;
-    text-shadow: 0 0 20px #d4af6a;
-  }
-  #fade.show { opacity: 1; pointer-events: auto; }
-
-  #victory {
-    position: fixed; inset: 0; z-index: 99;
     display: none;
-    background: radial-gradient(circle, rgba(212,175,106,0.15), rgba(0,0,0,0.85));
-    flex-direction: column; justify-content: center; align-items: center;
-    text-align: center; pointer-events: none;
-    animation: fadeIn 2s;
+    flex-direction: column;
+    padding: env(safe-area-inset-top, 12px) 16px env(safe-area-inset-bottom, 16px);
+    overflow-y: auto;
+    overflow-x: hidden;
   }
-  #victory.show { display: flex; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  #victory h1 {
-    font-size: 3.5em; color: #ffd684;
-    text-shadow: 0 0 30px #ffd684, 0 0 60px #d4af6a;
-    letter-spacing: 0.3em;
-    animation: glow 2s ease-in-out infinite;
-  }
-  #victory p { margin-top: 20px; color: #d4af6a; font-size: 1.2em; opacity: 0.9; }
+  .screen.active { display: flex; }
 
-  .corner-link {
-    position: fixed; bottom: 8px; right: 14px;
-    color: rgba(212,175,106,0.3); font-size: 0.75em;
-    text-decoration: none; font-family: monospace;
-    pointer-events: auto; z-index: 5;
+  /* ---------- LOBBY ---------- */
+  #lobby {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: radial-gradient(ellipse at center, #1a0e2a 0%, #0a0612 70%, #050208 100%);
   }
-  .corner-link:hover { color: #d4af6a; }
+  .logo {
+    font-family: "Georgia", serif;
+    font-size: clamp(36px, 9vw, 56px);
+    letter-spacing: 4px;
+    font-weight: 300;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #c9a25c 0%, #f0d9a8 35%, #87b8ff 65%, #4a7dc9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 6s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.3); }
+  }
+  .tag {
+    font-size: 13px;
+    opacity: 0.6;
+    letter-spacing: 3px;
+    margin-bottom: 40px;
+    text-transform: uppercase;
+  }
+  .lobby-card {
+    background: rgba(20, 12, 30, 0.7);
+    border: 1px solid rgba(201, 162, 92, 0.2);
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+    backdrop-filter: blur(8px);
+    margin-bottom: 16px;
+  }
+  .lobby-card h3 {
+    margin: 0 0 12px 0;
+    font-weight: 400;
+    font-size: 15px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+    font-family: inherit;
+    border: 1px solid rgba(240, 217, 168, 0.3);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(60, 40, 80, 0.4), rgba(30, 20, 50, 0.6));
+    color: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .btn:active { transform: scale(0.98); background: rgba(80, 60, 120, 0.5); }
+  .btn.primary {
+    background: linear-gradient(180deg, #c9a25c, #8b6f3a);
+    color: #1a0e08;
+    border-color: #c9a25c;
+    font-weight: 600;
+  }
+  .btn.future-style {
+    background: linear-gradient(180deg, #4a7dc9, #2a4f8f);
+    color: #fff;
+    border-color: #87b8ff;
+    font-weight: 600;
+  }
+  .input {
+    width: 100%;
+    padding: 14px;
+    font-size: 18px;
+    letter-spacing: 4px;
+    text-align: center;
+    text-transform: uppercase;
+    border: 1px solid rgba(240, 217, 168, 0.3);
+    border-radius: 12px;
+    background: rgba(0,0,0,0.4);
+    color: inherit;
+    font-family: "Courier New", monospace;
+    margin-bottom: 12px;
+  }
+  .input:focus { outline: none; border-color: #c9a25c; }
+  .code-display {
+    font-size: 28px;
+    font-family: "Courier New", monospace;
+    letter-spacing: 8px;
+    padding: 16px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 12px;
+    text-align: center;
+    color: #f0d9a8;
+    margin: 8px 0 16px 0;
+    border: 1px dashed rgba(240, 217, 168, 0.3);
+  }
+  .status {
+    font-size: 13px;
+    opacity: 0.7;
+    text-align: center;
+    margin-top: 8px;
+    min-height: 18px;
+  }
+  .small {
+    font-size: 12px;
+    opacity: 0.5;
+    margin-top: 20px;
+    line-height: 1.5;
+    max-width: 360px;
+  }
 
-  @media (max-width: 768px) {
-    #lobby h1 { font-size: 2.5em; letter-spacing: 0.2em; }
-    #clue-panel { max-width: calc(100% - 32px); font-size: 0.85em; padding: 10px 14px; top: 60px; }
-    #chat { width: calc(100% - 32px); left: 16px; bottom: 75px; }
-    #instruction { font-size: 0.85em; bottom: 240px; }
-    #game-title { font-size: 1em; letter-spacing: 0.2em; }
+  /* ---------- ROLE SELECT ---------- */
+  #role {
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
   }
+  .role-card {
+    width: 100%;
+    max-width: 360px;
+    padding: 28px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+  }
+  .role-card.past-card {
+    background: linear-gradient(135deg, #3a2418, #1a0e08);
+    border-color: #c9a25c;
+    color: #f0d9a8;
+  }
+  .role-card.future-card {
+    background: linear-gradient(135deg, #0a1a2e, #051022);
+    border-color: #4a7dc9;
+    color: #a8d4ff;
+  }
+  .role-card:active { transform: scale(0.97); }
+  .role-card.taken { opacity: 0.3; pointer-events: none; }
+  .role-icon { font-size: 56px; margin-bottom: 12px; line-height: 1; }
+  .role-card h2 { margin: 0; font-weight: 300; letter-spacing: 4px; font-size: 22px; }
+  .role-card p { margin: 8px 0 0 0; font-size: 13px; opacity: 0.7; }
+
+  /* ---------- GAME ---------- */
+  #game {
+    padding: 0;
+  }
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: max(env(safe-area-inset-top, 8px), 8px) 12px 8px;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .era-badge {
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    text-transform: uppercase;
+  }
+  body.past .era-badge { background: #c9a25c; color: #1a0e08; }
+  body.future .era-badge { background: #4a7dc9; color: #fff; }
+  .puzzle-indicator {
+    display: flex;
+    gap: 6px;
+  }
+  .dot {
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.1);
+  }
+  .dot.active { background: #c9a25c; }
+  body.future .dot.active { background: #4a7dc9; }
+  .dot.done { background: #4caf50; }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: inherit;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stage {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .scene-title {
+    text-align: center;
+    margin: 4px 0 20px;
+  }
+  .scene-title .era {
+    font-size: 11px;
+    letter-spacing: 3px;
+    opacity: 0.5;
+    text-transform: uppercase;
+  }
+  .scene-title h1 {
+    margin: 4px 0;
+    font-weight: 300;
+    font-size: 22px;
+    letter-spacing: 2px;
+  }
+
+  /* ---------- CARDS / OBJECTS ---------- */
+  .obj-card {
+    background: rgba(0,0,0,0.35);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+  }
+  body.past .obj-card { border-color: rgba(201, 162, 92, 0.15); }
+  body.future .obj-card { border-color: rgba(74, 125, 201, 0.2); }
+
+  .obj-card h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    font-weight: 400;
+  }
+
+  .scroll-text {
+    font-family: "Georgia", serif;
+    font-style: italic;
+    line-height: 1.6;
+    font-size: 14px;
+    padding: 12px;
+    background: rgba(50, 30, 10, 0.4);
+    border-left: 3px solid #c9a25c;
+    border-radius: 4px;
+    margin: 8px 0;
+  }
+  body.future .scroll-text {
+    background: rgba(10, 30, 50, 0.4);
+    border-left-color: #4a7dc9;
+    color: #c0e0ff;
+  }
+
+  /* ---------- PUZZLE 1: SUNDIAL ---------- */
+  .sundial-wrap {
+    aspect-ratio: 1;
+    max-width: 340px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .sundial-svg { width: 100%; height: 100%; }
+  .stone {
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .stone:active { transform: scale(0.92); transform-origin: center; transform-box: fill-box; }
+  .stone-symbol {
+    font-size: 28px;
+    pointer-events: none;
+  }
+  .stone-label {
+    font-size: 11px;
+    fill: rgba(255,255,255,0.4);
+    letter-spacing: 2px;
+    pointer-events: none;
+  }
+  .rose-center {
+    transition: all 1s;
+  }
+
+  /* ---------- PUZZLE 2: BOOKS ---------- */
+  .shelf {
+    background: linear-gradient(180deg, #4a2818 0%, #2a1408 100%);
+    border-radius: 8px;
+    padding: 14px 8px 22px;
+    margin: 12px 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6) inset;
+    min-height: 180px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 6px;
+    position: relative;
+  }
+  body.future .shelf {
+    background: linear-gradient(180deg, #2a2a30 0%, #15151a 100%);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.8) inset;
+  }
+  .book {
+    width: 38px;
+    height: 130px;
+    border-radius: 3px 3px 1px 1px;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 18px;
+    box-shadow: 2px 2px 6px rgba(0,0,0,0.4);
+    transition: all 0.3s ease;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    letter-spacing: 4px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+    border: 1px solid rgba(0,0,0,0.3);
+    font-family: Georgia, serif;
+  }
+  .book.selected {
+    transform: rotate(180deg) translateY(-12px);
+    box-shadow: 0 0 20px gold, 2px 2px 6px rgba(0,0,0,0.4);
+  }
+  .book.ghost {
+    background: rgba(60,60,80,0.3) !important;
+    color: transparent;
+    border: 1px dashed rgba(255,255,255,0.2);
+    box-shadow: inset 0 0 12px rgba(0,0,0,0.6);
+  }
+  .book-slot {
+    width: 38px;
+    height: 130px;
+    border-radius: 3px;
+    position: relative;
+  }
+  .book-slot.shadow {
+    border: 1px dashed rgba(255,255,255,0.15);
+  }
+
+  /* ---------- PUZZLE 3: WALL ---------- */
+  .wall-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    max-width: 320px;
+    margin: 14px auto;
+    aspect-ratio: 1;
+    padding: 8px;
+    background: linear-gradient(135deg, #3a2a1a, #1a1208);
+    border-radius: 8px;
+  }
+  body.future .wall-grid {
+    background: linear-gradient(135deg, #1a1a22, #0a0a14);
+  }
+  .wall-cell {
+    background: linear-gradient(135deg, #6a4828, #4a3018);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    position: relative;
+    color: #f0d9a8;
+    transition: all 0.15s;
+    aspect-ratio: 1;
+  }
+  body.future .wall-cell {
+    background: linear-gradient(135deg, #3a3a48, #20202a);
+    color: #a8d4ff;
+  }
+  .wall-cell:active { transform: scale(0.95); }
+  .wall-cell.cracked {
+    background: repeating-linear-gradient(45deg, #2a1a08, #2a1a08 4px, #1a0e04 4px, #1a0e04 8px);
+    cursor: not-allowed;
+    color: rgba(255,255,255,0.15);
+  }
+  body.future .wall-cell.cracked {
+    background: repeating-linear-gradient(45deg, #0a0a14, #0a0a14 4px, #050508 4px, #050508 8px);
+  }
+  .wall-cell.cracked::after {
+    content: "✕";
+    color: rgba(255,255,255,0.25);
+    position: absolute;
+    font-size: 18px;
+  }
+  .wall-cell.faded { opacity: 0.4; }
+
+  .symbol-palette {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+  }
+  .palette-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.4);
+    border: 2px solid rgba(255,255,255,0.15);
+    color: inherit;
+    font-size: 26px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .palette-btn.selected {
+    border-color: #c9a25c;
+    background: rgba(201, 162, 92, 0.25);
+    box-shadow: 0 0 12px rgba(201, 162, 92, 0.4);
+  }
+
+  /* ---------- LOCK ---------- */
+  .lock-display {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .digit-slot {
+    width: 56px;
+    height: 72px;
+    background: rgba(0,0,0,0.5);
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    font-size: 36px;
+    font-family: "Courier New", monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #c9a25c;
+    text-shadow: 0 0 10px rgba(201, 162, 92, 0.5);
+  }
+  body.future .digit-slot { color: #4a7dc9; text-shadow: 0 0 10px rgba(74, 125, 201, 0.5); }
+  .digit-slot.empty { color: rgba(255,255,255,0.2); }
+  .digit-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-width: 280px;
+    margin: 0 auto;
+  }
+  .key-btn {
+    height: 60px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: inherit;
+    font-size: 24px;
+    cursor: pointer;
+  }
+  .key-btn:active { background: rgba(255,255,255,0.15); }
+
+  /* ---------- CHAT ---------- */
+  #chat-toggle {
+    position: fixed;
+    bottom: max(env(safe-area-inset-bottom, 12px), 12px);
+    right: 12px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c9a25c, #8b6f3a);
+    color: #1a0e08;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    z-index: 50;
+    display: none;
+  }
+  body.future #chat-toggle {
+    background: linear-gradient(135deg, #4a7dc9, #2a4f8f);
+    color: #fff;
+  }
+  #chat-toggle.has-unread::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 12px;
+    height: 12px;
+    background: #ff4444;
+    border-radius: 50%;
+    border: 2px solid #0a0612;
+  }
+  #chat-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 70vh;
+    background: rgba(10, 6, 18, 0.97);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    transform: translateY(100%);
+    transition: transform 0.3s;
+    z-index: 100;
+    padding: env(safe-area-inset-top, 0) 12px env(safe-area-inset-bottom, 12px);
+    display: flex;
+    flex-direction: column;
+  }
+  #chat-panel.open { transform: translateY(0); }
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 4px;
+    min-height: 200px;
+    max-height: 50vh;
+  }
+  .msg {
+    margin: 6px 0;
+    padding: 8px 12px;
+    border-radius: 12px;
+    max-width: 80%;
+    font-size: 14px;
+    line-height: 1.4;
+    word-wrap: break-word;
+  }
+  .msg.mine {
+    background: rgba(201, 162, 92, 0.25);
+    margin-left: auto;
+    text-align: right;
+  }
+  body.future .msg.mine { background: rgba(74, 125, 201, 0.25); }
+  .msg.theirs {
+    background: rgba(255,255,255,0.06);
+    margin-right: auto;
+  }
+  .msg .who {
+    font-size: 10px;
+    opacity: 0.5;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .chat-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 8px 0;
+  }
+  .chat-input-row input {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.4);
+    color: inherit;
+    font-size: 16px;
+  }
+  .chat-input-row button {
+    padding: 0 16px;
+    border-radius: 10px;
+    border: none;
+    background: #c9a25c;
+    color: #1a0e08;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  body.future .chat-input-row button { background: #4a7dc9; color: #fff; }
+
+  /* ---------- WIN ---------- */
+  #win {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: radial-gradient(ellipse at center, rgba(76, 175, 80, 0.2), transparent 70%), #0a0612;
+  }
+  .victory-title {
+    font-size: 48px;
+    font-family: Georgia, serif;
+    font-weight: 300;
+    letter-spacing: 8px;
+    background: linear-gradient(135deg, #c9a25c, #87b8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+  .victory-sub {
+    font-size: 14px;
+    opacity: 0.6;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  /* ---------- HINT / TOAST ---------- */
+  .toast {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 24px;
+    font-size: 14px;
+    z-index: 200;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    max-width: 90%;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast.success { border-color: #4caf50; }
+  .toast.fail { border-color: #f44336; }
+
+  /* ---------- RIPPLE ---------- */
+  @keyframes ripple {
+    0% { transform: scale(0.5); opacity: 0.8; }
+    100% { transform: scale(3); opacity: 0; }
+  }
+  .ripple-fx {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100px;
+    height: 100px;
+    margin: -50px 0 0 -50px;
+    border-radius: 50%;
+    border: 3px solid #c9a25c;
+    animation: ripple 1.2s ease-out;
+    pointer-events: none;
+  }
+  body.future .ripple-fx { border-color: #4a7dc9; }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .obj-card { animation: fadein 0.4s ease-out; }
+
+  .glow { animation: glowpulse 2s ease-in-out infinite; }
+  @keyframes glowpulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(201, 162, 92, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(201, 162, 92, 0.8); }
+  }
+  body.future .glow {
+    animation: glowpulse-blue 2s ease-in-out infinite;
+  }
+  @keyframes glowpulse-blue {
+    0%, 100% { box-shadow: 0 0 4px rgba(74, 125, 201, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(74, 125, 201, 0.8); }
+  }
+
+  .fragment-display {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 14px 0;
+  }
+  .fragment {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.4);
+    border: 2px dashed rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-family: Georgia, serif;
+    color: rgba(255,255,255,0.2);
+  }
+  .fragment.filled {
+    background: radial-gradient(circle, #c9a25c, #8b6f3a);
+    color: #1a0e08;
+    border-color: #f0d9a8;
+    border-style: solid;
+    box-shadow: 0 0 16px rgba(201, 162, 92, 0.5);
+  }
+  body.future .fragment.filled {
+    background: radial-gradient(circle, #4a7dc9, #2a4f8f);
+    color: #fff;
+    border-color: #87b8ff;
+    box-shadow: 0 0 16px rgba(74, 125, 201, 0.5);
+  }
+
+  .helper-tag {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.06);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 8px;
+  }
+  .helper-tag.peer { background: rgba(76, 175, 80, 0.2); color: #8df0a8; }
+
+  .step-list { margin: 8px 0; padding-left: 22px; }
+  .step-list li { font-size: 13px; line-height: 1.6; margin: 4px 0; opacity: 0.85; }
+  .step-list li.done { opacity: 0.4; text-decoration: line-through; }
+
+  .peer-status {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(76, 175, 80, 0.15);
+    color: #8df0a8;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .peer-status::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: #4caf50;
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .peer-status.off { background: rgba(244,67,54,0.15); color: #ff9b95; }
+  .peer-status.off::before { background: #f44336; animation: none; }
+
+  .share-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .share-row .btn { flex: 1; padding: 12px; font-size: 14px; }
 </style>
 </head>
 <body>
 
-<canvas id="canvas"></canvas>
+<!-- ========== LOBBY ========== -->
+<div id="lobby" class="screen active">
+  <div class="logo">CHRONOS</div>
+  <div class="tag">ESCAPE · THE · LOOP</div>
 
-<div id="lobby">
-  <h1>MECHANO</h1>
-  <h2>3 ΔΩΜΑΤΙΑ · CO-OP · ESCAPE</h2>
-  <p>Τρία δωμάτια. Τρεις γρίφοι. Κάθε ένας από εσάς βλέπει διαφορετικά στοιχεία.<br>Πρέπει να μιλήσετε για να ξεφύγετε.</p>
-
-  <div class="panel" id="lobby-main">
-    <div class="row-btns">
-      <button class="lobby-btn" id="host-btn">▶ ΦΤΙΑΞΕ ΔΩΜΑΤΙΟ</button>
-      <button class="lobby-btn" id="join-btn">⚡ ΜΠΕΣ ΜΕ ΚΩΔΙΚΟ</button>
+  <div class="lobby-card" id="create-card">
+    <h3>Δημιούργησε δωμάτιο</h3>
+    <button class="btn primary" id="create-btn">Νέο παιχνίδι</button>
+    <div id="created-info" style="display:none">
+      <div class="code-display" id="my-code">------</div>
+      <div class="status" id="create-status">Αναμονή συνεργάτη…</div>
+      <div class="share-row">
+        <button class="btn" id="copy-btn">Αντιγραφή κωδικού</button>
+      </div>
     </div>
   </div>
 
-  <div class="panel" id="host-panel" style="display:none;">
-    <p>Δώσε στον συνεργάτη σου τον κωδικό:</p>
-    <div class="code-display" id="host-code" title="Κλικ για αντιγραφή">···</div>
-    <p class="lobby-status blink" id="host-status">⏳ Αναμονή συνεργάτη...</p>
+  <div class="lobby-card">
+    <h3>Συμμετοχή σε δωμάτιο</h3>
+    <input class="input" id="join-input" maxlength="6" placeholder="ΚΩΔΙΚΟΣ" autocapitalize="characters" autocomplete="off">
+    <button class="btn future-style" id="join-btn">Σύνδεση</button>
+    <div class="status" id="join-status"></div>
   </div>
 
-  <div class="panel" id="join-panel" style="display:none;">
-    <p>Πληκτρολόγησε τον κωδικό:</p>
-    <input class="text-input" id="join-code-input" placeholder="XXXXXX" maxlength="20" autocomplete="off">
-    <button class="lobby-btn" id="connect-btn" style="width:100%;">ΣΥΝΔΕΣΗ</button>
-    <p class="lobby-status" id="join-status"></p>
+  <div class="small">
+    Παίξτε σε 2 κινητά. Ο ένας φτιάχνει δωμάτιο, ο άλλος μπαίνει με κωδικό.<br>
+    Χωρίς εφαρμογές — μόνο browser. WebRTC peer-to-peer.
   </div>
-
-  <p class="small">drag = περιστροφή · click = αλληλεπίδραση · scroll = ζουμ</p>
-  <a href="coop.html" class="corner-link">› terminal version</a>
 </div>
 
-<div id="ui">
-  <div id="top-bar">
-    <div id="title-bar">
-      <div id="game-title">MECHANO</div>
-      <div id="role-badge">Παίκτης: <strong id="role-name">—</strong></div>
+<!-- ========== ROLE SELECT ========== -->
+<div id="role" class="screen">
+  <div style="text-align:center; margin-bottom: 20px;">
+    <div class="tag">ΕΠΕΛΕΞΕ ΕΠΟΧΗ</div>
+    <div style="font-size: 13px; opacity: 0.6;" id="role-hint">Ο ένας στο παρελθόν, ο άλλος στο μέλλον.</div>
+  </div>
+  <div class="role-card past-card" data-role="past">
+    <div class="role-icon">🕯️</div>
+    <h2>ΠΑΡΕΛΘΟΝ</h2>
+    <p>1872 · Το παλαιό αρχοντικό</p>
+  </div>
+  <div class="role-card future-card" data-role="future">
+    <div class="role-icon">🛰️</div>
+    <h2>ΜΕΛΛΟΝ</h2>
+    <p>2287 · Τα ερείπια</p>
+  </div>
+</div>
+
+<!-- ========== GAME ========== -->
+<div id="game" class="screen">
+  <div class="top-bar">
+    <div class="era-badge" id="era-badge">ΠΑΡΕΛΘΟΝ</div>
+    <div class="puzzle-indicator">
+      <div class="dot" data-d="1"></div>
+      <div class="dot" data-d="2"></div>
+      <div class="dot" data-d="3"></div>
     </div>
-    <div id="room-indicator">ΔΩΜΑΤΙΟ <strong id="room-num">1</strong> / 3 · <span id="room-name">ΒΙΒΛΙΟΘΗΚΗ</span></div>
+    <div class="peer-status" id="peer-status">συνδεδεμένος</div>
   </div>
+  <div class="stage" id="stage"></div>
+</div>
 
-  <div id="clue-panel">
-    <button id="clue-panel-close" title="Κλείσιμο">✕</button>
-    <h3 id="clue-title">Στοιχεία σου</h3>
-    <div id="clue-body"></div>
+<!-- ========== WIN ========== -->
+<div id="win" class="screen">
+  <div style="font-size: 80px; margin-bottom: 20px;">⏳✨</div>
+  <div class="victory-title">ESCAPE</div>
+  <div class="victory-sub">Ο βρόχος του χρόνου έσπασε</div>
+  <div id="win-text" style="font-size: 14px; opacity: 0.8; max-width: 360px; line-height: 1.7; margin-bottom: 32px;"></div>
+  <button class="btn" onclick="location.reload()" style="max-width: 280px;">Από την αρχή</button>
+</div>
+
+<!-- ========== CHAT ========== -->
+<button id="chat-toggle">💬</button>
+<div id="chat-panel">
+  <div class="chat-header">
+    <span style="font-size: 13px; letter-spacing: 2px; opacity: 0.7;">ΣΥΝΕΡΓΑΤΗΣ</span>
+    <button class="icon-btn" onclick="toggleChat(false)">✕</button>
   </div>
-  <button id="clue-reopen" title="Άνοιγμα στοιχείων">📋</button>
-
-  <div id="instruction">Παρατήρησε το κουτί στο γραφείο. Μίλησε με τον συνεργάτη σου.</div>
-
-  <div id="controls">
-    <button class="icon-btn" id="reset-btn" title="Επαναφορά κάμερας">⟲</button>
-    <button class="icon-btn" id="sound-btn" title="Ήχος">♪</button>
-  </div>
-
-  <div id="chat" class="collapsed">
-    <div id="chat-header"><span>CHAT</span><span id="chat-toggle">▲</span></div>
-    <div id="chat-messages"></div>
-    <div id="chat-input-row">
-      <input id="chat-input" placeholder="Πληκτρολόγησε...">
-    </div>
+  <div class="chat-messages" id="chat-messages"></div>
+  <div class="chat-input-row">
+    <input type="text" id="chat-input" placeholder="Πληκτρολόγησε μήνυμα…" maxlength="200">
+    <button onclick="sendChatMsg()">→</button>
   </div>
 </div>
 
-<div id="fade"><span id="fade-text"></span></div>
-
-<div id="victory">
-  <h1>ΕΛΕΥΘΕΡΟΙ</h1>
-  <p>Διασχίσατε και τα τρία δωμάτια.</p>
-  <p style="margin-top:30px; font-size:0.9em; opacity:0.7;">F5 για νέο παιχνίδι</p>
-</div>
+<div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
+<script>
+"use strict";
+
+// ===================== STATE =====================
+const ROOM_PREFIX = "chronos-loop-v1-";
+let peer = null;
+let conn = null;
+let isHost = false;
+let role = null; // 'past' | 'future'
+let otherRole = null;
+let myCode = "";
+
+// Shared world state — synced via PeerJS
+const initialState = () => ({
+  puzzle: 1,                  // current puzzle 1..3
+  // P1: Sundial garden
+  stones: { N: 0, E: 0, S: 0, W: 0 },
+  watered: false,
+  roseBloomed: false,
+  fragment1: null,            // number revealed once solved
+  // P2: Library
+  bookOrder: [],              // ids in shelf order, indices of BOOKS array
+  bookSolved: false,
+  fragment2: null,
+  // P3: Wall
+  carvings: {},               // "r,c" -> symbolIndex
+  doorOpen: false,
+  fragment3: null,
+  // Final
+  escaped: false,
+  // Misc presence
+  pastReady: false,
+  futureReady: false,
+});
+let state = initialState();
+
+// ===================== HELPERS =====================
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+function showScreen(id) {
+  $$(".screen").forEach(s => s.classList.remove("active"));
+  $("#"+id).classList.add("active");
 }
-</script>
 
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+function toast(msg, type) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.className = "toast show " + (type || "");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 2400);
+}
 
-const TOP_SIGILS = ['⚓', '☼', '♆'];
-const SIGIL_MEANING = { '⚓': 0, '☼': 2, '♆': 1 };
-const ALPHA_KEY = ['⚓', '♆'];
-const BETA_KEY  = ['☼'];
-const LEVER_TARGET = TOP_SIGILS.map(s => SIGIL_MEANING[s]);
-const POS_NAMES = ['ΑΡΙΣΤΕΡΑ', 'ΚΕΝΤΡΟ', 'ΔΕΞΙΑ'];
-
-const DIAL_SEGMENTS = 20;
-const DIAL_BASE   = [7, 14, 19, 4];
-const DIAL_OFFSET = 3;
-const DIAL_SOLUTION = DIAL_BASE.map(n => (n + DIAL_OFFSET) % DIAL_SEGMENTS);
-const ALPHA_DIGITS = [0, 2];
-const BETA_DIGITS  = [1, 3];
-
-const BUTTON_COUNT = 4;
-const BUTTON_NAMES_EL = ['ΚΟΚΚΙΝΟ', 'ΠΡΑΣΙΝΟ', 'ΜΠΛΕ', 'ΚΙΤΡΙΝΟ'];
-const BUTTON_COLORS = [0xff4444, 0x44ff66, 0x4488ff, 0xffdd44];
-const BUTTON_SEQUENCE = [2, 0, 3, 1, 2, 0];
-
-const ROOM_NAMES = ['ΒΙΒΛΙΟΘΗΚΗ', 'ΘΗΣΑΥΡΟΦΥΛΑΚΙΟ', 'ΑΙΘΟΥΣΑ ΕΛΕΓΧΟΥ'];
-
-const state = {
-  room: 0, soundOn: true, role: null,
-  levers: [1, 1, 1],
-  dialAngle: 0, dialSubmitted: [],
-  buttonInput: [], buttonShowing: false,
-  solved: false
-};
-
-// ============ NETWORKING ============
-let peer = null, conn = null, isHost = false;
-const PEER_CONFIG = {
-  debug: 1,
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-    ]
-  }
-};
 function genCode() {
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-  let s = 'mch';
-  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i=0; i<6; i++) s += chars[Math.floor(Math.random()*chars.length)];
   return s;
 }
-function showCode(id) { return id.startsWith('mch') ? id.slice(3).toUpperCase() : id.toUpperCase(); }
 
-function hostGame() {
-  const code = genCode();
+// ===================== PEERJS =====================
+function makePeer(id) {
+  return new Peer(id, {
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" }
+      ]
+    },
+    debug: 1
+  });
+}
+
+function host() {
+  myCode = genCode();
   isHost = true;
-  document.getElementById('host-code').textContent = '⏳ ...';
-  peer = new Peer(code, PEER_CONFIG);
-  const t = setTimeout(() => document.getElementById('host-code').textContent = '✗ Timeout', 15000);
-  peer.on('open', id => {
-    clearTimeout(t);
-    const disp = showCode(id);
-    const el = document.getElementById('host-code');
-    el.textContent = disp;
-    el.onclick = () => navigator.clipboard.writeText(disp).then(() => {
-      const o = el.textContent; el.textContent = '✓ ΑΝΤΙΓΡΑΦΗΚΕ';
-      setTimeout(() => el.textContent = o, 1200);
-    });
+  $("#create-btn").style.display = "none";
+  $("#created-info").style.display = "block";
+  $("#my-code").textContent = myCode;
+  $("#create-status").textContent = "Σύνδεση στο σύστημα…";
+
+  peer = makePeer(ROOM_PREFIX + myCode);
+  peer.on("open", () => {
+    $("#create-status").textContent = "Αναμονή συνεργάτη… κωδικός: " + myCode;
   });
-  peer.on('connection', c => {
-    conn = c; state.role = 'ΑΛΦΑ';
-    c.on('open', () => { send({ type: 'init', partnerRole: 'ΒΗΤΑ' }); startGame(); });
-    c.on('data', onData);
-    c.on('close', () => addChat('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
+  peer.on("connection", (c) => {
+    conn = c;
+    wireConn();
   });
-  peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
-  peer.on('error', err => { clearTimeout(t); document.getElementById('host-code').textContent = '✗ ' + (err.type || err.message); });
-}
-function joinGame(rawCode) {
-  let code = rawCode.toLowerCase().replace(/^mch[-_]?/, '');
-  code = 'mch' + code;
-  document.getElementById('join-status').textContent = '⏳ Σύνδεση...';
-  peer = new Peer(PEER_CONFIG);
-  const t = setTimeout(() => document.getElementById('join-status').textContent = '✗ Timeout', 20000);
-  peer.on('open', () => {
-    conn = peer.connect(code, { reliable: true });
-    conn.on('open', () => { clearTimeout(t); document.getElementById('join-status').textContent = '✓ Συνδέθηκε.'; });
-    conn.on('data', onData);
-    conn.on('close', () => addChat('Ο συνεργάτης αποσυνδέθηκε.', 'sys'));
-  });
-  peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
-  peer.on('error', err => {
-    clearTimeout(t);
-    let m = err.message || err.type;
-    if (err.type === 'peer-unavailable') m = 'Δεν βρέθηκε δωμάτιο με αυτόν τον κωδικό.';
-    document.getElementById('join-status').textContent = '✗ ' + m;
+  peer.on("error", (e) => {
+    console.error(e);
+    $("#create-status").textContent = "Σφάλμα: " + e.type;
   });
 }
-function send(data) { if (conn && conn.open) conn.send(data); }
-function onData(data) {
-  switch (data.type) {
-    case 'init': state.role = data.partnerRole; startGame(); break;
-    case 'chat': addChat(data.text, 'them'); break;
-    case 'lever': applyLeverChange(data.index, data.position); break;
-    case 'dial-rotate': dial.rotation.z = data.angle; updateDialReading(); break;
-    case 'dial-snap': dial.rotation.z = data.angle; state.dialAngle = data.value; break;
-    case 'dial-submit': applyDialSubmit(data.num, data.step); break;
-    case 'dial-reset': resetDial(); break;
-    case 'start-simon': runSimonSequence(); break;
-    case 'button-press': pressButton(data.index, false); break;
-    case 'button-fail': handleButtonFail(); break;
-    case 'enter-room': enterRoom(data.room); break;
-  }
+
+function join() {
+  const code = $("#join-input").value.trim().toUpperCase();
+  if (code.length < 4) return toast("Άκυρος κωδικός", "fail");
+  isHost = false;
+  $("#join-status").textContent = "Σύνδεση…";
+
+  peer = makePeer(ROOM_PREFIX + "j-" + genCode());
+  peer.on("open", () => {
+    conn = peer.connect(ROOM_PREFIX + code, { reliable: true });
+    wireConn();
+  });
+  peer.on("error", (e) => {
+    console.error(e);
+    $("#join-status").textContent = "Σφάλμα: " + (e.type === "peer-unavailable" ? "δωμάτιο δεν υπάρχει" : e.type);
+  });
 }
 
-// ============ AUDIO ============
-let audioCtx = null;
-function audio() {
-  if (!state.soundOn) return null;
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  return audioCtx;
-}
-function beep(freq, duration = 0.1, type = 'sine', gain = 0.1) {
-  const ctx = audio(); if (!ctx) return;
-  const osc = ctx.createOscillator();
-  const g = ctx.createGain();
-  osc.type = type; osc.frequency.value = freq;
-  g.gain.value = 0;
-  g.gain.linearRampToValueAtTime(gain, ctx.currentTime + 0.005);
-  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
-  osc.connect(g).connect(ctx.destination);
-  osc.start(); osc.stop(ctx.currentTime + duration);
-}
-function clunk() { beep(80, 0.15, 'square', 0.15); setTimeout(() => beep(60, 0.1, 'sawtooth', 0.1), 50); }
-function chime() { beep(523, 0.1); setTimeout(() => beep(659, 0.1), 80); setTimeout(() => beep(784, 0.15), 160); }
-function buzz() { beep(120, 0.3, 'sawtooth', 0.15); }
-function doorOpenSound() {
-  beep(200, 0.3, 'sawtooth', 0.1);
-  setTimeout(() => beep(140, 0.5, 'sawtooth', 0.08), 100);
+function wireConn() {
+  conn.on("open", () => {
+    if (isHost) $("#create-status").textContent = "Συνεργάτης συνδέθηκε!";
+    else $("#join-status").textContent = "Σύνδεση επιτυχής!";
+    setTimeout(() => {
+      if (isHost) {
+        // Host pre-claims past by default but lets user choose
+      }
+      showScreen("role");
+    }, 600);
+  });
+  conn.on("data", onRecv);
+  conn.on("close", () => {
+    setPeerStatus(false);
+    toast("Συνεργάτης αποσυνδέθηκε", "fail");
+  });
 }
 
-// ============ SCENE ============
-const canvas = document.getElementById('canvas');
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050306);
-
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.05, 100);
-camera.position.set(0, 1.8, 5);
-
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-const controls = new OrbitControls(camera, canvas);
-controls.target.set(0, 1.6, 0);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.minDistance = 1.5;
-controls.maxDistance = 7;
-controls.minPolarAngle = Math.PI * 0.2;
-controls.maxPolarAngle = Math.PI * 0.6;
-controls.enablePan = false;
-
-// ============ TEXTURES ============
-function noiseCanvas(w, h, baseColor, noiseColor, density = 0.3, lineDensity = 0) {
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = baseColor;
-  ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < w * h * density / 100; i++) {
-    ctx.fillStyle = `${noiseColor.replace('rgb', 'rgba').replace(')', `,${Math.random() * 0.3 + 0.05})`)}`;
-    ctx.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
-  }
-  for (let i = 0; i < lineDensity; i++) {
-    ctx.strokeStyle = `rgba(0,0,0,${Math.random() * 0.12 + 0.02})`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, Math.random() * h);
-    ctx.bezierCurveTo(w * 0.3, Math.random() * h, w * 0.7, Math.random() * h, w, Math.random() * h);
-    ctx.stroke();
-  }
-  return c;
-}
-function tex(canvas, repeatX = 1, repeatY = 1) {
-  const t = new THREE.CanvasTexture(canvas);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(repeatX, repeatY);
-  t.anisotropy = 8;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-const woodTexCanvas   = noiseCanvas(512, 512, '#5a3a1a', 'rgb(80,40,15)', 0.5, 60);
-const stoneTexCanvas  = noiseCanvas(512, 512, '#3a3a40', 'rgb(60,60,68)', 0.4, 0);
-const metalTexCanvas  = noiseCanvas(512, 512, '#2a2a30', 'rgb(50,50,58)', 0.2, 0);
-const planksTexCanvas = noiseCanvas(512, 512, '#3a2818', 'rgb(50,30,15)', 0.4, 80);
-const tileTexCanvas   = noiseCanvas(512, 512, '#1a1a1f', 'rgb(40,40,46)', 0.2, 0);
-
-function dialTexture() {
-  const size = 1024;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-  grad.addColorStop(0, '#d4af6a'); grad.addColorStop(1, '#8a6f3d');
-  ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.arc(size/2, size/2, size/2 - 10, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#5a4a2a'; ctx.lineWidth = 6; ctx.stroke();
-  ctx.fillStyle = '#1a0e05';
-  ctx.font = `bold ${size * 0.06}px Georgia`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for (let i = 0; i < DIAL_SEGMENTS; i++) {
-    const a = (i / DIAL_SEGMENTS) * Math.PI * 2 - Math.PI / 2;
-    const r = size/2 - 60;
-    ctx.fillText(String(i), size/2 + Math.cos(a) * r, size/2 + Math.sin(a) * r);
-    ctx.strokeStyle = '#1a0e05';
-    ctx.lineWidth = i % 5 === 0 ? 5 : 2;
-    const r1 = size/2 - 18, r2 = i % 5 === 0 ? size/2 - 40 : size/2 - 30;
-    ctx.beginPath();
-    ctx.moveTo(size/2 + Math.cos(a) * r1, size/2 + Math.sin(a) * r1);
-    ctx.lineTo(size/2 + Math.cos(a) * r2, size/2 + Math.sin(a) * r2);
-    ctx.stroke();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.anisotropy = 16;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-function topPlateTexture() {
-  const w = 512, h = 256;
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#3a2a18'; ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 60; i++) {
-    ctx.strokeStyle = `rgba(0,0,0,${Math.random() * 0.12})`;
-    ctx.beginPath(); ctx.moveTo(0, Math.random() * h); ctx.lineTo(w, Math.random() * h); ctx.stroke();
-  }
-  ctx.fillStyle = '#1a0e05';
-  ctx.font = `bold ${h * 0.55}px Georgia`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  TOP_SIGILS.forEach((s, i) => ctx.fillText(s, (w / 4) * (i + 1), h * 0.55));
-  ctx.font = `bold ${h * 0.18}px Georgia`;
-  ctx.fillStyle = '#5a4a2a';
-  ['I', 'II', 'III'].forEach((n, i) => ctx.fillText(n, (w / 4) * (i + 1), h * 0.18));
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-function paperTexture(role) {
-  const w = 512, h = 360;
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-  const grad = ctx.createRadialGradient(w/2, h/2, 50, w/2, h/2, w/2);
-  grad.addColorStop(0, '#e8d6a8'); grad.addColorStop(1, '#b89c70');
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 40; i++) {
-    ctx.fillStyle = `rgba(80,40,20,${Math.random() * 0.15})`;
-    ctx.beginPath(); ctx.arc(Math.random() * w, Math.random() * h, Math.random() * 18, 0, Math.PI*2); ctx.fill();
-  }
-  ctx.fillStyle = '#3a2a18';
-  ctx.font = `italic ${w * 0.06}px Georgia`;
-  ctx.textAlign = 'center';
-  ctx.fillText('Συνδυασμός 4 ψηφίων:', w / 2, h * 0.25);
-  const yourDigits = role === 'ΑΛΦΑ' ? ALPHA_DIGITS : BETA_DIGITS;
-  ctx.font = `bold ${w * 0.12}px Georgia`;
-  for (let i = 0; i < 4; i++) {
-    const x = w * (0.18 + i * 0.22), y = h * 0.55;
-    if (yourDigits.includes(i)) { ctx.fillStyle = '#5a2a0a'; ctx.fillText(String(DIAL_BASE[i]), x, y); }
-    else { ctx.fillStyle = '#5a4a2a'; ctx.fillText('▒▒', x, y); }
-  }
-  ctx.font = `italic ${w * 0.045}px Georgia`;
-  ctx.fillStyle = '#3a2a18';
-  if (role === 'ΒΗΤΑ') ctx.fillText('* πρόσθεσε ' + DIAL_OFFSET + ' σε κάθε ψηφίο πριν την εισαγωγή', w/2, h * 0.82);
-  else ctx.fillText('(λείπει σημείωμα...)', w/2, h * 0.82);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+function send(type, payload) {
+  if (!conn || !conn.open) return;
+  try { conn.send({ type, payload }); } catch(e) { console.warn(e); }
 }
 
-// ============ MATERIALS ============
-const brass = new THREE.MeshStandardMaterial({ color: 0xc8a574, roughness: 0.28, metalness: 0.88 });
-const brassDark = new THREE.MeshStandardMaterial({ color: 0x8a6f3d, roughness: 0.4, metalness: 0.75 });
-const darkSteel = new THREE.MeshStandardMaterial({ color: 0x222228, roughness: 0.5, metalness: 0.8 });
-const redKnob = new THREE.MeshStandardMaterial({ color: 0xaa2222, roughness: 0.4, metalness: 0.4 });
-
-// ============ ROOMS ============
-const ROOM_W = 8, ROOM_H = 4, ROOM_D = 8;
-
-function makeRoom(opts) {
-  const grp = new THREE.Group();
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROOM_W, ROOM_D),
-    new THREE.MeshStandardMaterial({ map: tex(opts.floorTex, 3, 3), roughness: 0.85, metalness: 0.05 })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  grp.add(floor);
-  const ceil = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROOM_W, ROOM_D),
-    new THREE.MeshStandardMaterial({ map: tex(opts.ceilTex || opts.wallTex, 3, 3), roughness: 0.9 })
-  );
-  ceil.rotation.x = Math.PI / 2;
-  ceil.position.y = ROOM_H;
-  grp.add(ceil);
-  const wallMat = new THREE.MeshStandardMaterial({ map: tex(opts.wallTex, 2, 1), roughness: 0.8 });
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_H), wallMat);
-  back.position.set(0, ROOM_H/2, -ROOM_D/2);
-  back.receiveShadow = true;
-  grp.add(back);
-  const front = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_H), wallMat);
-  front.position.set(0, ROOM_H/2, ROOM_D/2);
-  front.rotation.y = Math.PI;
-  grp.add(front);
-  const left = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_D, ROOM_H), wallMat);
-  left.position.set(-ROOM_W/2, ROOM_H/2, 0);
-  left.rotation.y = Math.PI / 2;
-  grp.add(left);
-  const right = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_D, ROOM_H), wallMat);
-  right.position.set(ROOM_W/2, ROOM_H/2, 0);
-  right.rotation.y = -Math.PI / 2;
-  grp.add(right);
-  return grp;
+function setPeerStatus(online) {
+  const el = $("#peer-status");
+  if (!el) return;
+  el.textContent = online ? "συνδεδεμένος" : "off-line";
+  el.classList.toggle("off", !online);
 }
 
-const room1 = makeRoom({ floorTex: planksTexCanvas, wallTex: woodTexCanvas, ceilTex: planksTexCanvas });
-const room2 = makeRoom({ floorTex: tileTexCanvas, wallTex: stoneTexCanvas, ceilTex: stoneTexCanvas });
-const room3 = makeRoom({ floorTex: tileTexCanvas, wallTex: metalTexCanvas, ceilTex: tileTexCanvas });
-scene.add(room1, room2, room3);
-room2.visible = false;
-room3.visible = false;
+// ===================== ROLE PICK =====================
+$$(".role-card").forEach(card => {
+  card.addEventListener("click", () => {
+    if (card.classList.contains("taken")) return;
+    const picked = card.dataset.role;
+    role = picked;
+    otherRole = picked === "past" ? "future" : "past";
+    send("role-claim", role);
+    enterGame();
+  });
+});
 
-// ============ DOORS ============
-function makeDoor(accentColor) {
-  const g = new THREE.Group();
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.7 });
-  const fL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 3.2, 0.15), frameMat);
-  fL.position.set(-1.05, 1.6, 0); g.add(fL);
-  const fR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 3.2, 0.15), frameMat);
-  fR.position.set(1.05, 1.6, 0); g.add(fR);
-  const fT = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.15, 0.15), frameMat);
-  fT.position.set(0, 3.12, 0); g.add(fT);
-  const hinge = new THREE.Group();
-  hinge.position.set(-0.95, 0, 0);
-  g.add(hinge);
-  const panel = new THREE.Mesh(
-    new THREE.BoxGeometry(1.9, 3.0, 0.08),
-    new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.8, metalness: 0.1 })
-  );
-  panel.position.set(0.95, 1.55, 0);
-  panel.castShadow = true;
-  hinge.add(panel);
-  const cross1 = new THREE.Mesh(
-    new THREE.BoxGeometry(1.4, 0.08, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0x1a0e05, roughness: 0.6 })
-  );
-  cross1.position.set(0.95, 1.55, 0.06);
-  hinge.add(cross1);
-  const cross2 = new THREE.Mesh(
-    new THREE.BoxGeometry(0.08, 2.4, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0x1a0e05, roughness: 0.6 })
-  );
-  cross2.position.set(0.95, 1.55, 0.06);
-  hinge.add(cross2);
-  const handleGroup = new THREE.Group();
-  handleGroup.position.set(1.7, 1.4, 0.1);
-  hinge.add(handleGroup);
-  const handleBase = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 16), brassDark);
-  handleBase.rotation.x = Math.PI/2;
-  handleGroup.add(handleBase);
-  const handleKnob = new THREE.Mesh(
-    new THREE.SphereGeometry(0.08, 16, 12),
-    new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0, roughness: 0.4, metalness: 0.5 })
-  );
-  handleKnob.position.z = 0.08;
-  handleGroup.add(handleKnob);
-  g.userData.hinge = hinge;
-  g.userData.handleKnob = handleKnob;
-  return g;
+function enterGame() {
+  document.body.classList.add(role);
+  $("#era-badge").textContent = role === "past" ? "ΠΑΡΕΛΘΟΝ · 1872" : "ΜΕΛΛΟΝ · 2287";
+  $("#chat-toggle").style.display = "flex";
+  showScreen("game");
+  render();
 }
 
-// ============ ROOM 1: LIBRARY ============
-function makeBookshelf() {
-  const g = new THREE.Group();
-  const frame = new THREE.Mesh(
-    new THREE.BoxGeometry(2.5, 2.8, 0.15),
-    new THREE.MeshStandardMaterial({ color: 0x3a2210, roughness: 0.8 })
-  );
-  frame.castShadow = true;
-  g.add(frame);
-  const colors = [0x8b3a3a, 0x3a5a8b, 0x5a8b3a, 0x8b6f3a, 0x6a3a8b, 0x3a8b8b, 0x8b3a6a];
-  for (let row = 0; row < 4; row++) {
-    let x = -1.15;
-    while (x < 1.15) {
-      const w = 0.08 + Math.random() * 0.08;
-      const h = 0.4 + Math.random() * 0.2;
-      const book = new THREE.Mesh(
-        new THREE.BoxGeometry(w, h, 0.13),
-        new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random() * colors.length)], roughness: 0.7 })
-      );
-      book.position.set(x + w/2, -1.0 + row * 0.7 + h/2, 0.05);
-      book.castShadow = true;
-      g.add(book);
-      x += w + 0.005;
+// ===================== MESSAGE HANDLING =====================
+function onRecv(msg) {
+  if (!msg || !msg.type) return;
+  setPeerStatus(true);
+
+  switch(msg.type) {
+    case "role-claim": {
+      const theirs = msg.payload;
+      const card = document.querySelector(`.role-card[data-role="${theirs}"]`);
+      if (card) card.classList.add("taken");
+      const hint = $("#role-hint");
+      if (hint && !role) hint.textContent = `Ο συνεργάτης διάλεξε ${theirs === "past" ? "ΠΑΡΕΛΘΟΝ" : "ΜΕΛΛΟΝ"}. Διάλεξε το άλλο.`;
+      break;
+    }
+    case "state": {
+      Object.assign(state, msg.payload);
+      render();
+      break;
+    }
+    case "ripple": {
+      // visual notification when a past action propagates to future
+      if (role === "future") {
+        toast("⌛ Κάτι αλλάζει στο παρελθόν…", "");
+      }
+      break;
+    }
+    case "chat": {
+      addChatMsg(msg.payload, "theirs");
+      if (!$("#chat-panel").classList.contains("open")) {
+        $("#chat-toggle").classList.add("has-unread");
+      }
+      break;
+    }
+    case "request-state": {
+      send("state", state);
+      break;
+    }
+    case "toast": {
+      toast(msg.payload.text, msg.payload.kind || "");
+      break;
     }
   }
-  return g;
-}
-[[-1.5, true], [1.5, true], [-1.5, false], [1.5, false]].forEach(([z, leftSide]) => {
-  const shelf = makeBookshelf();
-  shelf.position.set(leftSide ? -ROOM_W/2 + 0.1 : ROOM_W/2 - 0.1, ROOM_H/2, z);
-  shelf.rotation.y = leftSide ? Math.PI/2 : -Math.PI/2;
-  room1.add(shelf);
-});
-
-// Desk
-const desk = new THREE.Group();
-const deskTop = new THREE.Mesh(
-  new THREE.BoxGeometry(2.6, 0.1, 1.4),
-  new THREE.MeshStandardMaterial({ color: 0x4a2810, roughness: 0.6 })
-);
-deskTop.castShadow = true; deskTop.receiveShadow = true;
-deskTop.position.y = 0.95;
-desk.add(deskTop);
-for (const [dx, dz] of [[-1.2, -0.6], [1.2, -0.6], [-1.2, 0.6], [1.2, 0.6]]) {
-  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.95, 0.1), new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 0.7 }));
-  leg.castShadow = true;
-  leg.position.set(dx, 0.475, dz);
-  desk.add(leg);
-}
-desk.position.set(0, 0, -1.8);
-room1.add(desk);
-
-// Lever box on desk
-const leverBox = new THREE.Group();
-leverBox.position.set(0, 1.0, -1.8);
-room1.add(leverBox);
-
-const BOX_W = 2.4, BOX_H = 1.4, BOX_D = 1.4;
-const boxBody = new THREE.Mesh(
-  new THREE.BoxGeometry(BOX_W, BOX_H, BOX_D),
-  new THREE.MeshStandardMaterial({ map: tex(woodTexCanvas, 1, 0.6), roughness: 0.75 })
-);
-boxBody.position.y = BOX_H/2;
-boxBody.castShadow = true;
-boxBody.receiveShadow = true;
-leverBox.add(boxBody);
-
-const topPlate = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.4, 0.7),
-  new THREE.MeshStandardMaterial({ map: topPlateTexture(), roughness: 0.6, metalness: 0.3 })
-);
-topPlate.rotation.x = -Math.PI / 2;
-topPlate.position.set(0, BOX_H + 0.001, 0);
-leverBox.add(topPlate);
-
-function brassFrame(w, h, depth = 0.025, thick = 0.04) {
-  const g = new THREE.Group();
-  const horiz = new THREE.BoxGeometry(w + thick * 2, thick, depth);
-  const vert = new THREE.BoxGeometry(thick, h + thick * 2, depth);
-  const top = new THREE.Mesh(horiz, brass); top.position.y = h/2 + thick/2; g.add(top);
-  const bot = new THREE.Mesh(horiz, brass); bot.position.y = -h/2 - thick/2; g.add(bot);
-  const lf = new THREE.Mesh(vert, brass); lf.position.x = -w/2 - thick/2; g.add(lf);
-  const rt = new THREE.Mesh(vert, brass); rt.position.x = w/2 + thick/2; g.add(rt);
-  return g;
-}
-const plateFrame = brassFrame(1.4, 0.7);
-plateFrame.rotation.x = -Math.PI/2;
-plateFrame.position.set(0, BOX_H + 0.005, 0);
-leverBox.add(plateFrame);
-
-const levers = [];
-function makeLever(x) {
-  const g = new THREE.Group();
-  const baseMount = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.12), brassDark);
-  baseMount.castShadow = true;
-  g.add(baseMount);
-  const armGroup = new THREE.Group();
-  const armMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.55, 12), brass);
-  armMesh.position.y = 0.275;
-  armMesh.castShadow = true;
-  armGroup.add(armMesh);
-  const handle = new THREE.Mesh(
-    new THREE.SphereGeometry(0.1, 24, 18),
-    new THREE.MeshStandardMaterial({ color: 0xaa3322, roughness: 0.4, metalness: 0.3, emissive: 0x110000 })
-  );
-  handle.position.y = 0.56;
-  handle.castShadow = true;
-  handle.userData.interactive = true;
-  handle.userData.type = 'lever';
-  armGroup.add(handle);
-  g.add(armGroup);
-  g.position.set(x, BOX_H * 0.55, BOX_D/2 + 0.04);
-  g.userData.armGroup = armGroup;
-  return g;
-}
-const leverXs = [-0.7, 0, 0.7];
-leverXs.forEach((x, i) => {
-  const lever = makeLever(x);
-  lever.userData.index = i;
-  lever.traverse(c => { if (c.userData.interactive) c.userData.leverIndex = i; });
-  setLeverAngle(lever, 1, false);
-  leverBox.add(lever);
-  levers.push(lever);
-});
-function setLeverAngle(lever, position, animate = true) {
-  const target = position === 0 ? Math.PI/3 : position === 1 ? 0 : -Math.PI/3;
-  const arm = lever.userData.armGroup;
-  if (!animate) { arm.rotation.z = target; return; }
-  tween(arm.rotation, 'z', target, 350, easeOutBack);
 }
 
-['I', 'II', 'III'].forEach((n, i) => {
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#3a2a18'; ctx.fillRect(0, 0, 128, 128);
-  ctx.fillStyle = '#d4af6a'; ctx.font = 'bold 80px Georgia';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(n, 64, 64);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  const plate = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.22, 0.22),
-    new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, metalness: 0.3 })
-  );
-  plate.position.set(leverXs[i], BOX_H * 0.92, BOX_D/2 + 0.005);
-  leverBox.add(plate);
-});
-
-const r1Ambient = new THREE.AmbientLight(0x3a2818, 0.4);
-room1.add(r1Ambient);
-const r1Key = new THREE.SpotLight(0xffaa55, 18, 14, Math.PI / 5, 0.5, 1.5);
-r1Key.position.set(0, ROOM_H - 0.3, 0.5);
-r1Key.target.position.set(0, 1.0, -1.8);
-r1Key.castShadow = true;
-r1Key.shadow.mapSize.set(1024, 1024);
-r1Key.shadow.bias = -0.0005;
-room1.add(r1Key, r1Key.target);
-const r1Sconce1 = new THREE.PointLight(0xff8833, 2, 4);
-r1Sconce1.position.set(-ROOM_W/2 + 0.5, ROOM_H * 0.75, ROOM_D/2 - 0.5);
-room1.add(r1Sconce1);
-const r1Sconce2 = new THREE.PointLight(0xff8833, 2, 4);
-r1Sconce2.position.set(ROOM_W/2 - 0.5, ROOM_H * 0.75, ROOM_D/2 - 0.5);
-room1.add(r1Sconce2);
-
-const door1 = makeDoor(0xff6633);
-door1.position.set(0, 0, -ROOM_D/2 + 0.08);
-room1.add(door1);
-
-// ============ ROOM 2: VAULT ============
-const safe = new THREE.Group();
-safe.position.set(0, 1.8, -ROOM_D/2 + 0.12);
-room2.add(safe);
-
-const safeFrame = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 0.2), darkSteel);
-safeFrame.castShadow = true;
-safe.add(safeFrame);
-
-const safeFront = new THREE.Mesh(
-  new THREE.BoxGeometry(1.8, 1.8, 0.05),
-  new THREE.MeshStandardMaterial({ color: 0x33333a, roughness: 0.5, metalness: 0.7 })
-);
-safeFront.position.z = 0.1;
-safe.add(safeFront);
-
-for (let i = 0; i < 8; i++) {
-  const angle = (i / 8) * Math.PI * 2;
-  const r = 0.88;
-  const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), brass);
-  rivet.position.set(Math.cos(angle) * r, Math.sin(angle) * r, 0.13);
-  safe.add(rivet);
+function syncState(triggerRipple) {
+  // strip local-only fields (prefixed with _) before sending
+  const shared = {};
+  for (const k in state) if (!k.startsWith("_")) shared[k] = state[k];
+  send("state", shared);
+  if (triggerRipple) send("ripple", true);
+  render();
 }
 
-const dialAssembly = new THREE.Group();
-dialAssembly.position.set(0, 0, 0.12);
-safe.add(dialAssembly);
+// ===================== PUZZLE CONTENT =====================
+// Symbols used in puzzle 1 (cycle)
+const SUN_SYMBOLS = ["☀", "☽", "★", "✿"];
+const SUN_NAMES = ["sun", "moon", "star", "flower"];
+// Required configuration to solve puzzle 1
+// N=★(2), E=☀(0), S=✿(3), W=☽(1)
+const SUNDIAL_SOLUTION = { N: 2, E: 0, S: 3, W: 1 };
 
-const dialBack = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.05, 32), brassDark);
-dialBack.rotation.x = Math.PI/2;
-dialAssembly.add(dialBack);
+// Puzzle 2: books — each has color, letter, title
+const BOOKS = [
+  { id: 0, color: "#c43f3f", letter: "H", title: "Hidden Truths" },
+  { id: 1, color: "#3f7fc4", letter: "E", title: "Echo Chamber" },
+  { id: 2, color: "#3fa14a", letter: "A", title: "Ancient Roads" },
+  { id: 3, color: "#d4a830", letter: "R", title: "Rivers Flow" },
+  { id: 4, color: "#8a3fc4", letter: "T", title: "Twilight Tales" },
+];
+// Solution color order in shelf (from left to right) = HEART
+// Index order: 0,1,2,3,4 (which spells HEART by first letters)
+const BOOK_SOLUTION = [0, 1, 2, 3, 4];
+// Future side shows colors as colored shadows on shelf
+const BOOK_SHADOW_COLORS = BOOK_SOLUTION.map(i => BOOKS[i].color);
 
-const dial = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.62, 0.62, 0.06, 64),
-  new THREE.MeshStandardMaterial({ map: dialTexture(), roughness: 0.4, metalness: 0.7 })
-);
-dial.rotation.x = Math.PI/2;
-dial.position.z = 0.05;
-dial.castShadow = true;
-dial.userData.interactive = true;
-dial.userData.type = 'dial';
-dialAssembly.add(dial);
+// Puzzle 3: wall — past carves on 4x4 grid
+const WALL_SYMBOLS = ["★", "◆", "▲", "●"];
+// Cracked cells in future (past CANNOT successfully carve here — symbol gets destroyed by time)
+// Format "r,c"
+const CRACKED_CELLS = new Set(["0,0","0,3","1,1","2,0","2,3","3,2"]);
+// The constellation — pattern of stars to place. Each entry is "r,c"
+// Forms a "dragon" / "snake" shape that fits avoiding cracks
+const CONSTELLATION = [
+  { rc: "0,1", sym: 0 }, // ★
+  { rc: "1,2", sym: 0 }, // ★
+  { rc: "2,2", sym: 0 }, // ★
+  { rc: "3,1", sym: 0 }, // ★
+  { rc: "3,0", sym: 0 }, // ★
+];
 
-const pointer = new THREE.Mesh(
-  new THREE.ConeGeometry(0.05, 0.15, 4),
-  new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xaa0000, emissiveIntensity: 0.5, roughness: 0.3 })
-);
-pointer.position.set(0, 0.72, 0.08);
-pointer.rotation.x = Math.PI;
-dialAssembly.add(pointer);
+// ===================== RENDER =====================
+function render() {
+  // dots
+  $$(".dot").forEach(d => {
+    const n = parseInt(d.dataset.d);
+    d.classList.toggle("active", n === state.puzzle && !state.escaped);
+    d.classList.toggle("done", n < state.puzzle || state.escaped);
+  });
 
-const submitGroup = new THREE.Group();
-submitGroup.position.set(0.85, 0, 0.05);
-dialAssembly.add(submitGroup);
-const submitBase = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.05, 16), brassDark);
-submitBase.rotation.x = Math.PI/2;
-submitGroup.add(submitBase);
-const submitArm = new THREE.Group();
-const submitArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 12), brass);
-submitArmMesh.position.y = 0.11;
-submitArm.add(submitArmMesh);
-const submitKnob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), redKnob);
-submitKnob.position.y = 0.22;
-submitKnob.castShadow = true;
-submitKnob.userData.interactive = true;
-submitKnob.userData.type = 'submit';
-submitArm.add(submitKnob);
-submitGroup.add(submitArm);
-
-const submitLeds = [];
-for (let i = 0; i < 4; i++) {
-  const led = new THREE.Mesh(
-    new THREE.SphereGeometry(0.04, 12, 10),
-    new THREE.MeshStandardMaterial({ color: 0x442200, emissive: 0x000000, roughness: 0.4 })
-  );
-  led.position.set(-0.22 + i * 0.15, -0.78, 0.08);
-  dialAssembly.add(led);
-  submitLeds.push(led);
-}
-
-// Side table with paper
-const sideTable = new THREE.Group();
-sideTable.position.set(-2.5, 0, -1.5);
-room2.add(sideTable);
-const sideTableTop = new THREE.Mesh(
-  new THREE.BoxGeometry(1.2, 0.08, 1.2),
-  new THREE.MeshStandardMaterial({ color: 0x3a2820, roughness: 0.7 })
-);
-sideTableTop.position.y = 0.95;
-sideTableTop.castShadow = true;
-sideTable.add(sideTableTop);
-for (const [dx, dz] of [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55]]) {
-  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.95, 0.08), new THREE.MeshStandardMaterial({ color: 0x2a1810 }));
-  leg.castShadow = true;
-  leg.position.set(dx, 0.475, dz);
-  sideTable.add(leg);
-}
-const paperMesh = new THREE.Mesh(
-  new THREE.PlaneGeometry(0.8, 0.55),
-  new THREE.MeshStandardMaterial({ color: 0xd4c090, roughness: 0.95, metalness: 0, side: THREE.DoubleSide })
-);
-paperMesh.rotation.x = -Math.PI/2 + 0.05;
-paperMesh.position.set(0, 1.001, 0);
-sideTable.add(paperMesh);
-
-const lamp = new THREE.Mesh(
-  new THREE.ConeGeometry(0.15, 0.25, 12),
-  new THREE.MeshStandardMaterial({ color: 0xffcc88, emissive: 0xffaa44, emissiveIntensity: 1.5, roughness: 0.6 })
-);
-lamp.position.set(-0.4, 1.15, 0.3);
-sideTable.add(lamp);
-
-const r2Ambient = new THREE.AmbientLight(0x1a2030, 0.4);
-room2.add(r2Ambient);
-const r2Key = new THREE.SpotLight(0xaaccff, 20, 12, Math.PI / 5, 0.4, 1.5);
-r2Key.position.set(0, ROOM_H - 0.3, 1);
-r2Key.target.position.set(0, 1.5, -ROOM_D/2);
-r2Key.castShadow = true;
-r2Key.shadow.mapSize.set(1024, 1024);
-r2Key.shadow.bias = -0.0005;
-room2.add(r2Key, r2Key.target);
-const r2Lamp = new THREE.PointLight(0xffcc88, 3, 4);
-r2Lamp.position.set(-2.5, 1.5, -1.5);
-room2.add(r2Lamp);
-
-// Door 2 — on side wall (right) so it doesn't conflict with safe on back wall
-const door2 = makeDoor(0x4488ff);
-door2.position.set(ROOM_W/2 - 0.08, 0, 0);
-door2.rotation.y = -Math.PI/2;
-room2.add(door2);
-
-// ============ ROOM 3: CONTROL ============
-const consoleObj = new THREE.Group();
-consoleObj.position.set(0, 0, -ROOM_D/2 + 0.8);
-room3.add(consoleObj);
-
-const consoleBase = new THREE.Mesh(
-  new THREE.BoxGeometry(3.5, 0.9, 1.4),
-  new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.6, metalness: 0.6 })
-);
-consoleBase.position.y = 0.45;
-consoleBase.castShadow = true;
-consoleBase.receiveShadow = true;
-consoleObj.add(consoleBase);
-
-const consoleTop = new THREE.Mesh(
-  new THREE.BoxGeometry(3.5, 0.1, 1.4),
-  new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.4, metalness: 0.7 })
-);
-consoleTop.position.y = 0.95;
-consoleTop.castShadow = true;
-consoleObj.add(consoleTop);
-
-const consolePanel = new THREE.Mesh(
-  new THREE.BoxGeometry(3.5, 0.05, 0.8),
-  new THREE.MeshStandardMaterial({ color: 0x222226, roughness: 0.5, metalness: 0.6 })
-);
-consolePanel.rotation.x = -0.25;
-consolePanel.position.set(0, 1.15, -0.2);
-consoleObj.add(consolePanel);
-
-const colorButtons = [];
-for (let i = 0; i < BUTTON_COUNT; i++) {
-  const colorHex = BUTTON_COLORS[i];
-  const b = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.13, 0.13, 0.08, 24),
-    new THREE.MeshStandardMaterial({
-      color: colorHex, emissive: colorHex, emissiveIntensity: 0.2,
-      roughness: 0.3, metalness: 0.2
-    })
-  );
-  const x = -0.7 + i * 0.47;
-  b.position.set(x, 0.07, 0);
-  b.castShadow = true;
-  b.userData.interactive = true;
-  b.userData.type = 'button';
-  b.userData.index = i;
-  b.userData.originalEmissive = 0.2;
-  consolePanel.add(b);
-  colorButtons.push(b);
-}
-const startBtn = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.11, 0.11, 0.08, 32),
-  new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x888888, emissiveIntensity: 0.4, roughness: 0.3, metalness: 0.4 })
-);
-startBtn.position.set(1.4, 0.07, 0);
-startBtn.castShadow = true;
-startBtn.userData.interactive = true;
-startBtn.userData.type = 'startBtn';
-consolePanel.add(startBtn);
-
-const r3Ambient = new THREE.AmbientLight(0x202028, 0.5);
-room3.add(r3Ambient);
-const r3Key = new THREE.SpotLight(0xddeeff, 18, 14, Math.PI / 4, 0.4, 1.5);
-r3Key.position.set(0, ROOM_H - 0.3, 1.5);
-r3Key.target.position.set(0, 1.0, -ROOM_D/2 + 0.8);
-r3Key.castShadow = true;
-r3Key.shadow.mapSize.set(1024, 1024);
-r3Key.shadow.bias = -0.0005;
-room3.add(r3Key, r3Key.target);
-const r3RedLight = new THREE.PointLight(0xff3322, 2, 6);
-r3RedLight.position.set(-ROOM_W/2 + 0.5, ROOM_H * 0.8, ROOM_D/2 - 0.5);
-room3.add(r3RedLight);
-const r3GreenLight = new THREE.PointLight(0x22ff66, 1.5, 6);
-r3GreenLight.position.set(ROOM_W/2 - 0.5, ROOM_H * 0.8, ROOM_D/2 - 0.5);
-room3.add(r3GreenLight);
-
-const door3 = makeDoor(0xff3322);
-door3.position.set(0, 0, ROOM_D/2 - 0.08);
-door3.rotation.y = Math.PI;
-room3.add(door3);
-
-// ============ ANIMATION ============
-const easeOutBack = t => 1 + 2.5 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
-const easeInOutCubic = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
-function tween(obj, prop, target, duration = 500, easing = easeInOutCubic, onComplete) {
-  const start = obj[prop]; const startTime = performance.now();
-  function step(now) {
-    const t = Math.min(1, (now - startTime) / duration);
-    obj[prop] = start + (target - start) * easing(t);
-    if (t < 1) requestAnimationFrame(step);
-    else if (onComplete) onComplete();
-  }
-  requestAnimationFrame(step);
-}
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-// ============ RAYCAST ============
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-let hoveredInteractive = null;
-let dragging = false, dialDragStart = null, didDrag = false, dragStart = null;
-let lastDialBroadcast = 0;
-
-function getInteractives() {
-  const arr = [];
-  scene.traverse(obj => { if (obj.userData.interactive && isFamilyVisible(obj)) arr.push(obj); });
-  return arr;
-}
-function isFamilyVisible(obj) {
-  let o = obj; while (o) { if (!o.visible) return false; o = o.parent; }
-  return true;
-}
-function pickAt(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects(getInteractives(), false);
-  return hits[0] || null;
-}
-
-canvas.addEventListener('pointerdown', e => {
-  dragStart = { x: e.clientX, y: e.clientY };
-  didDrag = false;
-  const hit = pickAt(e.clientX, e.clientY);
-  if (hit && hit.object.userData.type === 'dial' && state.room === 2) {
-    dialDragStart = { angle: Math.atan2(mouse.y, mouse.x), dialRot: dial.rotation.z };
-    controls.enabled = false;
-    dragging = true;
-  }
-});
-canvas.addEventListener('pointermove', e => {
-  if (dragStart) {
-    const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) didDrag = true;
-  }
-  if (dragging && dialDragStart) {
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    const angleNow = Math.atan2(mouse.y, mouse.x);
-    let delta = angleNow - dialDragStart.angle;
-    dial.rotation.z = dialDragStart.dialRot - delta * 1.5;
-    updateDialReading();
-    const now = performance.now();
-    if (now - lastDialBroadcast > 33) {
-      lastDialBroadcast = now;
-      send({ type: 'dial-rotate', angle: dial.rotation.z });
-    }
-  }
-  const hit = pickAt(e.clientX, e.clientY);
-  if (hit) {
-    canvas.classList.add('pointing');
-    if (hoveredInteractive !== hit.object) {
-      if (hoveredInteractive) hoverOut(hoveredInteractive);
-      hoveredInteractive = hit.object;
-      hoverIn(hit.object);
-    }
-  } else {
-    canvas.classList.remove('pointing');
-    if (hoveredInteractive) { hoverOut(hoveredInteractive); hoveredInteractive = null; }
-  }
-});
-canvas.addEventListener('pointerup', e => {
-  controls.enabled = true;
-  if (dragging) {
-    dragging = false; dialDragStart = null;
-    snapDial();
+  if (state.escaped) {
+    renderWin();
     return;
   }
-  if (didDrag) { dragStart = null; return; }
-  dragStart = null;
-  const hit = pickAt(e.clientX, e.clientY);
-  if (hit) handleClick(hit.object);
-});
-function hoverIn(obj) {
-  if (obj.material && obj.material.emissiveIntensity !== undefined) {
-    obj.userData._origEmissive = obj.material.emissiveIntensity;
-    obj.material.emissiveIntensity = Math.max(0.5, obj.material.emissiveIntensity + 0.4);
-  }
-}
-function hoverOut(obj) {
-  if (obj.material && obj.userData._origEmissive !== undefined) {
-    obj.material.emissiveIntensity = obj.userData._origEmissive;
-  }
+
+  const stage = $("#stage");
+  stage.innerHTML = "";
+  if (state.puzzle === 1) renderPuzzle1(stage);
+  else if (state.puzzle === 2) renderPuzzle2(stage);
+  else if (state.puzzle === 3) renderPuzzle3(stage);
+  else if (state.puzzle === 4) renderFinal(stage);
 }
 
-function handleClick(obj) {
-  const t = obj.userData.type;
-  if (t === 'lever' && state.room === 1) {
-    const idx = obj.userData.leverIndex;
-    const newPos = (state.levers[idx] + 1) % 3;
-    applyLeverChange(idx, newPos);
-    send({ type: 'lever', index: idx, position: newPos });
-  } else if (t === 'submit' && state.room === 2) {
-    submitDialNumber(true);
-  } else if (t === 'startBtn' && state.room === 3) {
-    if (!state.buttonShowing && state.role === 'ΑΛΦΑ') {
-      send({ type: 'start-simon' });
-      runSimonSequence();
+// ============ PUZZLE 1: SUNDIAL ============
+function renderPuzzle1(stage) {
+  const title = document.createElement("div");
+  title.className = "scene-title";
+  title.innerHTML = `<div class="era">Αίνιγμα I</div><h1>Ο Κήπος του Ηλιακού Ρολογιού</h1>`;
+  stage.appendChild(title);
+
+  if (role === "past") {
+    // Past sees the actual sundial
+    const intro = document.createElement("div");
+    intro.className = "obj-card";
+    intro.innerHTML = `
+      <span class="helper-tag">Παρελθόν · 1872</span>
+      <div class="scroll-text">«Τέσσερις πέτρες, τέσσερα σύμβολα. Όταν τα μάτια του ουρανού δουν τη σωστή σειρά, το τριαντάφυλλο θα φυτρώσει.»</div>
+      <p style="font-size: 12px; opacity: 0.7; margin-top: 6px;">Άγγιξε τις πέτρες για να αλλάξεις το σύμβολο. Ο συνεργάτης σου ξέρει τη σωστή σειρά.</p>
+    `;
+    stage.appendChild(intro);
+
+    // sundial SVG
+    const wrap = document.createElement("div");
+    wrap.className = "obj-card";
+    wrap.style.padding = "20px";
+    wrap.innerHTML = `<div class="sundial-wrap" id="sundial"></div>`;
+    stage.appendChild(wrap);
+
+    drawSundial();
+
+    // Watering button (only after stones correct)
+    const allCorrect = ["N","E","S","W"].every(d => state.stones[d] === SUNDIAL_SOLUTION[d]);
+    const action = document.createElement("div");
+    action.className = "obj-card";
+    if (state.roseBloomed) {
+      action.innerHTML = `<div style="text-align:center; font-size: 48px;">🌹</div>
+        <div class="scroll-text">«Το τριαντάφυλλο άνθισε. Ο χρόνος πέρασε από πάνω του και πρόσφερε το δώρο του στο μέλλον.»</div>`;
+    } else if (allCorrect && !state.watered) {
+      action.innerHTML = `<button class="btn primary glow" id="water-btn">💧 Πότισε τον σπόρο</button>`;
+      stage.appendChild(action);
+      $("#water-btn").addEventListener("click", () => {
+        state.watered = true;
+        state.roseBloomed = true;
+        // Generate fragment1 from sum of symbol indices + offset → 7
+        state.fragment1 = ((SUNDIAL_SOLUTION.N + SUNDIAL_SOLUTION.E + SUNDIAL_SOLUTION.S + SUNDIAL_SOLUTION.W) % 10);
+        // 2+0+3+1 = 6
+        state.fragment1 = state.fragment1 === 0 ? 9 : state.fragment1; // ensure non-zero
+        toast("🌹 Το τριαντάφυλλο άνθισε!", "success");
+        syncState(true);
+      });
+      return;
+    } else if (!allCorrect) {
+      action.innerHTML = `<p style="font-size: 13px; opacity: 0.7; text-align: center;">Οι πέτρες δεν είναι σε αρμονία. Μίλησε με τον συνεργάτη σου.</p>`;
+    } else {
+      action.innerHTML = `<p style="font-size: 13px; opacity: 0.7; text-align: center;">Ο σπόρος ποτίστηκε…</p>`;
     }
-  } else if (t === 'button' && state.room === 3) {
-    if (state.buttonShowing) return;
-    pressButton(obj.userData.index, true);
-  }
-}
-
-function applyLeverChange(idx, pos) {
-  state.levers[idx] = pos;
-  setLeverAngle(levers[idx], pos);
-  clunk();
-  if (isHost) checkRoom1();
-}
-
-function updateDialReading() {
-  const seg = ((-dial.rotation.z / (Math.PI * 2)) * DIAL_SEGMENTS) % DIAL_SEGMENTS;
-  state.dialAngle = ((Math.round(seg) % DIAL_SEGMENTS) + DIAL_SEGMENTS) % DIAL_SEGMENTS;
-}
-function snapDial() {
-  const segAngle = (Math.PI * 2) / DIAL_SEGMENTS;
-  const snapped = Math.round(dial.rotation.z / segAngle) * segAngle;
-  tween(dial.rotation, 'z', snapped, 200, easeOutCubic, () => {
-    updateDialReading();
-    beep(440, 0.05, 'triangle', 0.05);
-    send({ type: 'dial-snap', angle: snapped, value: state.dialAngle });
-  });
-}
-function submitDialNumber(broadcast) {
-  if (state.room !== 2) return;
-  const num = state.dialAngle;
-  const step = state.dialSubmitted.length;
-  if (step >= DIAL_SOLUTION.length) return;
-  applyDialSubmit(num, step);
-  if (broadcast) send({ type: 'dial-submit', num, step });
-}
-function applyDialSubmit(num, step) {
-  if (state.dialSubmitted.length !== step) return;
-  state.dialSubmitted.push(num);
-  const expected = DIAL_SOLUTION[step];
-  const led = submitLeds[step];
-  if (num === expected) {
-    led.material.color.setHex(0x22ff44);
-    led.material.emissive.setHex(0x118822);
-    led.material.emissiveIntensity = 1;
-    beep(660, 0.15, 'sine', 0.1);
+    stage.appendChild(action);
+    if (state.roseBloomed) {
+      const next = document.createElement("button");
+      next.className = "btn primary";
+      next.textContent = "Επόμενο αίνιγμα →";
+      next.onclick = () => { state.puzzle = 2; syncState(); };
+      stage.appendChild(next);
+    }
   } else {
-    led.material.color.setHex(0xff2222);
-    led.material.emissive.setHex(0x880000);
-    led.material.emissiveIntensity = 1;
-    buzz();
-  }
-  tween(submitArm.rotation, 'x', 0.4, 120, easeOutCubic, () => tween(submitArm.rotation, 'x', 0, 200, easeOutBack));
-  if (state.dialSubmitted.length === DIAL_SOLUTION.length) {
-    const correct = state.dialSubmitted.every((v, i) => v === DIAL_SOLUTION[i]);
-    setTimeout(() => {
-      if (correct && isHost) completeRoom2();
-      else if (!correct && isHost) { send({ type: 'dial-reset' }); resetDial(); setInstruction('Λάθος συνδυασμός. Δοκιμάστε ξανά.'); }
-    }, 800);
+    // Future sees ruins + plaque
+    const intro = document.createElement("div");
+    intro.className = "obj-card";
+    intro.innerHTML = `
+      <span class="helper-tag">Μέλλον · 2287</span>
+      <div class="scroll-text">«Ερείπια ενός κήπου. Ένα σπασμένο ηλιακό ρολόι. Δίπλα του, μια ορειχάλκινη πλάκα έχει διασωθεί.»</div>
+    `;
+    stage.appendChild(intro);
+
+    const plaque = document.createElement("div");
+    plaque.className = "obj-card";
+    plaque.innerHTML = `
+      <h3>📜 Ορειχάλκινη Πλάκα</h3>
+      <div class="scroll-text" style="font-size: 15px;">
+        <strong>«ΒΟΡΡΑΣ · εκεί που γεννιούνται τα <u>ΑΣΤΕΡΙΑ</u> ★»</strong><br>
+        <strong>«ΑΝΑΤΟΛΗ · εκεί που γεννιέται ο <u>ΗΛΙΟΣ</u> ☀»</strong><br>
+        <strong>«ΝΟΤΟΣ · εκεί που ανθίζουν τα <u>ΛΟΥΛΟΥΔΙΑ</u> ✿»</strong><br>
+        <strong>«ΔΥΣΗ · εκεί που κοιμάται η <u>ΣΕΛΗΝΗ</u> ☽»</strong>
+      </div>
+      <p style="font-size: 12px; opacity: 0.7;">Μετάφερε αυτή την πληροφορία στον συνεργάτη σου στο παρελθόν.</p>
+    `;
+    stage.appendChild(plaque);
+
+    // Show progress
+    const progress = document.createElement("div");
+    progress.className = "obj-card";
+    const stoneStr = ["N","E","S","W"].map(d =>
+      `${d}: ${SUN_SYMBOLS[state.stones[d]]}`
+    ).join(" · ");
+    progress.innerHTML = `
+      <h3>🔮 Παρατήρηση από το παρόν</h3>
+      <p style="text-align: center; font-size: 18px; letter-spacing: 4px;">${stoneStr}</p>
+      <p style="font-size: 12px; opacity: 0.6; text-align: center;">Οι πέτρες όπως είναι τώρα στο παρελθόν</p>
+    `;
+    stage.appendChild(progress);
+
+    const result = document.createElement("div");
+    result.className = "obj-card";
+    if (state.roseBloomed && state.fragment1 != null) {
+      result.innerHTML = `
+        <h3>✨ Πρώτο Θραύσμα</h3>
+        <div style="text-align: center;">
+          <div style="font-size: 64px;">🌹</div>
+          <p>Στο σημείο όπου άνθισε το τριαντάφυλλο, μια πέτρα φέρει χαραγμένο τον αριθμό:</p>
+          <div class="fragment-display"><div class="fragment filled">${state.fragment1}</div></div>
+        </div>
+      `;
+      stage.appendChild(result);
+      const next = document.createElement("button");
+      next.className = "btn future-style";
+      next.textContent = "Επόμενο αίνιγμα →";
+      next.onclick = () => { state.puzzle = 2; syncState(); };
+      stage.appendChild(next);
+    } else {
+      result.innerHTML = `<p style="font-size: 13px; opacity: 0.7; text-align: center;">Περιμένεις τον συνεργάτη σου να ολοκληρώσει την ευθυγράμμιση…</p>`;
+      stage.appendChild(result);
+    }
   }
 }
-function resetDial() {
-  state.dialSubmitted = [];
-  submitLeds.forEach(l => {
-    l.material.color.setHex(0x442200);
-    l.material.emissive.setHex(0x000000);
-    l.material.emissiveIntensity = 0;
+
+function drawSundial() {
+  const wrap = $("#sundial");
+  if (!wrap) return;
+  const positions = {
+    N: { x: 50, y: 12 },
+    E: { x: 88, y: 50 },
+    S: { x: 50, y: 88 },
+    W: { x: 12, y: 50 },
+  };
+  const allCorrect = ["N","E","S","W"].every(d => state.stones[d] === SUNDIAL_SOLUTION[d]);
+  const svg = `
+    <svg class="sundial-svg" viewBox="0 0 100 100">
+      <defs>
+        <radialGradient id="gradCenter">
+          <stop offset="0%" stop-color="${allCorrect ? '#f0c0c0' : '#5a4030'}"/>
+          <stop offset="100%" stop-color="${allCorrect ? '#8a3030' : '#2a1808'}"/>
+        </radialGradient>
+        <filter id="softGlow">
+          <feGaussianBlur stdDeviation="1.5"/>
+        </filter>
+      </defs>
+      <circle cx="50" cy="50" r="42" fill="#1a0e08" stroke="#8b6f3a" stroke-width="0.4" opacity="0.6"/>
+      <circle cx="50" cy="50" r="36" fill="none" stroke="#5a4020" stroke-width="0.3" stroke-dasharray="1,2"/>
+      <!-- gnomon shadow -->
+      <line x1="50" y1="50" x2="${50 + 28*Math.cos(-Math.PI/3)}" y2="${50 + 28*Math.sin(-Math.PI/3)}"
+            stroke="#3a2510" stroke-width="0.6" opacity="0.5"/>
+      <!-- center -->
+      <circle class="rose-center" cx="50" cy="50" r="${state.roseBloomed ? 8 : 4}"
+              fill="url(#gradCenter)" filter="${state.roseBloomed ? 'url(#softGlow)' : 'none'}"/>
+      ${state.roseBloomed ? `<text x="50" y="55" font-size="10" text-anchor="middle">🌹</text>` : ''}
+      ${["N","E","S","W"].map(dir => {
+        const p = positions[dir];
+        const sym = SUN_SYMBOLS[state.stones[dir]];
+        const correct = state.stones[dir] === SUNDIAL_SOLUTION[dir];
+        return `
+          <g class="stone" data-dir="${dir}">
+            <circle cx="${p.x}" cy="${p.y}" r="11"
+                    fill="${correct ? '#4a6028' : '#3a2a18'}"
+                    stroke="${correct ? '#c9a25c' : '#5a4020'}" stroke-width="0.6"/>
+            <text class="stone-symbol" x="${p.x}" y="${p.y+3.5}" text-anchor="middle"
+                  fill="${correct ? '#f0d9a8' : '#a89070'}">${sym}</text>
+            <text class="stone-label" x="${p.x}" y="${p.y + (dir==='S' ? 18 : (dir==='N' ? -14 : 4))}"
+                  text-anchor="middle">${dir}</text>
+          </g>`;
+      }).join("")}
+    </svg>
+  `;
+  wrap.innerHTML = svg;
+  wrap.querySelectorAll(".stone").forEach(s => {
+    s.addEventListener("click", () => {
+      const dir = s.dataset.dir;
+      state.stones[dir] = (state.stones[dir] + 1) % 4;
+      syncState(true);
+    });
   });
-  buzz();
 }
 
-function checkRoom1() {
-  if (state.room !== 1) return;
-  if (state.levers.every((v, i) => v === LEVER_TARGET[i])) setTimeout(completeRoom1, 500);
-}
-
-async function completeRoom1() {
-  if (state.room >= 2) return;
-  chime();
-  setInstruction('Η πόρτα ξεκλείδωσε!');
-  door1.userData.handleKnob.material.emissiveIntensity = 1;
-  tween(door1.userData.hinge.rotation, 'y', -Math.PI * 0.6, 1200, easeOutCubic);
-  doorOpenSound();
-  await sleep(1400);
-  if (isHost) send({ type: 'enter-room', room: 2 });
-  enterRoom(2);
-}
-async function completeRoom2() {
-  if (state.room >= 3) return;
-  chime();
-  setInstruction('Η πόρτα του θησαυροφυλακίου ανοίγει!');
-  door2.userData.handleKnob.material.emissiveIntensity = 1;
-  tween(door2.userData.hinge.rotation, 'y', -Math.PI * 0.6, 1200, easeOutCubic);
-  doorOpenSound();
-  await sleep(1400);
-  if (isHost) send({ type: 'enter-room', room: 3 });
-  enterRoom(3);
-}
-async function enterRoom(num) {
-  const fade = document.getElementById('fade');
-  const fadeText = document.getElementById('fade-text');
-  fadeText.textContent = ROOM_NAMES[num - 1];
-  fade.classList.add('show');
-  await sleep(1000);
-  room1.visible = num === 1;
-  room2.visible = num === 2;
-  room3.visible = num === 3;
-  state.room = num;
-  document.getElementById('room-num').textContent = num;
-  document.getElementById('room-name').textContent = ROOM_NAMES[num - 1];
-  if (num === 1) { camera.position.set(0, 1.8, 1.2); controls.target.set(0, 1.4, -1.8); }
-  else if (num === 2) { camera.position.set(0, 1.7, 1.8); controls.target.set(0, 1.8, -ROOM_D/2); }
-  else if (num === 3) { camera.position.set(0, 1.8, 1.8); controls.target.set(0, 1.1, -ROOM_D/2 + 0.8); }
-  if (num === 2) {
-    paperMesh.material.map = paperTexture(state.role);
-    paperMesh.material.needsUpdate = true;
+// ============ PUZZLE 2: LIBRARY ============
+function renderPuzzle2(stage) {
+  if ((!state.bookOrder || state.bookOrder.length === 0) && role === "past") {
+    state.bookOrder = [4, 2, 0, 3, 1];
+    syncState();
   }
-  updateClues();
-  updateInstructionForRoom();
-  await sleep(300);
-  fade.classList.remove('show');
-}
-function updateInstructionForRoom() {
-  if (state.room === 1) setInstruction('Παρατήρησε τα σύμβολα στο καπάκι του κουτιού. Ξεκλείδωσε την πόρτα.');
-  else if (state.room === 2) setInstruction('Διαβάστε το χαρτί στο τραπεζάκι. Γυρίστε το καντράν και υποβάλετε.');
-  else if (state.room === 3) setInstruction(state.role === 'ΑΛΦΑ' ? 'Πάτησε ΕΚΚΙΝΗΣΗ. Μόνο εσύ θα δεις την ακολουθία.' : 'Ο ΑΛΦΑ θα σου πει χρώματα. Πάτα τα κουμπιά στη σωστή σειρά.');
-}
-
-async function runSimonSequence() {
-  state.buttonShowing = true;
-  state.buttonInput = [];
-  setInstruction('Παρακολουθούν...');
-  flashEmissive(startBtn, 1.2, 200);
-  await sleep(600);
-  for (const i of BUTTON_SEQUENCE) {
-    await flashColorButton(i);
-    await sleep(180);
-  }
-  state.buttonShowing = false;
-  setInstruction('Επαναλάβετε την ακολουθία!');
-}
-function flashColorButton(idx) {
-  return new Promise(resolve => {
-    const b = colorButtons[idx];
-    const origE = b.userData.originalEmissive;
-    if (state.role === 'ΑΛΦΑ') b.material.emissiveIntensity = 1.5;
-    beep(220 + idx * 130, 0.25, 'sine', 0.1);
-    setTimeout(() => {
-      if (state.role === 'ΑΛΦΑ') b.material.emissiveIntensity = origE;
-      resolve();
-    }, 380);
-  });
-}
-function pressButton(idx, broadcast) {
-  const b = colorButtons[idx];
-  flashEmissive(b, 1.5, 200);
-  beep(220 + idx * 130, 0.2, 'sine', 0.1);
-  if (broadcast) send({ type: 'button-press', index: idx });
-  state.buttonInput.push(idx);
-  if (!broadcast) return;
-  const i = state.buttonInput.length - 1;
-  if (BUTTON_SEQUENCE[i] !== idx) {
-    setTimeout(() => { send({ type: 'button-fail' }); handleButtonFail(); }, 250);
+  if (!state.bookOrder || state.bookOrder.length === 0) {
+    const wait = document.createElement("div");
+    wait.className = "obj-card";
+    wait.innerHTML = `<p style="text-align: center; opacity: 0.7;">Συντονισμός με το παρελθόν…</p>`;
+    stage.appendChild(wait);
     return;
   }
-  if (state.buttonInput.length === BUTTON_SEQUENCE.length) {
-    if (isHost) setTimeout(victory, 400);
-  }
-}
-function handleButtonFail() {
-  buzz();
-  state.buttonInput = [];
-  setInstruction('Λάθος. ΑΛΦΑ πάτα ΕΚΚΙΝΗΣΗ για νέα ακολουθία.');
-}
-function flashEmissive(mesh, intensity, duration) {
-  const orig = mesh.material.emissiveIntensity;
-  mesh.material.emissiveIntensity = intensity;
-  setTimeout(() => mesh.material.emissiveIntensity = orig, duration);
-}
 
-async function victory() {
-  state.solved = true;
-  chime(); setTimeout(chime, 300); setTimeout(chime, 600);
-  setInstruction('Η εξώπορτα ανοίγει...');
-  door3.userData.handleKnob.material.emissiveIntensity = 1;
-  tween(door3.userData.hinge.rotation, 'y', -Math.PI * 0.6, 1500, easeOutCubic);
-  doorOpenSound();
-  await sleep(1500);
-  tween(camera.position, 'z', ROOM_D/2 + 3, 2000, easeInOutCubic);
-  tween(controls.target, 'z', ROOM_D/2 + 5, 2000, easeInOutCubic);
-  await sleep(2200);
-  document.getElementById('victory').classList.add('show');
-}
+  const title = document.createElement("div");
+  title.className = "scene-title";
+  title.innerHTML = `<div class="era">Αίνιγμα II</div><h1>Η Σπασμένη Βιβλιοθήκη</h1>`;
+  stage.appendChild(title);
 
-function setInstruction(text) { document.getElementById('instruction').textContent = text; }
+  if (role === "past") {
+    const intro = document.createElement("div");
+    intro.className = "obj-card";
+    intro.innerHTML = `
+      <span class="helper-tag">Παρελθόν</span>
+      <div class="scroll-text">«Πέντε βιβλία βρίσκονται στο ράφι. Όταν τα τοποθετήσεις σωστά, τα αρχικά τους θα μιλήσουν για ό,τι κρύβει το ξύλο.»</div>
+      <p style="font-size: 12px; opacity: 0.7;">Άγγιξε δύο βιβλία για να τα ανταλλάξεις. Ο συνεργάτης σου στο μέλλον βλέπει τα χρώματα όπως θα έπρεπε να είναι.</p>
+    `;
+    stage.appendChild(intro);
 
-function updateClues() {
-  const body = document.getElementById('clue-body');
-  const title = document.getElementById('clue-title');
-  const role = state.role;
-  if (state.room === 1) {
-    title.textContent = 'Σου · Βιβλιοθήκη';
-    const myKey = role === 'ΑΛΦΑ' ? ALPHA_KEY : BETA_KEY;
-    const other = role === 'ΑΛΦΑ' ? 'ΒΗΤΑ' : 'ΑΛΦΑ';
-    let html = '<p>Στο καπάκι του κουτιού έχουν χαραχθεί:</p>';
-    html += '<div class="symbol-row">' + TOP_SIGILS.join(' &nbsp; ') + '</div>';
-    html += '<p>Ξέρεις τη σημασία αυτών:</p>';
-    html += '<ul class="key-list">';
-    myKey.forEach(s => { html += `<li><span style="font-size:1.3em;color:#ffd684;">${s}</span> = <code>${POS_NAMES[SIGIL_MEANING[s]]}</code></li>`; });
-    html += '</ul>';
-    html += `<p style="opacity:0.7;font-size:0.85em;margin-top:8px;">Τα υπόλοιπα ο <strong>${other}</strong> — μιλήστε.</p>`;
-    body.innerHTML = html;
-  } else if (state.room === 2) {
-    title.textContent = 'Σου · Θησαυροφυλάκιο';
-    const my = role === 'ΑΛΦΑ' ? ALPHA_DIGITS : BETA_DIGITS;
-    let html = '<p>Στο χαρτί διακρίνεις:</p>';
-    html += '<div class="digit-block">';
-    for (let i = 0; i < 4; i++) {
-      if (my.includes(i)) html += `<span class="filled">${DIAL_BASE[i]}</span>`;
-      else html += '<span class="hidden">▒</span>';
-    }
-    html += '</div>';
-    if (role === 'ΒΗΤΑ') html += `<p>Κάτω: <em>"πρόσθεσε <strong>${DIAL_OFFSET}</strong> στο κάθε ψηφίο πριν την εισαγωγή"</em></p>`;
-    else html += '<p style="opacity:0.75;">Κάτι είναι μουτζουρωμένο στο κάτω μέρος.</p>';
-    body.innerHTML = html;
-  } else if (state.room === 3) {
-    title.textContent = 'Σου · Αίθουσα Ελέγχου';
-    let html = '';
-    if (role === 'ΑΛΦΑ') html += '<p>Πατώντας ΕΚΚΙΝΗΣΗ, μόνο εσύ θα δεις την ακολουθία.</p><p style="margin-top:6px;">Πες τα χρώματα στον ΒΗΤΑ.</p>';
-    else html += '<p>Ο ΑΛΦΑ θα σου πει χρώματα. Πάτα τα στη σωστή σειρά.</p>';
-    html += '<p style="margin-top:10px;font-size:0.9em;">Χρώματα:';
-    BUTTON_COLORS.forEach((c, i) => {
-      const hex = '#' + c.toString(16).padStart(6, '0');
-      html += ` <span class="color-chip" style="background:${hex};color:${hex};"></span><strong>${BUTTON_NAMES_EL[i]}</strong>`;
-      if (i < BUTTON_COLORS.length - 1) html += ',';
+    const shelf = document.createElement("div");
+    shelf.className = "obj-card";
+    shelf.innerHTML = `<h3>📚 Το ράφι</h3>`;
+    const shelfDiv = document.createElement("div");
+    shelfDiv.className = "shelf";
+    state.bookOrder.forEach((bookId, idx) => {
+      const b = BOOKS[bookId];
+      const el = document.createElement("div");
+      el.className = "book";
+      el.dataset.idx = idx;
+      el.style.background = `linear-gradient(90deg, ${b.color}, ${shade(b.color, -25)})`;
+      el.textContent = b.title;
+      if (state._selBook === idx) el.classList.add("selected");
+      el.addEventListener("click", () => onBookTap(idx));
+      shelfDiv.appendChild(el);
     });
-    html += '</p>';
-    body.innerHTML = html;
+    shelf.appendChild(shelfDiv);
+    stage.appendChild(shelf);
+
+    // Check
+    if (state.bookSolved) {
+      const result = document.createElement("div");
+      result.className = "obj-card";
+      result.innerHTML = `
+        <h3>🗝️ Το κλειδί</h3>
+        <div style="text-align: center;">
+          <div style="font-size: 48px;">🗝️</div>
+          <p>Πίσω από το τελευταίο βιβλίο, ένα μικρό κλειδί. Πάνω του χαραγμένος ένας αριθμός.</p>
+          <p style="font-size: 12px; opacity: 0.7;">Στο μέλλον, ο συνεργάτης σου μπορεί τώρα να ανοίξει το κουτί του.</p>
+        </div>
+      `;
+      stage.appendChild(result);
+      const next = document.createElement("button");
+      next.className = "btn primary";
+      next.textContent = "Επόμενο αίνιγμα →";
+      next.onclick = () => { state.puzzle = 3; syncState(); };
+      stage.appendChild(next);
+    } else {
+      const checkBtn = document.createElement("button");
+      checkBtn.className = "btn";
+      checkBtn.textContent = "🔍 Έλεγξε τη σειρά";
+      checkBtn.onclick = () => {
+        const correct = state.bookOrder.every((b,i) => b === BOOK_SOLUTION[i]);
+        if (correct) {
+          state.bookSolved = true;
+          state.fragment2 = 4; // HEART has 5 letters → 4 (or any chosen value)
+          toast("🗝️ Σωστά! Ένα κλειδί έπεσε από το ράφι", "success");
+          syncState(true);
+        } else {
+          toast("Όχι ακόμα… τα γράμματα δεν λένε τίποτα.", "fail");
+        }
+      };
+      stage.appendChild(checkBtn);
+    }
+  } else {
+    // Future view
+    const intro = document.createElement("div");
+    intro.className = "obj-card";
+    intro.innerHTML = `
+      <span class="helper-tag">Μέλλον</span>
+      <div class="scroll-text">«Η βιβλιοθήκη είναι κατάλοιπο. Από τα βιβλία απομένουν μόνο οι χρωματισμένες σκιές στο ξύλο, κάποτε δίπλα-δίπλα.»</div>
+    `;
+    stage.appendChild(intro);
+
+    // Memory shelf — shows correct color order
+    const memShelf = document.createElement("div");
+    memShelf.className = "obj-card";
+    memShelf.innerHTML = `<h3>👻 Σκιές στο ξύλο</h3><p style="font-size: 12px; opacity: 0.6;">Η σειρά των χρωμάτων όπως ήταν.</p>`;
+    const shadDiv = document.createElement("div");
+    shadDiv.className = "shelf";
+    BOOK_SHADOW_COLORS.forEach((c, i) => {
+      const slot = document.createElement("div");
+      slot.className = "book";
+      slot.style.background = `linear-gradient(90deg, ${c}aa, ${shade(c,-25)}aa)`;
+      slot.style.opacity = "0.45";
+      slot.textContent = " ";
+      shadDiv.appendChild(slot);
+    });
+    memShelf.appendChild(shadDiv);
+    stage.appendChild(memShelf);
+
+    // Current state from past
+    const cur = document.createElement("div");
+    cur.className = "obj-card";
+    cur.innerHTML = `<h3>👁️ Ζωντανή εικόνα από το παρελθόν</h3>`;
+    const curShelf = document.createElement("div");
+    curShelf.className = "shelf";
+    state.bookOrder.forEach((bid) => {
+      const b = BOOKS[bid];
+      const el = document.createElement("div");
+      el.className = "book";
+      el.style.background = `linear-gradient(90deg, ${b.color}, ${shade(b.color, -25)})`;
+      el.textContent = b.title;
+      curShelf.appendChild(el);
+    });
+    cur.appendChild(curShelf);
+    stage.appendChild(cur);
+
+    // Diary fragment
+    const diary = document.createElement("div");
+    diary.className = "obj-card";
+    diary.innerHTML = `
+      <h3>📔 Καμένο ημερολόγιο</h3>
+      <div class="scroll-text" style="font-family: Courier New, monospace; font-size: 13px;">
+        «…η σειρά πρέπει να σχηματ̶͔͐_____ τη λέξη που σημαίνει ζωή…»<br>
+        «…από αριστερά: H, ε, A, ρ, T…»
+      </div>
+      <p style="font-size: 11px; opacity: 0.6;">Δώσε αυτή την πληροφορία στον συνεργάτη σου: HEART.</p>
+    `;
+    stage.appendChild(diary);
+
+    if (state.bookSolved) {
+      // Show locked box that needs key (received from past automatically)
+      const box = document.createElement("div");
+      box.className = "obj-card";
+      box.innerHTML = `
+        <h3>📦 Σφραγισμένο κουτί</h3>
+        <div style="text-align: center;">
+          <div style="font-size: 56px;">📦✨</div>
+          <p>Το κουτί ανοίγει αυτόματα — ο χρόνος σε προσπερνά και το κλειδί από το παρελθόν εμφανίζεται μέσα του.</p>
+          <div class="fragment-display"><div class="fragment filled">${state.fragment2}</div></div>
+        </div>
+      `;
+      stage.appendChild(box);
+      const next = document.createElement("button");
+      next.className = "btn future-style";
+      next.textContent = "Επόμενο αίνιγμα →";
+      next.onclick = () => { state.puzzle = 3; syncState(); };
+      stage.appendChild(next);
+    } else {
+      const wait = document.createElement("div");
+      wait.className = "obj-card";
+      wait.innerHTML = `<p style="text-align: center; opacity: 0.7;">Περιμένεις τον συνεργάτη σου…</p>`;
+      stage.appendChild(wait);
+    }
   }
 }
 
-function addChat(text, who) {
-  const c = document.getElementById('chat-messages');
-  const d = document.createElement('div');
-  d.className = 'msg-' + who;
-  const prefix = who === 'me' ? 'ΕΣΥ' : who === 'them' ? 'ΣΥΝΕΡΓΑΤΗΣ' : '◆';
-  d.textContent = `[${prefix}] ${text}`;
-  c.appendChild(d);
-  c.scrollTop = c.scrollHeight;
-}
-
-document.getElementById('chat-input').addEventListener('keypress', e => {
-  if (e.key === 'Enter') {
-    const text = e.target.value.trim();
-    if (!text) return;
-    addChat(text, 'me'); send({ type: 'chat', text });
-    e.target.value = '';
+function onBookTap(idx) {
+  if (state._selBook == null) {
+    state._selBook = idx;
+    render();
+  } else if (state._selBook === idx) {
+    state._selBook = null;
+    render();
+  } else {
+    const a = state._selBook, b = idx;
+    const tmp = state.bookOrder[a];
+    state.bookOrder[a] = state.bookOrder[b];
+    state.bookOrder[b] = tmp;
+    state._selBook = null;
+    syncState(true);
   }
-});
-document.getElementById('chat-header').addEventListener('click', () => {
-  const c = document.getElementById('chat');
-  c.classList.toggle('collapsed');
-  document.getElementById('chat-toggle').textContent = c.classList.contains('collapsed') ? '▲' : '▼';
-});
-document.getElementById('clue-panel-close').addEventListener('click', () => {
-  document.getElementById('clue-panel').classList.add('collapsed');
-  document.getElementById('clue-reopen').classList.add('show');
-});
-document.getElementById('clue-reopen').addEventListener('click', () => {
-  document.getElementById('clue-panel').classList.remove('collapsed');
-  document.getElementById('clue-reopen').classList.remove('show');
-});
-document.getElementById('reset-btn').addEventListener('click', () => {
-  if (state.room === 1) { camera.position.set(0, 1.8, 1.2); controls.target.set(0, 1.4, -1.8); }
-  else if (state.room === 2) { camera.position.set(0, 1.7, 1.8); controls.target.set(0, 1.8, -ROOM_D/2); }
-  else if (state.room === 3) { camera.position.set(0, 1.8, 1.8); controls.target.set(0, 1.1, -ROOM_D/2 + 0.8); }
-});
-document.getElementById('sound-btn').addEventListener('click', e => {
-  state.soundOn = !state.soundOn;
-  e.target.textContent = state.soundOn ? '♪' : '♪̸';
-  if (state.soundOn) beep(660, 0.1);
-});
-
-document.getElementById('host-btn').addEventListener('click', () => {
-  document.getElementById('lobby-main').style.display = 'none';
-  document.getElementById('host-panel').style.display = 'block';
-  hostGame();
-});
-document.getElementById('join-btn').addEventListener('click', () => {
-  document.getElementById('lobby-main').style.display = 'none';
-  document.getElementById('join-panel').style.display = 'block';
-  document.getElementById('join-code-input').focus();
-});
-document.getElementById('connect-btn').addEventListener('click', () => {
-  const code = document.getElementById('join-code-input').value.trim();
-  if (!code) return;
-  document.getElementById('connect-btn').disabled = true;
-  joinGame(code);
-});
-document.getElementById('join-code-input').addEventListener('keypress', e => {
-  if (e.key === 'Enter') document.getElementById('connect-btn').click();
-});
-
-function startGame() {
-  document.getElementById('lobby').style.display = 'none';
-  document.getElementById('ui').classList.add('show');
-  document.getElementById('role-name').textContent = state.role;
-  enterRoom(1);
-  addChat('Σύνδεση επιτυχής. Είσαι ' + state.role + '.', 'sys');
-  audio();
-  beep(440, 0.05, 'sine', 0.05);
 }
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-function loop() {
-  controls.update();
-  renderer.render(scene, camera);
-  requestAnimationFrame(loop);
+// ============ PUZZLE 3: WALL ============
+function renderPuzzle3(stage) {
+  const title = document.createElement("div");
+  title.className = "scene-title";
+  title.innerHTML = `<div class="era">Αίνιγμα III</div><h1>Η Πύλη των Χαραγμένων Άστρων</h1>`;
+  stage.appendChild(title);
+
+  if (role === "past") {
+    const intro = document.createElement("div");
+    intro.className = "obj-card";
+    intro.innerHTML = `
+      <span class="helper-tag">Παρελθόν</span>
+      <div class="scroll-text">«Ένας πέτρινος τοίχος με 16 πλακίδια. Έχω σμίλη και ξέρω να χαράζω άστρα — αλλά δεν ξέρω ποια πλακίδια θα αντέξουν τον χρόνο.»</div>
+      <p style="font-size: 12px; opacity: 0.7;">Διάλεξε σύμβολο και άγγιξε ένα πλακίδιο για να χαράξεις. Άγγιξε ξανά για σβήσιμο. <strong>Πρέπει να βάλεις 5 άστρα ★ στη σωστή θέση (την ομάδα Δράκος).</strong></p>
+    `;
+    stage.appendChild(intro);
+
+    // Past sees a "constellation map" - the shape of the dragon
+    const map = document.createElement("div");
+    map.className = "obj-card";
+    map.innerHTML = `
+      <h3>🗺️ Χάρτης αστερισμού (Δράκος)</h3>
+      <div style="text-align: center;">
+        <svg viewBox="0 0 100 100" style="width: 60%; max-width: 200px;">
+          <g fill="#f0d9a8">
+            <circle cx="35" cy="20" r="3"/>
+            <circle cx="60" cy="40" r="3"/>
+            <circle cx="60" cy="60" r="3"/>
+            <circle cx="35" cy="80" r="3"/>
+            <circle cx="15" cy="80" r="3"/>
+          </g>
+          <g stroke="#c9a25c" stroke-width="0.6" fill="none" opacity="0.5">
+            <line x1="35" y1="20" x2="60" y2="40"/>
+            <line x1="60" y1="40" x2="60" y2="60"/>
+            <line x1="60" y1="60" x2="35" y2="80"/>
+            <line x1="35" y1="80" x2="15" y2="80"/>
+          </g>
+        </svg>
+        <p style="font-size: 12px; opacity: 0.7;">Σχήμα φιδιού/δράκου: ξεκινάει πάνω-αριστερά, κατεβαίνει δεξιά, μετά πάει αριστερά.</p>
+      </div>
+    `;
+    stage.appendChild(map);
+
+    // Palette
+    const pal = document.createElement("div");
+    pal.className = "obj-card";
+    pal.innerHTML = `<h3>🔨 Σμίλη</h3>`;
+    const palDiv = document.createElement("div");
+    palDiv.className = "symbol-palette";
+    WALL_SYMBOLS.forEach((s, i) => {
+      const b = document.createElement("button");
+      b.className = "palette-btn";
+      b.textContent = s;
+      if ((state._selSym ?? 0) === i) b.classList.add("selected");
+      b.onclick = () => { state._selSym = i; render(); };
+      palDiv.appendChild(b);
+    });
+    pal.appendChild(palDiv);
+    stage.appendChild(pal);
+
+    // Grid - past does NOT see which cells are cracked, but can talk to future
+    const wallCard = document.createElement("div");
+    wallCard.className = "obj-card";
+    wallCard.innerHTML = `<h3>🧱 Ο τοίχος</h3>
+    <p style="font-size: 11px; opacity: 0.6;">Συντονίσου με το μέλλον — μόνο εκείνο ξέρει ποια πλακίδια ραγίζουν.</p>`;
+    const grid = document.createElement("div");
+    grid.className = "wall-grid";
+    for (let r=0; r<4; r++) for (let c=0; c<4; c++) {
+      const cell = document.createElement("div");
+      cell.className = "wall-cell";
+      const key = `${r},${c}`;
+      const sym = state.carvings[key];
+      if (sym != null) cell.textContent = WALL_SYMBOLS[sym];
+      cell.addEventListener("click", () => onCarve(r, c));
+      grid.appendChild(cell);
+    }
+    wallCard.appendChild(grid);
+    stage.appendChild(wallCard);
+
+    // check
+    if (state.doorOpen) {
+      const win = document.createElement("div");
+      win.className = "obj-card";
+      win.innerHTML = `<h3>🚪 Η πύλη άνοιξε</h3>
+        <p>Στο μέλλον, ο τοίχος αναγνώρισε τον αστερισμό σου.</p>`;
+      stage.appendChild(win);
+      const next = document.createElement("button");
+      next.className = "btn primary";
+      next.textContent = "Τελική απόδραση →";
+      next.onclick = () => { state.puzzle = 4; syncState(); };
+      stage.appendChild(next);
+    } else {
+      const cb = document.createElement("button");
+      cb.className = "btn";
+      cb.textContent = "🔍 Ολοκλήρωση χάραξης";
+      cb.onclick = checkWall;
+      stage.appendChild(cb);
+    }
+
+  } else {
+    // Future view: shows cracked cells + door
+    const intro = document.createElement("div");
+    intro.className = "obj-card";
+    intro.innerHTML = `
+      <span class="helper-tag">Μέλλον</span>
+      <div class="scroll-text">«Ο τοίχος έχει αντέξει 400 χρόνια. Κάποια πλακίδια έχουν ραγίσει — εκεί τα χαράγματα του παρελθόντος έχουν χαθεί. Πρέπει να πεις στον συνεργάτη σου ποια πλακίδια ΔΕΝ μπορεί να χρησιμοποιήσει.»</div>
+    `;
+    stage.appendChild(intro);
+
+    // Show wall with cracks + current carvings
+    const wallCard = document.createElement("div");
+    wallCard.className = "obj-card";
+    wallCard.innerHTML = `<h3>🧱 Ο τοίχος (400 χρόνια αργότερα)</h3>`;
+    const grid = document.createElement("div");
+    grid.className = "wall-grid";
+    for (let r=0; r<4; r++) for (let c=0; c<4; c++) {
+      const cell = document.createElement("div");
+      cell.className = "wall-cell";
+      const key = `${r},${c}`;
+      if (CRACKED_CELLS.has(key)) {
+        cell.classList.add("cracked");
+      } else {
+        const sym = state.carvings[key];
+        if (sym != null) cell.textContent = WALL_SYMBOLS[sym];
+      }
+      grid.appendChild(cell);
+    }
+    wallCard.appendChild(grid);
+    wallCard.innerHTML += `<p style="font-size: 11px; opacity: 0.6; margin-top: 6px;">Σκούρα πλακίδια = ραγισμένα = δεν αντέχουν χαράξεις.</p>`;
+    stage.appendChild(wallCard);
+
+    // Diary
+    const diary = document.createElement("div");
+    diary.className = "obj-card";
+    diary.innerHTML = `
+      <h3>📜 Πάπυρος του αστρονόμου</h3>
+      <div class="scroll-text">«Ο αστερισμός που πρέπει να επικαλεστείς είναι ο <strong>Δράκος</strong>. Πέντε αστέρια — μόνο ο σύντροφός σου στο παρελθόν έχει τον χάρτη του.»</div>
+      <p style="font-size: 11px; opacity: 0.6;">Συνεργαστείτε: εσύ ξέρεις πού ΔΕΝ μπορεί να χαράξει. Εκείνος ξέρει το σχήμα.</p>
+    `;
+    stage.appendChild(diary);
+
+    if (state.doorOpen) {
+      const win = document.createElement("div");
+      win.className = "obj-card";
+      win.innerHTML = `<h3>🚪 Η πύλη άνοιξε</h3>
+        <div style="text-align: center;">
+          <div style="font-size: 56px;">🚪✨</div>
+          <p>Ο αστερισμός φωτίζει τα ραγισμένα πλακίδια και η πύλη αποκαλύπτει τον τελευταίο αριθμό:</p>
+          <div class="fragment-display"><div class="fragment filled">${state.fragment3}</div></div>
+        </div>`;
+      stage.appendChild(win);
+      const next = document.createElement("button");
+      next.className = "btn future-style";
+      next.textContent = "Τελική απόδραση →";
+      next.onclick = () => { state.puzzle = 4; syncState(); };
+      stage.appendChild(next);
+    }
+  }
 }
-loop();
+
+function onCarve(r, c) {
+  const key = `${r},${c}`;
+  const sel = state._selSym ?? 0;
+  if (state.carvings[key] === sel) {
+    delete state.carvings[key];
+  } else {
+    state.carvings[key] = sel;
+  }
+  syncState(true);
+}
+
+function checkWall() {
+  // require all CONSTELLATION cells to have ★ (sym=0) AND no carvings on cracked cells
+  let allMatch = CONSTELLATION.every(({rc, sym}) => state.carvings[rc] === sym);
+  // No extra stars in non-constellation cells
+  const constellationKeys = new Set(CONSTELLATION.map(x => x.rc));
+  let noExtras = Object.entries(state.carvings).every(([k, v]) => {
+    if (constellationKeys.has(k)) return true;
+    return false;
+  });
+  // None on cracked
+  let noOnCracked = Object.keys(state.carvings).every(k => !CRACKED_CELLS.has(k));
+  if (allMatch && noExtras && noOnCracked) {
+    state.doorOpen = true;
+    state.fragment3 = 2;
+    toast("🌌 Ο αστερισμός φώτισε!", "success");
+    syncState(true);
+  } else if (!noOnCracked) {
+    toast("Κάποιες χαραγές θα χαθούν στον χρόνο…", "fail");
+  } else if (!allMatch || !noExtras) {
+    toast("Το σχήμα δεν είναι ολοκληρωμένο.", "fail");
+  }
+}
+
+// ============ FINAL ============
+function renderFinal(stage) {
+  const title = document.createElement("div");
+  title.className = "scene-title";
+  title.innerHTML = `<div class="era">Τελική Απόδραση</div><h1>Η Κλειδαριά του Χρόνου</h1>`;
+  stage.appendChild(title);
+
+  const intro = document.createElement("div");
+  intro.className = "obj-card";
+  intro.innerHTML = `
+    <span class="helper-tag">${role === "past" ? "Παρελθόν" : "Μέλλον"}</span>
+    <div class="scroll-text">«Τρία θραύσματα. Ένας κωδικός. Η πόρτα που στέκεται έξω από τον χρόνο περιμένει.»</div>
+    <p style="font-size: 12px; opacity: 0.7;">Και οι δύο πληκτρολογήστε τον ίδιο κωδικό. Συνδυάστε τα θραύσματα στη σωστή σειρά.</p>
+  `;
+  stage.appendChild(intro);
+
+  const frags = document.createElement("div");
+  frags.className = "obj-card";
+  frags.innerHTML = `<h3>Τα τρία θραύσματα</h3>
+    <div class="fragment-display">
+      <div class="fragment ${state.fragment1!=null?'filled':''}">${state.fragment1 ?? '?'}</div>
+      <div class="fragment ${state.fragment2!=null?'filled':''}">${state.fragment2 ?? '?'}</div>
+      <div class="fragment ${state.fragment3!=null?'filled':''}">${state.fragment3 ?? '?'}</div>
+    </div>
+    <p style="font-size: 12px; opacity: 0.7; text-align: center;">Σειρά: από το πρώτο αίνιγμα προς το τρίτο.</p>`;
+  stage.appendChild(frags);
+
+  // Lock
+  const lock = document.createElement("div");
+  lock.className = "obj-card";
+  lock.innerHTML = `<h3>🔐 Τελική κλειδαριά</h3>`;
+  const display = document.createElement("div");
+  display.className = "lock-display";
+  state._lockInput = state._lockInput || "";
+  for (let i=0; i<3; i++) {
+    const d = document.createElement("div");
+    d.className = "digit-slot";
+    if (state._lockInput[i]) d.textContent = state._lockInput[i];
+    else { d.classList.add("empty"); d.textContent = "·"; }
+    display.appendChild(d);
+  }
+  lock.appendChild(display);
+
+  const kp = document.createElement("div");
+  kp.className = "digit-keypad";
+  const keys = ["1","2","3","4","5","6","7","8","9","⌫","0","✓"];
+  keys.forEach(k => {
+    const b = document.createElement("button");
+    b.className = "key-btn";
+    b.textContent = k;
+    b.onclick = () => onKey(k);
+    kp.appendChild(b);
+  });
+  lock.appendChild(kp);
+  stage.appendChild(lock);
+}
+
+function onKey(k) {
+  state._lockInput = state._lockInput || "";
+  if (k === "⌫") {
+    state._lockInput = state._lockInput.slice(0, -1);
+  } else if (k === "✓") {
+    const target = `${state.fragment1}${state.fragment2}${state.fragment3}`;
+    if (state._lockInput === target) {
+      state.escaped = true;
+      syncState(true);
+      toast("🎉 ΑΠΕΔΡΑΣΑΤΕ!", "success");
+    } else {
+      toast("Λάθος κωδικός…", "fail");
+      state._lockInput = "";
+    }
+  } else if (state._lockInput.length < 3) {
+    state._lockInput += k;
+  }
+  render();
+}
+
+function renderWin() {
+  showScreen("win");
+  $("#win-text").innerHTML = `
+    Λύσατε τα τρία αινίγματα του χρόνου.<br>
+    Στο 1872 ο κήπος άνθισε.<br>
+    Στο 2287 η βιβλιοθήκη ξύπνησε.<br>
+    Ο αστερισμός του Δράκου άνοιξε τη μοναδική πόρτα έξω από τον βρόχο.<br><br>
+    <em>«Δύο εποχές, ένα κλειδί.»</em>
+  `;
+}
+
+// ===================== CHAT =====================
+$("#chat-toggle").addEventListener("click", () => toggleChat());
+$("#chat-input").addEventListener("keydown", e => { if (e.key === "Enter") sendChatMsg(); });
+
+function toggleChat(force) {
+  const p = $("#chat-panel");
+  if (force === false) p.classList.remove("open");
+  else p.classList.toggle("open");
+  if (p.classList.contains("open")) {
+    $("#chat-toggle").classList.remove("has-unread");
+    setTimeout(() => $("#chat-input").focus(), 100);
+  }
+}
+
+function sendChatMsg() {
+  const inp = $("#chat-input");
+  const txt = inp.value.trim();
+  if (!txt) return;
+  send("chat", txt);
+  addChatMsg(txt, "mine");
+  inp.value = "";
+}
+
+function addChatMsg(txt, side) {
+  const m = document.createElement("div");
+  m.className = "msg " + side;
+  const who = document.createElement("div");
+  who.className = "who";
+  who.textContent = side === "mine" ? "Εσύ" : (role === "past" ? "Μέλλον" : "Παρελθόν");
+  m.appendChild(who);
+  const body = document.createElement("div");
+  body.textContent = txt;
+  m.appendChild(body);
+  $("#chat-messages").appendChild(m);
+  $("#chat-messages").scrollTop = $("#chat-messages").scrollHeight;
+}
+
+// ===================== UTIL =====================
+function shade(hex, percent) {
+  const f = parseInt(hex.slice(1), 16);
+  const t = percent < 0 ? 0 : 255;
+  const p = Math.abs(percent) / 100;
+  const R = f >> 16, G = (f >> 8) & 0xff, B = f & 0xff;
+  return "#" + (
+    0x1000000 +
+    (Math.round((t - R) * p) + R) * 0x10000 +
+    (Math.round((t - G) * p) + G) * 0x100 +
+    (Math.round((t - B) * p) + B)
+  ).toString(16).slice(1);
+}
+
+// ===================== WIRE UI =====================
+$("#create-btn").addEventListener("click", host);
+$("#join-btn").addEventListener("click", join);
+$("#copy-btn").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(myCode);
+    toast("Κωδικός αντιγράφηκε", "success");
+  } catch(e) { toast("Πάτα παρατεταμένα τον κωδικό για αντιγραφή"); }
+});
+$("#join-input").addEventListener("input", e => {
+  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"");
+});
+
+// Prevent iOS zoom on double-tap
+document.addEventListener("dblclick", e => e.preventDefault());
+
 </script>
 </body>
 </html>
