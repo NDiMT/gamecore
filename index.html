@@ -14,6 +14,19 @@
 </head>
 <body>
   <div id="app"></div>
+  <pre id="err" style="position:fixed; left:0; right:0; top:0; padding:10px; background:#000; color:#ff8080; font:12px monospace; white-space:pre-wrap; z-index:9999; display:none;"></pre>
+  <script>
+    window.addEventListener("error", (e) => {
+      const el = document.getElementById("err");
+      el.style.display = "block";
+      el.textContent = "JS error: " + (e.message || e.error?.stack || e);
+    });
+    window.addEventListener("unhandledrejection", (e) => {
+      const el = document.getElementById("err");
+      el.style.display = "block";
+      el.textContent = "Promise: " + (e.reason?.message || e.reason);
+    });
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

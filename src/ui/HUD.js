@@ -1,4 +1,4 @@
-import { ERA_PAST, ERA_FUTURE, SEEDS } from "../constants.js";
+import { ERA_PAST, ERA_FUTURE, SEEDS, GAME_WIDTH, GAME_HEIGHT } from "../constants.js";
 
 export class HUD {
   constructor(scene, state) {
@@ -10,7 +10,8 @@ export class HUD {
 
   build() {
     const sc = this.scene;
-    const W = sc.scale.width;
+    const W = GAME_WIDTH;
+    const H = GAME_HEIGHT;
 
     const topBg = sc.add.rectangle(W/2, 36, W, 72, 0x000000, 0.55);
     topBg.setStrokeStyle(0);
@@ -36,8 +37,8 @@ export class HUD {
     this.toggleBtn.setInteractive();
     this.toggleBtn.on("pointerdown", () => this.state.toggleEra());
 
-    this.selBg = sc.add.rectangle(W/2, sc.scale.height - 38, W, 64, 0x000000, 0.6);
-    this.selText = sc.add.text(W/2, sc.scale.height - 38, "", {
+    this.selBg = sc.add.rectangle(W/2, H - 38, W, 64, 0x000000, 0.6);
+    this.selText = sc.add.text(W/2, H - 38, "", {
       fontFamily: "Georgia, serif",
       fontSize: 14,
       color: "#f0d9a8",

@@ -59,8 +59,8 @@ export class HintNote {
     if (this.modalOpen) return;
     this.modalOpen = true;
     const sc = this.scene;
-    const W = sc.scale.width;
-    const H = sc.scale.height;
+    const W = sc.game.config.width;
+    const H = sc.game.config.height;
 
     const layer = sc.add.container(0, 0).setDepth(1000);
     const bg = sc.add.rectangle(W/2, H/2, W, H, 0x000000, 0.78);

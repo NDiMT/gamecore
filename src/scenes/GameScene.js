@@ -21,20 +21,28 @@ export class GameScene extends Phaser.Scene {
   preload() {}
 
   create() {
-    this.state = roomState;
-    this.state.reset();
+    try {
+      this.state = roomState;
+      this.state.reset();
+      this.add.text(20, 20, "phaser create() ok", { fontFamily: "monospace", fontSize: 14, color: "#fff" });
+      this.buildBackground();
+      this.buildPots();
+      this.buildSeeds();
+      this.buildNotes();
+      this.buildDoor();
+      this.buildBowl();
+      this.buildWindow();
+      this.hud = new HUD(this, this.state);
+    } catch (e) {
+      const W = GAME_WIDTH, H = GAME_HEIGHT;
+      this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.8);
+      this.add.text(W/2, H/2, "RUNTIME ERROR:\n\n" + (e.stack || e.message || e), {
+        fontFamily: "monospace", fontSize: 14, color: "#ff8080", align: "center", wordWrap: { width: W - 40 }
+      }).setOrigin(0.5);
+      return;
+    }
 
-    this.buildBackground();
-    this.buildPots();
-    this.buildSeeds();
-    this.buildNotes();
-    this.buildDoor();
-    this.buildBowl();
-    this.buildWindow();
-
-    this.hud = new HUD(this, this.state);
-
-    this.toastText = this.add.text(this.scale.width/2, this.scale.height - 120, "", {
+    this.toastText = this.add.text(GAME_WIDTH/2, GAME_HEIGHT - 120, "", {
       fontFamily: "Georgia, serif",
       fontStyle: "italic",
       fontSize: 16,
@@ -57,8 +65,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   buildBackground() {
-    const W = this.scale.width;
-    const H = this.scale.height;
+    const W = GAME_WIDTH;
+    const H = GAME_HEIGHT;
     this.bgColor = TESTING_GREEN_BG ? TESTING_BG_COLOR : PRODUCTION_BG_COLOR;
     this.cameras.main.setBackgroundColor(this.bgColor);
 
