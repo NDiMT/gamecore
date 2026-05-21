@@ -1,13 +1,17 @@
-import Phaser from "phaser";
-import { GAME_WIDTH, GAME_HEIGHT } from "./constants.js";
-import { BootScene } from "./scenes/BootScene.js";
-import { GameScene } from "./scenes/GameScene.js";
-import { roomState } from "./state/RoomState.js";
 import { network } from "./network/Network.js";
+import { roomState } from "./state/RoomState.js";
+import { Scene3D } from "./engine/Scene3D.js";
+import { Room } from "./world/Room.js";
+import { Dials } from "./entities/Dials.js";
+import { Plates } from "./entities/Plates.js";
+import { Levers } from "./entities/Levers.js";
+import { Door } from "./entities/Door.js";
+import { HUD } from "./ui/HUD.js";
+import { ERA_PAST, ERA_FUTURE } from "./constants.js";
 
 const lobby = document.getElementById("lobby");
 const roleScreen = document.getElementById("role");
-const gameMount = document.getElementById("app");
+const game = document.getElementById("game");
 const createBtn = document.getElementById("create-btn");
 const createdInfo = document.getElementById("created-info");
 const myCodeEl = document.getElementById("my-code");
@@ -18,17 +22,21 @@ const joinBtn = document.getElementById("join-btn");
 const joinStatus = document.getElementById("join-status");
 const roleHint = document.getElementById("role-hint");
 const roleCards = document.querySelectorAll(".role-card");
+const soloBtn = document.getElementById("solo-btn");
 
-let phaserGame = null;
+let scene3d = null;
+let room = null;
+let dials = null;
+let plates = null;
+let levers = null;
+let door = null;
+let hud = null;
+let solo = false;
 
 function show(id) {
-  const map = { lobby: "flex", role: "flex", game: "block" };
-  ["lobby", "role"].forEach((x) => {
-    const el = document.getElementById(x);
-    if (el) el.style.display = (x === id) ? map[x] : "none";
-  });
-  const app = document.getElementById("app");
-  if (app) app.style.display = (id === "game") ? "block" : "none";
+  lobby.style.display = id === "lobby" ? "flex" : "none";
+  roleScreen.style.display = id === "role" ? "flex" : "none";
+  game.style.display = id === "game" ? "block" : "none";
 }
 
 createBtn.addEventListener("click", () => {
@@ -36,17 +44,13 @@ createBtn.addEventListener("click", () => {
   createdInfo.style.display = "block";
   network.host((code) => {
     myCodeEl.textContent = code;
-    createStatus.textContent = "Αναμονή συνεργάτη… κωδικός: " + code;
+    createStatus.textContent = "Αναμονή… κωδικός: " + code;
   });
 });
 
 copyBtn.addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(myCodeEl.textContent);
-    createStatus.textContent = "Κωδικός αντιγράφηκε";
-  } catch (e) {
-    createStatus.textContent = "Πάτα παρατεταμένα τον κωδικό για αντιγραφή";
-  }
+  try { await navigator.clipboard.writeText(myCodeEl.textContent); createStatus.textContent = "Αντιγράφηκε"; }
+  catch (e) { createStatus.textContent = "Πάτα παρατεταμένα τον κωδικό για αντιγραφή"; }
 });
 
 joinInput.addEventListener("input", (e) => {
@@ -57,6 +61,12 @@ joinBtn.addEventListener("click", () => {
   const code = joinInput.value.trim().toUpperCase();
   if (code.length < 4) { joinStatus.textContent = "Άκυρος κωδικός"; return; }
   network.join(code, (s) => joinStatus.innerHTML = s);
+});
+
+soloBtn.addEventListener("click", () => {
+  solo = true;
+  roomState.setRole("past");
+  startGame();
 });
 
 network.on((ev) => {
@@ -70,7 +80,7 @@ network.on((ev) => {
     const card = document.querySelector(`.role-card[data-role="${theirs}"]`);
     if (card) card.classList.add("taken");
     if (roleHint && !roomState.role) {
-      roleHint.textContent = `Ο σύντροφος ξύπνησε στο ${theirs === "past" ? "1872" : "2287"}. Διάλεξε την άλλη εποχή.`;
+      roleHint.textContent = `Σύντροφος στο ${theirs === "past" ? "1872" : "2287"}. Διάλεξε την άλλη.`;
     }
   }
 });
@@ -87,17 +97,62 @@ roleCards.forEach((card) => {
 
 function startGame() {
   show("game");
-  if (phaserGame) return;
+  roomState.attachNetwork();
   requestAnimationFrame(() => {
-    phaserGame = new Phaser.Game({
-      type: Phaser.AUTO,
-      parent: gameMount,
-      width: GAME_WIDTH,
-      height: GAME_HEIGHT,
-      backgroundColor: "#06040c",
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-      scene: [BootScene, GameScene],
-      render: { antialias: true, pixelArt: false },
+    const container = document.getElementById("game-canvas");
+    scene3d = new Scene3D(container);
+    rebuildEra();
+    hud = new HUD(roomState);
+    hud.setPeer(network.connected);
+    if (solo) hud.showToast("Solo mode: 1/2 αλλαγή εποχής");
+
+    roomState.on((ev) => {
+      if (ev.type === "era") rebuildEra();
+      if (ev.type === "dial") dials.refresh();
+      if (ev.type === "plate") plates.refresh();
+      if (ev.type === "lever") levers.refresh();
+      if (ev.type === "fragment") { door.refresh(); hud.showToast(fragMsg(ev.which)); }
+      if (ev.type === "sync") { dials.refresh(); plates.refresh(); levers.refresh(); door.refresh(); }
+      if (ev.type === "doorOpen") { door.refresh(); hud.showToast("Η πύλη άνοιξε."); }
+      if (ev.type === "doorLocked") hud.showToast("Λείπουν θραύσματα.");
+      if (ev.type === "chat") hud.appendChat(ev.text, ev.who === "me" ? "mine" : "them");
     });
+    network.on((ev) => {
+      if (ev.type === "open") hud.setPeer(true);
+      if (ev.type === "close") hud.setPeer(false);
+    });
+
+    if (solo) {
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "1") roomState.setEra(ERA_PAST);
+        if (e.key === "2") roomState.setEra(ERA_FUTURE);
+      });
+    }
   });
+}
+
+function rebuildEra() {
+  if (!scene3d) return;
+  if (room) room.destroy();
+  if (dials) dials.destroy();
+  if (plates) plates.destroy();
+  if (levers) levers.destroy();
+  if (door) door.destroy();
+  scene3d.setEra(roomState.era);
+  scene3d.applyEraLights();
+  const era = roomState.era;
+  room = new Room(scene3d, era);
+  dials = new Dials(scene3d, roomState, era, scene3d.picker);
+  plates = new Plates(scene3d, roomState, era, scene3d.picker);
+  levers = new Levers(scene3d, roomState, era, scene3d.picker);
+  door = new Door(scene3d, roomState, era, scene3d.picker);
+  scene3d.tickers.length = 0;
+  scene3d.tick((dt) => door.tick(dt));
+}
+
+function fragMsg(which) {
+  if (which === "dial")  return "✦ Πρώτο θραύσμα ξεκλείδωσε.";
+  if (which === "plate") return "✦ Δεύτερο θραύσμα ξεκλείδωσε.";
+  if (which === "lever") return "✦ Τρίτο θραύσμα ξεκλείδωσε.";
+  return "";
 }

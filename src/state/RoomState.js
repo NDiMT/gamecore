@@ -1,16 +1,20 @@
-import { POTS, SOLUTION, ERA_PAST, ERA_FUTURE } from "../constants.js";
+import { ERA_PAST, ERA_FUTURE, DIAL_SOLUTION, PLATE_SOLUTION, LEVER_SOLUTION } from "../constants.js";
 import { network } from "../network/Network.js";
 
 export class RoomState {
   constructor() {
     this.role = null;
     this.era = ERA_PAST;
-    this.plantings = {};
-    this.watered = {};
-    this.selectedSeed = null;
-    this.solved = false;
+    this.dials = [0, 0, 0];
+    this.dialsLocked = false;
+    this.plates = [false, false, false, false];
+    this.platesLocked = false;
+    this.levers = ["down", "down", "down"];
+    this.leversLocked = false;
+    this.fragments = { dial: false, plate: false, lever: false };
+    this.doorOpen = false;
+    this.escaped = false;
     this.listeners = new Set();
-    this.suppressEmit = false;
   }
 
   attachNetwork() {
@@ -20,121 +24,113 @@ export class RoomState {
     });
   }
 
-  on(fn) {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
-  }
-
-  emit(ev) {
-    if (this.suppressEmit) return;
-    for (const fn of this.listeners) fn(ev);
-  }
+  on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
+  emit(ev) { for (const fn of this.listeners) fn(ev); }
 
   setRole(role) {
     this.role = role;
-    if (role === "future") this.era = ERA_FUTURE; else this.era = ERA_PAST;
-    this.emit({ type: "role", role });
-    this.emit({ type: "era", era: this.era });
+    this.era = role === "future" ? ERA_FUTURE : ERA_PAST;
+    this.emit({ type: "role" });
+    this.emit({ type: "era" });
   }
 
   setEra(era) {
     this.era = era;
-    this.emit({ type: "era", era });
+    this.emit({ type: "era" });
   }
 
-  selectSeed(seedType) {
-    this.selectedSeed = this.selectedSeed === seedType ? null : seedType;
-    this.emit({ type: "select", seedType: this.selectedSeed });
+  rotateDial(idx, broadcast = true) {
+    if (this.dialsLocked) return;
+    this.dials[idx] = (this.dials[idx] + 1) % 10;
+    this.checkDials();
+    this.emit({ type: "dial", idx });
+    if (broadcast) network.send("dial", { idx });
   }
 
-  clearSelection() {
-    this.selectedSeed = null;
-    this.emit({ type: "select", seedType: null });
-  }
-
-  plantedAt(potId) {
-    return this.plantings[potId] || null;
-  }
-
-  isWatered(potId) {
-    return !!this.watered[potId];
-  }
-
-  potOfSeed(seedType) {
-    for (const k in this.plantings) if (this.plantings[k] === seedType) return parseInt(k);
-    return null;
-  }
-
-  plant(potId, seedType, broadcast = true) {
-    const prev = this.potOfSeed(seedType);
-    if (prev !== null) {
-      delete this.plantings[prev];
-      delete this.watered[prev];
+  checkDials() {
+    const ok = DIAL_SOLUTION.every((v, i) => this.dials[i] === v);
+    if (ok && !this.dialsLocked) {
+      this.dialsLocked = true;
+      this.fragments.dial = true;
+      this.emit({ type: "fragment", which: "dial" });
     }
-    this.plantings[potId] = seedType;
-    this.watered[potId] = false;
-    this.checkSolved();
-    this.emit({ type: "plant", potId, seedType });
-    if (broadcast) network.send("plant", { potId, seedType });
   }
 
-  uproot(potId, broadcast = true) {
-    if (!this.plantings[potId]) return;
-    delete this.plantings[potId];
-    delete this.watered[potId];
-    this.checkSolved();
-    this.emit({ type: "uproot", potId });
-    if (broadcast) network.send("uproot", { potId });
+  togglePlate(idx, broadcast = true) {
+    if (this.platesLocked) return;
+    this.plates[idx] = !this.plates[idx];
+    this.checkPlates();
+    this.emit({ type: "plate", idx });
+    if (broadcast) network.send("plate", { idx });
   }
 
-  water(potId, broadcast = true) {
-    if (!this.plantings[potId]) return;
-    this.watered[potId] = true;
-    this.checkSolved();
-    this.emit({ type: "water", potId });
-    if (broadcast) network.send("water", { potId });
+  checkPlates() {
+    const ok = PLATE_SOLUTION.every((v, i) => this.plates[i] === v);
+    if (ok && !this.platesLocked) {
+      this.platesLocked = true;
+      this.fragments.plate = true;
+      this.emit({ type: "fragment", which: "plate" });
+    }
   }
 
-  checkSolved() {
-    const wasSolved = this.solved;
-    const ok = Object.entries(SOLUTION).every(([placement, seedType]) => {
-      const pot = POTS.find((p) => p.placement === placement);
-      return pot && this.plantings[pot.id] === seedType && this.watered[pot.id];
-    });
-    this.solved = ok;
-    if (ok && !wasSolved) this.emit({ type: "solved" });
-    if (!ok && wasSolved) this.emit({ type: "unsolved" });
+  toggleLever(idx, broadcast = true) {
+    if (this.leversLocked) return;
+    this.levers[idx] = this.levers[idx] === "up" ? "down" : "up";
+    this.checkLevers();
+    this.emit({ type: "lever", idx });
+    if (broadcast) network.send("lever", { idx });
   }
 
-  reset(broadcast = true) {
-    this.plantings = {};
-    this.watered = {};
-    this.selectedSeed = null;
-    this.solved = false;
-    this.emit({ type: "reset" });
-    if (broadcast) network.send("reset", {});
+  checkLevers() {
+    const ok = LEVER_SOLUTION.every((v, i) => this.levers[i] === v);
+    if (ok && !this.leversLocked) {
+      this.leversLocked = true;
+      this.fragments.lever = true;
+      this.emit({ type: "fragment", which: "lever" });
+    }
+  }
+
+  tryOpenDoor(broadcast = true) {
+    if (this.doorOpen) return;
+    const all = this.fragments.dial && this.fragments.plate && this.fragments.lever;
+    if (!all) { this.emit({ type: "doorLocked" }); return; }
+    this.doorOpen = true;
+    this.emit({ type: "doorOpen" });
+    if (broadcast) network.send("doorOpen", {});
+  }
+
+  escape(broadcast = true) {
+    if (!this.doorOpen) return;
+    this.escaped = true;
+    this.emit({ type: "escaped" });
+    if (broadcast) network.send("escape", {});
   }
 
   applyRemote(msg) {
     if (!msg || !msg.type) return;
     const { type, payload } = msg;
-    if (type === "plant")  this.plant(payload.potId, payload.seedType, false);
-    if (type === "uproot") this.uproot(payload.potId, false);
-    if (type === "water")  this.water(payload.potId, false);
-    if (type === "reset")  this.reset(false);
-    if (type === "full")   this.applyFull(payload);
-    if (type === "chat")   this.emit({ type: "chat", text: payload, who: "them" });
+    if (type === "dial")     this.rotateDial(payload.idx, false);
+    if (type === "plate")    this.togglePlate(payload.idx, false);
+    if (type === "lever")    this.toggleLever(payload.idx, false);
+    if (type === "doorOpen") { this.doorOpen = true; this.emit({ type: "doorOpen" }); }
+    if (type === "escape")   { this.escaped = true; this.emit({ type: "escaped" }); }
+    if (type === "full")     this.applyFull(payload);
+    if (type === "chat")     this.emit({ type: "chat", text: payload, who: "them" });
   }
 
   applyFull(snap) {
-    this.plantings = snap.plantings || {};
-    this.watered = snap.watered || {};
-    this.checkSolved();
+    Object.assign(this, snap);
+    this.checkDials(); this.checkPlates(); this.checkLevers();
     this.emit({ type: "sync" });
   }
 
   broadcastFull() {
-    network.send("full", { plantings: this.plantings, watered: this.watered });
+    network.send("full", {
+      dials: this.dials, dialsLocked: this.dialsLocked,
+      plates: this.plates, platesLocked: this.platesLocked,
+      levers: this.levers, leversLocked: this.leversLocked,
+      fragments: this.fragments, doorOpen: this.doorOpen, escaped: this.escaped,
+    });
   }
 
   sendChat(text) {

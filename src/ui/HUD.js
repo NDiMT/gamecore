@@ -1,73 +1,146 @@
-import Phaser from "phaser";
-import { ERA_PAST, ERA_FUTURE, SEEDS, GAME_WIDTH, GAME_HEIGHT } from "../constants.js";
+import { DIAL_RIDDLE, DIAL_FUTURE_LABELS, DIAL_SOLUTION, PLATE_FUTURE_STATUS, LEVER_HINT_PAST, LEVER_HINT_FUTURE, WIN_MESSAGE } from "../constants.js";
 
 export class HUD {
-  constructor(scene, state) {
-    this.scene = scene;
+  constructor(state) {
     this.state = state;
-    this.build();
+    this.dom = document.getElementById("hud");
+    this.eraBadge = document.getElementById("era-badge");
+    this.frags = document.getElementById("frag-row");
+    this.peer = document.getElementById("peer-status");
+    this.toast = document.getElementById("toast");
+    this.inspectBtn = document.getElementById("inspect-btn");
+    this.inspectModal = document.getElementById("inspect-modal");
+    this.inspectBody = document.getElementById("inspect-body");
+    this.inspectClose = document.getElementById("inspect-close");
+    this.winOverlay = document.getElementById("win-overlay");
+    this.eraToggle = document.getElementById("era-toggle");
+    this.chatToggle = document.getElementById("chat-toggle");
+    this.chatPanel = document.getElementById("chat-panel");
+    this.chatMessages = document.getElementById("chat-messages");
+    this.chatInput = document.getElementById("chat-input");
+    this.chatSend = document.getElementById("chat-send");
+
+    this.inspectBtn.addEventListener("click", () => this.openInspect());
+    this.inspectClose.addEventListener("click", () => this.closeInspect());
+    this.eraToggle.addEventListener("click", () => {
+      if (this.state.role) return;
+      this.state.setEra(this.state.era === "past" ? "future" : "past");
+    });
+    this.chatToggle.addEventListener("click", () => this.toggleChat());
+    this.chatSend.addEventListener("click", () => this.sendChat());
+    this.chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
+
+    state.on(() => this.refresh());
     this.refresh();
   }
 
-  build() {
-    const sc = this.scene;
-    const W = GAME_WIDTH;
-    const H = GAME_HEIGHT;
-
-    this.topBg = sc.add.rectangle(W/2, 36, W, 72, 0x000000, 0.55);
-
-    this.eraText = sc.add.text(28, 28, "", {
-      fontFamily: "Georgia, serif", fontSize: 18, fontStyle: "italic", color: "#f0d9a8",
-    }).setOrigin(0, 0.5);
-
-    this.subText = sc.add.text(28, 52, "", {
-      fontFamily: "Georgia, serif", fontSize: 12, color: "#8a7a5a",
-    }).setOrigin(0, 0.5);
-
-    this.peerText = sc.add.text(W - 28, 36, "● live", {
-      fontFamily: "Arial", fontSize: 11, color: "#8df0a8",
-    }).setOrigin(1, 0.5);
-
-    this.selBg = sc.add.rectangle(W/2, H - 40, W, 70, 0x000000, 0.65);
-    this.selText = sc.add.text(W/2, H - 40, "", {
-      fontFamily: "Georgia, serif", fontSize: 14, color: "#f0d9a8", fontStyle: "italic", align: "center",
-      wordWrap: { width: W - 40 },
-    }).setOrigin(0.5);
-
-    this.winLabel = sc.add.text(W/2, 96, "", {
-      fontFamily: "Georgia, serif", fontSize: 24, color: "#ffd76a", fontStyle: "italic", align: "center",
-      shadow: { offsetX: 1, offsetY: 1, color: "#000", blur: 4, fill: true },
-    }).setOrigin(0.5).setAlpha(0);
-
-    this.unsub = this.state.on(() => this.refresh());
-  }
-
-  setPeerStatus(online) {
-    this.peerText.setText(online ? "● live" : "○ off");
-    this.peerText.setColor(online ? "#8df0a8" : "#ff9b95");
-  }
-
   refresh() {
-    if (this.state.era === ERA_PAST) {
-      this.eraText.setText("⌛ 1872 · παρελθόν");
-      this.subText.setText("φύτεψε και πότισε");
+    if (this.state.era === "past") {
+      this.eraBadge.textContent = "⌛ 1872 · παρελθόν";
+      this.eraBadge.style.background = "#c9a25c";
+      this.eraBadge.style.color = "#1a0e08";
     } else {
-      this.eraText.setText("✦ 2287 · μέλλον");
-      this.subText.setText("κοίτα τι μεγάλωσε");
+      this.eraBadge.textContent = "✦ 2287 · μέλλον";
+      this.eraBadge.style.background = "#4a7dc9";
+      this.eraBadge.style.color = "#fff";
     }
-    if (this.state.selectedSeed) {
-      const def = SEEDS[this.state.selectedSeed];
-      this.selText.setText(`κρατάς σπόρο ${def.label.toLowerCase()} · άγγιξε γλάστρα`);
-    } else if (this.state.role === "past") {
-      this.selText.setText("άγγιξε ένα σακουλάκι για να διαλέξεις");
+    this.frags.innerHTML = "";
+    const order = [
+      { key: "dial",  emoji: "◎", color: "#c94f4f" },
+      { key: "plate", emoji: "▣", color: "#4fc97a" },
+      { key: "lever", emoji: "⇅", color: "#4f7fc9" },
+    ];
+    order.forEach(({ key, emoji, color }) => {
+      const f = document.createElement("div");
+      f.className = "frag";
+      if (this.state.fragments[key]) {
+        f.style.background = color;
+        f.style.color = "#fff";
+        f.style.borderColor = "#fff";
+      }
+      f.textContent = emoji;
+      this.frags.appendChild(f);
+    });
+    if (this.state.escaped) this.showWin();
+  }
+
+  setPeer(online) {
+    this.peer.textContent = online ? "● live" : "○ off";
+    this.peer.style.color = online ? "#8df0a8" : "#ff9b95";
+  }
+
+  openInspect() {
+    const era = this.state.era;
+    let html = "";
+    if (era === "past") {
+      html += "<h3>σημείωμα στο τραπέζι</h3>";
+      html += "<div class='paper'>";
+      DIAL_RIDDLE.forEach((r, i) => {
+        html += `<p><strong>${i + 1}.</strong> ${r.replace(/\n/g, "<br>")}</p>`;
+      });
+      html += "</div>";
+      html += "<h3>χάραξη στον τοίχο</h3>";
+      html += `<div class='paper' style='font-family: monospace;'>${LEVER_HINT_PAST.replace(/\n/g, "<br>")}</div>`;
     } else {
-      this.selText.setText("μόνο ο σύντροφος στο 1872 μπορεί να φυτέψει");
+      html += "<h3>επιγραφή πάνω από τους μηχανισμούς</h3>";
+      html += "<div class='paper diary'>";
+      html += "<p>τα τρία γραμμένα σύμβολα:</p>";
+      html += `<p style='font-size:32px; text-align:center; letter-spacing:24px;'>${DIAL_FUTURE_LABELS.join("")}</p>`;
+      html += "</div>";
+      html += "<h3>πινακίδα στο πάτωμα</h3>";
+      html += "<div class='paper diary'>";
+      html += "<p>κατάσταση πλακών (αριστερά → δεξιά):</p>";
+      html += "<ul>";
+      PLATE_FUTURE_STATUS.forEach((s, i) => {
+        html += `<li>Πλάκα ${i + 1}: <em>${s}</em></li>`;
+      });
+      html += "</ul>";
+      html += "</div>";
+      html += "<h3>σκουριασμένος καθρέφτης</h3>";
+      html += `<div class='paper diary'>${LEVER_HINT_FUTURE.replace(/\n/g, "<br>")}</div>`;
     }
-    if (this.state.solved) {
-      this.winLabel.setText("Το δωμάτιο θυμήθηκε σωστά.");
-      this.scene.tweens.add({ targets: this.winLabel, alpha: 1, duration: 600 });
-    } else {
-      this.winLabel.setAlpha(0);
+    this.inspectBody.innerHTML = html;
+    this.inspectModal.style.display = "flex";
+  }
+
+  closeInspect() { this.inspectModal.style.display = "none"; }
+
+  showWin() {
+    this.winOverlay.style.display = "flex";
+    document.getElementById("win-text").textContent = WIN_MESSAGE;
+  }
+
+  showToast(msg) {
+    this.toast.textContent = msg;
+    this.toast.style.opacity = "1";
+    clearTimeout(this._tt);
+    this._tt = setTimeout(() => this.toast.style.opacity = "0", 2200);
+  }
+
+  toggleChat(force) {
+    if (force === false) this.chatPanel.classList.remove("open");
+    else this.chatPanel.classList.toggle("open");
+    if (this.chatPanel.classList.contains("open")) {
+      this.chatToggle.classList.remove("has-unread");
+      setTimeout(() => this.chatInput.focus(), 100);
+    }
+  }
+
+  sendChat() {
+    const txt = this.chatInput.value.trim();
+    if (!txt) return;
+    this.state.sendChat(txt);
+    this.chatInput.value = "";
+  }
+
+  appendChat(text, side) {
+    const el = document.createElement("div");
+    el.className = "msg " + side;
+    el.textContent = text;
+    this.chatMessages.appendChild(el);
+    this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+    if (side === "them" && !this.chatPanel.classList.contains("open")) {
+      this.chatToggle.classList.add("has-unread");
     }
   }
 }
