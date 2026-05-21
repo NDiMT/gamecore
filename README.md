@@ -1,27 +1,54 @@
-# Chronos — Escape the Loop
+# Chronos · Greenhouse
 
-Co-op escape room για κινητά, σε browser. Ο ένας παίκτης βρίσκεται στο 1872, ο άλλος στο 2287. Οι ενέργειες του παρελθόντος αλλάζουν το μέλλον σε πραγματικό χρόνο.
+Phaser 3 + Vite. Πρώτη πίστα για ένα coop time-loop escape παιχνίδι.
 
-## Παίξε
+## Run locally
 
-Άνοιξε σε 2 κινητά τη διεύθυνση του GitHub Pages του repo (π.χ. `https://<user>.github.io/gamecore/`).
+```bash
+npm install
+npm run dev
+```
 
-1. Ο ένας πατάει "Νέο παιχνίδι" και μοιράζεται τον 6-ψήφιο κωδικό.
-2. Ο άλλος βάζει τον κωδικό και πατάει "Σύνδεση".
-3. Διαλέγετε εποχή (ένας στο παρελθόν, ένας στο μέλλον).
-4. Λύνετε 3 αινίγματα συνεργατικά μέσω WebRTC. Built-in chat.
+Άνοιξε http://localhost:5173
 
-## Τα 3 αινίγματα
+## Controls
 
-1. **Ο Κήπος του Ηλιακού Ρολογιού** — Το μέλλον διαβάζει μια ορειχάλκινη πλάκα, το παρελθόν περιστρέφει 4 τελετουργικές πέτρες.
-2. **Η Σπασμένη Βιβλιοθήκη** — Το μέλλον βλέπει τις σκιές των βιβλίων στο ξύλο, το παρελθόν αναδιατάσσει βιβλία ώστε τα αρχικά να σχηματίσουν λέξη.
-3. **Η Πύλη των Χαραγμένων Άστρων** — Το μέλλον βλέπει ποια πλακίδια έχουν ραγίσει, το παρελθόν έχει χάρτη αστερισμού. Πρέπει να χαραχτεί ο Δράκος μόνο σε σώα πλακίδια.
+- `1` — Δωμάτιο Παρελθόντος
+- `2` — Δωμάτιο Μέλλοντος
+- `R` — Reset
+- `G` — Toggle green background (sprite testing)
+- Click σακουλάκι → επιλογή σπόρου
+- Click γλάστρα → φύτευση (ή ξεφύτεμα αν δεν έχεις σπόρο επιλεγμένο)
 
-Συνδυάζετε 3 ψηφία από κάθε αίνιγμα → τελική κλειδαριά απόδρασης.
+## Project structure
 
-## Tech
+```
+src/
+├─ main.js                  Phaser bootstrap
+├─ constants.js             positions, palette, solution, hints
+├─ scenes/GameScene.js      κύρια σκηνή
+├─ state/RoomState.js       reactive shared state
+├─ entities/
+│  ├─ Seed.js               σακουλάκι σπόρου
+│  ├─ Pot.js                γλάστρα με stage-aware rendering
+│  ├─ HintNote.js           σημείωμα/ημερολόγιο modal
+│  └─ Door.js               πύλη του χρόνου
+└─ ui/HUD.js                era badge + selected seed bar
+```
 
-- Single-file HTML5
-- WebRTC peer-to-peer (PeerJS public broker)
-- Χωρίς server, χωρίς build, χωρίς εγγραφές
-- Mobile-first responsive
+## Solution
+
+Φτερό → παράθυρο, Σταγόνα → μπολ με νερό, Κύκλος → κέντρο.
+Μάτι/Δόντι είναι decoys.
+
+Hint:
+- Παρελθόν: «Ό,τι σπάρθηκε πριν, ακόμα θυμάται το φως.»
+- Μέλλον: «Εκείνο που ήθελε αέρα μεγάλωσε προς το σπασμένο παράθυρο…»
+
+## Swap to real sprites later
+
+Όλα τα placeholder visuals είναι Phaser Graphics primitives σε `src/entities/*.js`.
+Όταν έχεις atlas:
+1. `public/sprites/plants.png` + `plants.json`
+2. στο `GameScene.preload()` φόρτωσε με `this.load.atlas(...)`
+3. στα entities αντικατάστησε τα `add.graphics()` με `add.sprite(x, y, "plants", "ftero_mature")`
