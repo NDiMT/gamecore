@@ -1,4 +1,5 @@
-import { SEEDS, COLORS } from "../constants.js";
+import Phaser from "phaser";
+import { SEEDS, TEX_PLANTS } from "../constants.js";
 
 export class Seed {
   constructor(scene, type, x, y, state) {
@@ -14,47 +15,28 @@ export class Seed {
 
   build() {
     const c = this.scene.add.container(this.x, this.y);
-    c.setSize(96, 110);
 
-    const shadow = this.scene.add.ellipse(0, 50, 70, 12, 0x000000, 0.4);
+    const halo = this.scene.add.ellipse(0, 60, 110, 18, 0x000000, 0.35);
 
-    const bag = this.scene.add.graphics();
-    bag.fillStyle(0xb89060, 1);
-    bag.fillRoundedRect(-32, -40, 64, 78, 6);
-    bag.lineStyle(2, 0x6a4828, 1);
-    bag.strokeRoundedRect(-32, -40, 64, 78, 6);
-    bag.fillStyle(0x8a6840, 1);
-    bag.fillRect(-32, -40, 64, 14);
+    const sprite = this.scene.add.image(0, 0, TEX_PLANTS, this.def.bagFrame);
+    sprite.setDisplaySize(120, 150);
 
-    const glyphCircle = this.scene.add.circle(0, -2, 18, 0xefe6cf);
-    glyphCircle.setStrokeStyle(2, 0x3a2818);
-
-    const glyph = this.scene.add.text(0, -2, this.def.glyph, {
-      fontFamily: "Georgia, serif",
-      fontSize: 26,
-      color: rgbToHex(this.def.color),
+    const label = this.scene.add.text(0, 86, this.def.label, {
+      fontFamily: "Georgia, serif", fontSize: 14, color: "#f0d9a8", fontStyle: "italic",
+      shadow: { offsetX: 1, offsetY: 1, color: "#000", blur: 2, fill: true },
     }).setOrigin(0.5);
 
-    const label = this.scene.add.text(0, 32, this.def.label, {
-      fontFamily: "Georgia, serif",
-      fontSize: 13,
-      color: "#3a2818",
-      fontStyle: "italic",
-    }).setOrigin(0.5);
+    const ring = this.scene.add.circle(0, 0, 76, 0xffd76a, 0);
+    ring.setStrokeStyle(4, 0xffd76a, 0);
 
-    const ring = this.scene.add.circle(0, 0, 50, 0xffd76a, 0);
-    ring.setStrokeStyle(3, 0xffd76a, 0.9);
-    ring.setVisible(false);
-
-    c.add([shadow, bag, glyphCircle, glyph, label, ring]);
-    c.setInteractive(new Phaser.Geom.Rectangle(-32, -40, 64, 90), Phaser.Geom.Rectangle.Contains);
-
+    c.add([halo, sprite, label, ring]);
+    c.setSize(120, 180);
+    c.setInteractive(new Phaser.Geom.Rectangle(-60, -90, 120, 180), Phaser.Geom.Rectangle.Contains);
     c.on("pointerdown", () => this.handleSelect());
-    c.on("pointerover", () => this.scene.input.manager.canvas.style.cursor = "pointer");
-    c.on("pointerout", () => this.scene.input.manager.canvas.style.cursor = "default");
 
     this.root = c;
-    this.ringEl = ring;
+    this.ring = ring;
+    this.sprite = sprite;
   }
 
   handleSelect() {
@@ -63,10 +45,10 @@ export class Seed {
   }
 
   setSelected(yes) {
-    this.ringEl.setVisible(yes);
+    this.ring.setStrokeStyle(4, 0xffd76a, yes ? 0.9 : 0);
     this.scene.tweens.add({
       targets: this.root,
-      y: yes ? this.y - 14 : this.y,
+      y: yes ? this.y - 16 : this.y,
       duration: 220,
       ease: "Cubic.easeOut",
     });
@@ -74,14 +56,8 @@ export class Seed {
 
   setDisabled(yes) {
     this.disabled = yes;
-    this.root.setAlpha(yes ? 0.35 : 1);
+    this.sprite.setAlpha(yes ? 0.25 : 1);
   }
 
-  destroy() {
-    this.root.destroy();
-  }
-}
-
-function rgbToHex(n) {
-  return "#" + n.toString(16).padStart(6, "0");
+  setVisible(v) { this.root.setVisible(v); }
 }
