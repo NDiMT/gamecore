@@ -3,10 +3,9 @@ import { roomState } from "./state/RoomState.js";
 import { Scene3D } from "./engine/Scene3D.js";
 import { ChamberSky } from "./world/ChamberSky.js";
 import { ChamberRoot } from "./world/ChamberRoot.js";
-import { Constellation } from "./entities/Constellation.js";
-import { Vault } from "./entities/Vault.js";
-import { Altar } from "./entities/Altar.js";
-import { Crystal } from "./entities/Crystal.js";
+import { StarMap } from "./entities/StarMap.js";
+import { CombinationLock } from "./entities/CombinationLock.js";
+import { CrystalTowers } from "./entities/CrystalTowers.js";
 import { Gate } from "./entities/Gate.js";
 import { HUD } from "./ui/HUD.js";
 import { CHAMBER_SKY, CHAMBER_ROOT, PALETTE_SKY, PALETTE_ROOT } from "./constants.js";
@@ -28,10 +27,9 @@ const soloBtn = document.getElementById("solo-btn");
 
 let scene3d = null;
 let chamber = null;
-let constellation = null;
-let vault = null;
-let altar = null;
-let crystal = null;
+let starMap = null;
+let combo = null;
+let towers = null;
 let gate = null;
 let hud = null;
 let solo = false;
@@ -105,7 +103,14 @@ function startGame() {
   requestAnimationFrame(() => {
     const container = document.getElementById("game-canvas");
     const palette = roomState.chamber === CHAMBER_SKY ? PALETTE_SKY : PALETTE_ROOT;
-    scene3d = new Scene3D(container, palette);
+    try {
+      scene3d = new Scene3D(container, palette);
+    } catch (e) {
+      const err = document.getElementById("err");
+      err.style.display = "block";
+      err.textContent = "Scene3D init error: " + (e.stack || e.message);
+      return;
+    }
     rebuildScene();
     hud = new HUD(roomState);
     hud.setPeer(network.connected);
@@ -113,25 +118,16 @@ function startGame() {
 
     roomState.on((ev) => {
       if (ev.type === "chamber") rebuildScene();
-      if (ev.type === "star") constellation && constellation.refresh();
-      if (ev.type === "constellation-solved") {
-        constellation && constellation.refresh();
-        vault && vault.refresh();
-      }
-      if (ev.type === "altar") altar && altar.refresh();
-      if (ev.type === "altar-solved") {
-        altar && altar.refresh();
-        crystal && crystal.refresh();
-      }
-      if (ev.type === "crystal" || ev.type === "crystal-solved") {
-        crystal && crystal.refresh();
-        gate && gate.refresh();
-      }
+      if (ev.type === "star") starMap && starMap.refresh();
+      if (ev.type === "stars-solved") { starMap && starMap.refresh(); combo && combo.refresh(); }
+      if (ev.type === "disc") combo && combo.refresh();
+      if (ev.type === "discs-solved") { combo && combo.refresh(); towers && towers.refresh(); }
+      if (ev.type === "tower-correct" || ev.type === "tower-wrong") towers && towers.refresh();
+      if (ev.type === "towers-solved") { towers && towers.refresh(); gate && gate.refresh(); }
       if (ev.type === "sync") {
-        constellation && constellation.refresh();
-        vault && vault.refresh();
-        altar && altar.refresh();
-        crystal && crystal.refresh();
+        starMap && starMap.refresh();
+        combo && combo.refresh();
+        towers && towers.refresh();
         gate && gate.refresh();
       }
     });
@@ -153,26 +149,29 @@ function startGame() {
 function rebuildScene() {
   if (!scene3d) return;
   if (chamber) chamber.destroy();
-  if (constellation) constellation.destroy();
-  if (vault) vault.destroy();
-  if (altar) altar.destroy();
-  if (crystal) crystal.destroy();
+  if (starMap) starMap.destroy();
+  if (combo) combo.destroy();
+  if (towers) towers.destroy();
   if (gate) gate.destroy();
   scene3d.picker.clear();
   scene3d.tickers.length = 0;
 
   const palette = roomState.chamber === CHAMBER_SKY ? PALETTE_SKY : PALETTE_ROOT;
   scene3d.applyPalette(palette);
+  if (scene3d.bloom) {
+    scene3d.bloom.strength = roomState.chamber === CHAMBER_SKY ? 1.0 : 0.7;
+    scene3d.bloom.radius = roomState.chamber === CHAMBER_SKY ? 0.65 : 0.45;
+    scene3d.bloom.threshold = 0.55;
+  }
 
   if (roomState.chamber === CHAMBER_SKY) {
     chamber = new ChamberSky(scene3d);
-    constellation = new Constellation(scene3d, roomState, scene3d.picker);
-    crystal = new Crystal(scene3d, roomState, scene3d.picker);
+    starMap = new StarMap(scene3d, roomState, scene3d.picker);
+    towers = new CrystalTowers(scene3d, roomState, scene3d.picker);
     gate = new Gate(scene3d, roomState, scene3d.picker, CHAMBER_SKY);
   } else {
     chamber = new ChamberRoot(scene3d);
-    vault = new Vault(scene3d, roomState, scene3d.picker);
-    altar = new Altar(scene3d, roomState, scene3d.picker);
+    combo = new CombinationLock(scene3d, roomState, scene3d.picker);
     gate = new Gate(scene3d, roomState, scene3d.picker, CHAMBER_ROOT);
   }
 }

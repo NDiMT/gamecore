@@ -1,4 +1,8 @@
 import * as THREE from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { OrbitTouch } from "./Controls.js";
 import { Picker } from "./Picker.js";
 
@@ -10,17 +14,17 @@ export class Scene3D {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(palette.fog);
-    this.scene.fog = new THREE.FogExp2(palette.fog, 0.07);
+    this.scene.fog = new THREE.FogExp2(palette.fog, 0.075);
 
     this.camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 60);
-    this.camera.position.set(0, 4.2, 8.5);
+    this.camera.position.set(0, 4.0, 8.5);
     this.target = new THREE.Vector3(0, 2.4, 0);
     this.camera.lookAt(this.target);
 
@@ -29,10 +33,10 @@ export class Scene3D {
     this.controls.onTap((nx, ny) => this.picker.pickAt(nx, ny));
     this.controls.onHover((nx, ny) => this.picker.hoverAt(nx, ny));
 
-    this.ambient = new THREE.AmbientLight(0xffffff, 0.25);
+    this.ambient = new THREE.AmbientLight(0xffffff, 0.22);
     this.scene.add(this.ambient);
 
-    this.key = new THREE.DirectionalLight(0xffffff, 0.55);
+    this.key = new THREE.DirectionalLight(0xffffff, 0.5);
     this.key.position.set(3, 8, 5);
     this.key.castShadow = true;
     this.key.shadow.mapSize.set(1024, 1024);
@@ -47,11 +51,23 @@ export class Scene3D {
     this.rim.position.set(-3, 4, -2);
     this.scene.add(this.rim);
 
+    this.setupPostFX();
     this.applyPalette(palette);
+
     this.tickers = [];
     this._last = performance.now();
     window.addEventListener("resize", this.onResize);
     requestAnimationFrame(this.animate);
+  }
+
+  setupPostFX() {
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.85, 0.5, 0.6);
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
   }
 
   applyPalette(palette) {
@@ -70,6 +86,7 @@ export class Scene3D {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
     this.renderer.setSize(w, h);
+    this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   };
@@ -81,6 +98,6 @@ export class Scene3D {
     this._last = now;
     this.controls.update(dt);
     for (const fn of this.tickers) fn(dt, now / 1000);
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   };
 }

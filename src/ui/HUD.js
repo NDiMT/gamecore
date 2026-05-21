@@ -1,4 +1,9 @@
-import { CHAMBER_LABEL, HINTS_SKY, HINTS_ROOT, WIN_MESSAGE, SIGIL_DEFS, ALTAR_SOLUTION } from "../constants.js";
+import { CHAMBER_LABEL_DUMMY, HINTS_SKY, HINTS_ROOT, COMBO_SYMBOLS, COMBO_NAMES, WIN_MESSAGE } from "../constants.js";
+
+const CHAMBER_LABEL = {
+  sky:  { title: "Αίθουσα του Σιωπηλού Ουρανού", short: "ΟΥΡΑΝΟΣ" },
+  root: { title: "Αίθουσα των Ριζών", short: "ΡΙΖΕΣ" },
+};
 
 export class HUD {
   constructor(state) {
@@ -20,7 +25,6 @@ export class HUD {
     this.winOverlay = document.getElementById("win-overlay");
     this.winText = document.getElementById("win-text");
     this.progress = document.getElementById("progress");
-    this.tapRipple = document.getElementById("tap-ripple");
 
     this.inspectBtn.addEventListener("click", () => { this.openInspect(); this.haptic(); });
     this.inspectClose.addEventListener("click", () => { this.closeInspect(); this.haptic(); });
@@ -37,9 +41,11 @@ export class HUD {
 
   handleStateEvent(ev) {
     this.refresh();
-    if (ev.type === "constellation-solved") this.showToast("Ο ουρανός θυμήθηκε. Κάτι ραγίζει αλλού.", "win");
-    if (ev.type === "altar-solved") this.showToast("Οι ρίζες πέρασαν το όνομα. Ο κρύσταλλος ξυπνά.", "win");
-    if (ev.type === "crystal-solved") this.showToast("Η πύλη ξυπνά.", "win");
+    if (ev.type === "stars-solved") this.showToast("Ο ουρανός θυμήθηκε. Κάτι ξυπνά αλλού.", "win");
+    if (ev.type === "discs-solved") this.showToast("Οι δίσκοι κλείδωσαν. Οι πύργοι ανάβουν.", "win");
+    if (ev.type === "tower-correct") this.showToast("Ένας πύργος συντονίζεται…", "win");
+    if (ev.type === "tower-wrong") this.showToast("Λάθος σειρά. Όλοι σιωπούν ξανά.", "fail");
+    if (ev.type === "towers-solved") this.showToast("Η πύλη ξυπνά.", "win");
     if (ev.type === "gate-locked") this.showToast("Η πύλη δεν είναι έτοιμη.", "fail");
     if (ev.type === "escaped") this.showWin();
     if (ev.type === "chat") this.appendChat(ev.text, ev.who === "me" ? "mine" : "them");
@@ -54,9 +60,9 @@ export class HUD {
       document.body.classList.add(this.state.chamber === "sky" ? "chamber-sky" : "chamber-root");
     }
     const stages = [
-      { name: "Αστερισμός", done: this.state.constellationSolved },
-      { name: "Ριζωμένο",   done: this.state.altarSolved },
-      { name: "Κρύσταλλος", done: this.state.crystalSolved },
+      { name: "Αστερισμός", done: this.state.starsSolved },
+      { name: "Δίσκοι",     done: this.state.discsSolved },
+      { name: "Πύργοι",     done: this.state.towersSolved },
     ];
     this.progress.innerHTML = "";
     stages.forEach((s, i) => {
@@ -77,13 +83,13 @@ export class HUD {
     const hints = ch === "sky" ? HINTS_SKY : HINTS_ROOT;
     let html = `<div class="paper-title">Φύλλα Σημείωσης</div>`;
     hints.forEach((h, i) => {
-      html += `<div class="paper-line"><span class="paper-num">${i + 1}</span><span>${h}</span></div>`;
+      html += `<div class="paper-line"><span class="paper-num">${i + 1}</span><span>${h.replace(/\n/g, "<br>")}</span></div>`;
     });
-    if (ch === "root" && this.state.vaultOpen) {
-      html += `<div class="paper-title">Σύμβολα του χρηματοκιβωτίου</div>`;
+    if (ch === "root") {
+      html += `<div class="paper-title">Σύμβολα δίσκων</div>`;
       html += `<div class="paper-glyphs">`;
-      ALTAR_SOLUTION.forEach((s) => {
-        html += `<div class="glyph">${SIGIL_DEFS[s].glyph}<span>${SIGIL_DEFS[s].label}</span></div>`;
+      COMBO_SYMBOLS.forEach((s, i) => {
+        html += `<div class="glyph">${s}<span>${COMBO_NAMES[i]}</span></div>`;
       });
       html += `</div>`;
     }
@@ -98,7 +104,7 @@ export class HUD {
     this.toast.dataset.kind = kind;
     this.toast.classList.add("show");
     clearTimeout(this._toastT);
-    this._toastT = setTimeout(() => this.toast.classList.remove("show"), 2600);
+    this._toastT = setTimeout(() => this.toast.classList.remove("show"), 2800);
   }
 
   showWin() {

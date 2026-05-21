@@ -1,19 +1,15 @@
-import { CONSTELLATION_TARGET, CONSTELLATION_TOLERANCE, ALTAR_SOLUTION, CRYSTAL_SOLUTION, CHAMBER_SKY, CHAMBER_ROOT } from "../constants.js";
+import { STAR_MAP_SIZE, STAR_MAP_SOLUTION, COMBO_DISCS, COMBO_SOLUTION, COMBO_SYMBOLS, TOWER_COUNT, TOWER_SEQUENCE, CHAMBER_SKY, CHAMBER_ROOT } from "../constants.js";
 import { network } from "../network/Network.js";
 
 export class RoomState {
   constructor() {
     this.chamber = null;
-    this.stars = CONSTELLATION_TARGET.map((t) => ({
-      x: t.x + (Math.random() - 0.5) * 4,
-      y: t.y + (Math.random() - 0.5) * 2.5,
-    }));
-    this.constellationSolved = false;
-    this.vaultOpen = false;
-    this.altarSlots = [null, null, null];
-    this.altarSolved = false;
-    this.crystalRotations = [0, 0, 0];
-    this.crystalSolved = false;
+    this.stars = new Array(STAR_MAP_SIZE).fill(false);
+    this.starsSolved = false;
+    this.discs = new Array(COMBO_DISCS).fill(0);
+    this.discsSolved = false;
+    this.towerProgress = [];
+    this.towersSolved = false;
     this.gateOpen = false;
     this.escaped = false;
     this.listeners = new Set();
@@ -34,80 +30,84 @@ export class RoomState {
     this.emit({ type: "chamber" });
   }
 
-  moveStar(idx, dx, dy, broadcast = true) {
-    if (this.constellationSolved) return;
-    this.stars[idx].x += dx;
-    this.stars[idx].y += dy;
-    this.checkConstellation();
+  toggleStar(idx, broadcast = true) {
+    if (this.starsSolved) return;
+    this.stars[idx] = !this.stars[idx];
+    this.checkStars();
     this.emit({ type: "star", idx });
-    if (broadcast) network.send("star", { idx, x: this.stars[idx].x, y: this.stars[idx].y });
+    if (broadcast) network.send("star", { idx, value: this.stars[idx] });
   }
 
-  setStar(idx, x, y) {
-    this.stars[idx].x = x;
-    this.stars[idx].y = y;
-    this.checkConstellation();
+  setStar(idx, value) {
+    this.stars[idx] = !!value;
+    this.checkStars();
     this.emit({ type: "star", idx });
   }
 
-  checkConstellation() {
-    if (this.constellationSolved) return;
-    const ok = CONSTELLATION_TARGET.every((t, i) => {
-      const s = this.stars[i];
-      return Math.hypot(s.x - t.x, s.y - t.y) < CONSTELLATION_TOLERANCE;
-    });
+  checkStars() {
+    if (this.starsSolved) return;
+    const selected = this.stars.map((v, i) => v ? i : -1).filter(i => i >= 0).sort((a, b) => a - b);
+    const target = [...STAR_MAP_SOLUTION].sort((a, b) => a - b);
+    if (selected.length !== target.length) return;
+    const ok = selected.every((v, i) => v === target[i]);
     if (ok) {
-      this.constellationSolved = true;
-      this.vaultOpen = true;
-      this.emit({ type: "constellation-solved" });
-      network.send("constellation-solved", {});
+      this.starsSolved = true;
+      this.emit({ type: "stars-solved" });
+      network.send("stars-solved", {});
     }
   }
 
-  placeSigil(slot, sigil, broadcast = true) {
-    if (this.altarSolved) return;
-    if (!this.vaultOpen) return;
-    this.altarSlots[slot] = sigil;
-    this.checkAltar();
-    this.emit({ type: "altar", slot });
-    if (broadcast) network.send("altar", { slot, sigil });
+  rotateDisc(idx, broadcast = true) {
+    if (!this.starsSolved) return;
+    if (this.discsSolved) return;
+    this.discs[idx] = (this.discs[idx] + 1) % COMBO_SYMBOLS.length;
+    this.checkDiscs();
+    this.emit({ type: "disc", idx });
+    if (broadcast) network.send("disc", { idx, value: this.discs[idx] });
   }
 
-  clearSigil(slot, broadcast = true) {
-    if (this.altarSolved) return;
-    this.altarSlots[slot] = null;
-    this.emit({ type: "altar", slot });
-    if (broadcast) network.send("altar", { slot, sigil: null });
+  setDisc(idx, value) {
+    this.discs[idx] = value;
+    this.checkDiscs();
+    this.emit({ type: "disc", idx });
   }
 
-  checkAltar() {
-    if (this.altarSolved) return;
-    const ok = ALTAR_SOLUTION.every((s, i) => this.altarSlots[i] === s);
+  checkDiscs() {
+    if (this.discsSolved) return;
+    const ok = COMBO_SOLUTION.every((v, i) => this.discs[i] === v);
     if (ok) {
-      this.altarSolved = true;
-      this.emit({ type: "altar-solved" });
-      network.send("altar-solved", {});
+      this.discsSolved = true;
+      this.emit({ type: "discs-solved" });
+      network.send("discs-solved", {});
     }
   }
 
-  rotateCrystal(idx, broadcast = true) {
-    if (!this.altarSolved) return;
-    if (this.crystalSolved) return;
-    this.crystalRotations[idx] = (this.crystalRotations[idx] + 1) % 3;
-    this.checkCrystal();
-    this.emit({ type: "crystal", idx });
-    if (broadcast) network.send("crystal", { idx });
+  tapTower(idx, broadcast = true) {
+    if (!this.discsSolved) return;
+    if (this.towersSolved) return;
+    const expectedIdx = this.towerProgress.length;
+    const expected = TOWER_SEQUENCE[expectedIdx];
+    if (idx === expected) {
+      this.towerProgress.push(idx);
+      this.emit({ type: "tower-correct", idx });
+      if (this.towerProgress.length === TOWER_SEQUENCE.length) {
+        this.towersSolved = true;
+        this.gateOpen = true;
+        this.emit({ type: "towers-solved" });
+        if (broadcast) network.send("towers-solved", {});
+      } else {
+        if (broadcast) network.send("tower-correct", { idx, progress: this.towerProgress.length });
+      }
+    } else {
+      this.towerProgress = [];
+      this.emit({ type: "tower-wrong", idx });
+      if (broadcast) network.send("tower-wrong", { idx });
+    }
   }
 
-  checkCrystal() {
-    if (this.crystalSolved) return;
-    const ok = CRYSTAL_SOLUTION.every((v, i) => this.crystalRotations[i] === v);
-    if (ok) {
-      this.crystalSolved = true;
-      this.gateOpen = true;
-      this.emit({ type: "crystal-solved" });
-      network.send("crystal-solved", {});
-    }
+  setTowerProgress(progress) {
+    this.towerProgress = TOWER_SEQUENCE.slice(0, progress);
+    this.emit({ type: "tower-correct", idx: -1 });
   }
 
   tryEscape(broadcast = true) {
@@ -120,31 +120,13 @@ export class RoomState {
   applyRemote(msg) {
     if (!msg || !msg.type) return;
     const { type, payload } = msg;
-    if (type === "star") this.setStar(payload.idx, payload.x, payload.y);
-    if (type === "constellation-solved") {
-      this.constellationSolved = true;
-      this.vaultOpen = true;
-      this.emit({ type: "constellation-solved" });
-    }
-    if (type === "altar") {
-      this.altarSlots[payload.slot] = payload.sigil;
-      this.checkAltar();
-      this.emit({ type: "altar", slot: payload.slot });
-    }
-    if (type === "altar-solved") {
-      this.altarSolved = true;
-      this.emit({ type: "altar-solved" });
-    }
-    if (type === "crystal") {
-      this.crystalRotations[payload.idx] = (this.crystalRotations[payload.idx] + 1) % 3;
-      this.checkCrystal();
-      this.emit({ type: "crystal", idx: payload.idx });
-    }
-    if (type === "crystal-solved") {
-      this.crystalSolved = true;
-      this.gateOpen = true;
-      this.emit({ type: "crystal-solved" });
-    }
+    if (type === "star") this.setStar(payload.idx, payload.value);
+    if (type === "stars-solved") { this.starsSolved = true; this.emit({ type: "stars-solved" }); }
+    if (type === "disc") this.setDisc(payload.idx, payload.value);
+    if (type === "discs-solved") { this.discsSolved = true; this.emit({ type: "discs-solved" }); }
+    if (type === "tower-correct") this.setTowerProgress(payload.progress);
+    if (type === "tower-wrong") { this.towerProgress = []; this.emit({ type: "tower-wrong", idx: payload.idx }); }
+    if (type === "towers-solved") { this.towersSolved = true; this.gateOpen = true; this.emit({ type: "towers-solved" }); }
     if (type === "escape") { this.escaped = true; this.emit({ type: "escaped" }); }
     if (type === "full") this.applyFull(payload);
     if (type === "chat") this.emit({ type: "chat", text: payload, who: "them" });
@@ -158,12 +140,11 @@ export class RoomState {
   broadcastFull() {
     network.send("full", {
       stars: this.stars,
-      constellationSolved: this.constellationSolved,
-      vaultOpen: this.vaultOpen,
-      altarSlots: this.altarSlots,
-      altarSolved: this.altarSolved,
-      crystalRotations: this.crystalRotations,
-      crystalSolved: this.crystalSolved,
+      starsSolved: this.starsSolved,
+      discs: this.discs,
+      discsSolved: this.discsSolved,
+      towerProgress: this.towerProgress,
+      towersSolved: this.towersSolved,
       gateOpen: this.gateOpen,
       escaped: this.escaped,
     });
