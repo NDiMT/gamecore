@@ -22,10 +22,13 @@ const roleCards = document.querySelectorAll(".role-card");
 let phaserGame = null;
 
 function show(id) {
-  ["lobby", "role", "game"].forEach((x) => {
+  const map = { lobby: "flex", role: "flex", game: "block" };
+  ["lobby", "role"].forEach((x) => {
     const el = document.getElementById(x);
-    if (el) el.style.display = (x === id) ? "" : "none";
+    if (el) el.style.display = (x === id) ? map[x] : "none";
   });
+  const app = document.getElementById("app");
+  if (app) app.style.display = (id === "game") ? "block" : "none";
 }
 
 createBtn.addEventListener("click", () => {
@@ -84,7 +87,8 @@ roleCards.forEach((card) => {
 
 function startGame() {
   show("game");
-  if (!phaserGame) {
+  if (phaserGame) return;
+  requestAnimationFrame(() => {
     phaserGame = new Phaser.Game({
       type: Phaser.AUTO,
       parent: gameMount,
@@ -95,5 +99,5 @@ function startGame() {
       scene: [BootScene, GameScene],
       render: { antialias: true, pixelArt: false },
     });
-  }
+  });
 }
