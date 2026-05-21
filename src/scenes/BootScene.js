@@ -13,8 +13,8 @@ export class BootScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.load.on("progress", (p) => { fill.width = 320 * p; });
-    this.load.image(TEX_ROOM, "sprites/room_past.png");
-    this.load.image(TEX_PLANTS, "sprites/plants_sheet.png");
+    this.load.image(TEX_ROOM, "sprites/room_v3.png");
+    this.load.image(TEX_PLANTS, "sprites/plants_v3.png");
   }
 
   create() {

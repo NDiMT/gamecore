@@ -19,7 +19,9 @@ export class Seed {
     const halo = this.scene.add.ellipse(0, 60, 110, 18, 0x000000, 0.35);
 
     const sprite = this.scene.add.image(0, 0, TEX_PLANTS, this.def.bagFrame);
-    sprite.setDisplaySize(120, 150);
+    sprite.setOrigin(0.5, 0.5);
+    sprite.displayHeight = 130;
+    sprite.scaleX = sprite.scaleY;
 
     const label = this.scene.add.text(0, 86, this.def.label, {
       fontFamily: "Georgia, serif", fontSize: 14, color: "#f0d9a8", fontStyle: "italic",

@@ -51,8 +51,10 @@ export class Pot {
     this.spriteSlot.removeAll(true);
     const planted = this.state.plantedAt(this.def.id);
     if (!planted) {
-      const empty = this.scene.add.image(0, 0, TEX_PLANTS, "pot_empty");
-      empty.setDisplaySize(140, 175);
+      const empty = this.scene.add.image(0, 30, TEX_PLANTS, "pot_empty");
+      empty.setOrigin(0.5, 1);
+      empty.displayHeight = 140;
+      empty.scaleX = empty.scaleY;
       this.spriteSlot.add(empty);
       return;
     }
@@ -64,8 +66,10 @@ export class Pot {
       stage = this.state.isWatered(this.def.id) ? 3 : 2;
     }
     const frame = def.plantFrames[stage];
-    const sp = this.scene.add.image(0, 0, TEX_PLANTS, frame);
-    sp.setDisplaySize(150, 190);
+    const sp = this.scene.add.image(0, 30, TEX_PLANTS, frame);
+    sp.setOrigin(0.5, 1);
+    sp.displayHeight = 200;
+    sp.scaleX = sp.scaleY;
     this.spriteSlot.add(sp);
   }
 

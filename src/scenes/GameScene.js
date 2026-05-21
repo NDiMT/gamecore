@@ -41,7 +41,9 @@ export class GameScene extends Phaser.Scene {
       this.door = new Door(this, 365, 350, this.state);
 
       this.wateringCan = this.add.image(95, 1010, TEX_PLANTS, "can_0");
-      this.wateringCan.setDisplaySize(110, 130);
+      this.wateringCan.setOrigin(0.5, 0.5);
+      this.wateringCan.displayHeight = 110;
+      this.wateringCan.scaleX = this.wateringCan.scaleY;
 
       this.hud = new HUD(this, this.state);
       this.hud.setPeerStatus(network.connected);
