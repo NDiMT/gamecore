@@ -5,37 +5,57 @@ export class OrbitTouch {
     this.camera = camera;
     this.dom = dom;
     this.target = target.clone();
-    this.spherical = new THREE.Spherical();
-    this.spherical.setFromVector3(camera.position.clone().sub(this.target));
-    this.minPolar = 0.25;
-    this.maxPolar = Math.PI * 0.49;
-    this.minDist = 5;
-    this.maxDist = 16;
-    this.minTheta = -Math.PI * 0.7;
-    this.maxTheta = Math.PI * 0.7;
-    this.rotateSpeed = 0.005;
-    this.zoomSpeed = 0.01;
-    this.startX = 0;
-    this.startY = 0;
-    this.dragging = false;
-    this.pinch = 0;
-    this.dragMoved = 0;
-    this.tapCallbacks = [];
+    this.smoothTarget = target.clone();
 
-    this.dom.addEventListener("pointerdown", this.onDown);
-    this.dom.addEventListener("pointermove", this.onMove);
-    this.dom.addEventListener("pointerup", this.onUp);
-    this.dom.addEventListener("pointercancel", this.onUp);
-    this.dom.addEventListener("touchstart", this.onTouch, { passive: false });
-    this.dom.addEventListener("touchmove", this.onTouchMove, { passive: false });
-    this.dom.addEventListener("touchend", this.onTouchEnd, { passive: false });
-    this.dom.addEventListener("wheel", this.onWheel, { passive: false });
+    const offset = camera.position.clone().sub(this.target);
+    this.spherical = new THREE.Spherical().setFromVector3(offset);
+    this.targetSpherical = this.spherical.clone();
+
+    this.minPolar = 0.35;
+    this.maxPolar = Math.PI * 0.48;
+    this.minDist = 4.5;
+    this.maxDist = 14;
+    this.minTheta = -Math.PI * 0.85;
+    this.maxTheta = Math.PI * 0.85;
+
+    this.rotateSpeed = 0.0045;
+    this.zoomSpeed = 0.012;
+    this.damping = 0.12;
+
+    this.tapCallbacks = [];
+    this.hoverCallbacks = [];
 
     this.activeTouches = new Map();
-    this.update();
+    this.pinch = 0;
+
+    this.startX = 0; this.startY = 0;
+    this.dragging = false;
+    this.dragMoved = 0;
+
+    dom.addEventListener("pointerdown", this.onDown);
+    dom.addEventListener("pointermove", this.onMove);
+    dom.addEventListener("pointerup", this.onUp);
+    dom.addEventListener("pointercancel", this.onUp);
+    dom.addEventListener("touchstart", this.onTouch, { passive: false });
+    dom.addEventListener("touchmove", this.onTouchMove, { passive: false });
+    dom.addEventListener("touchend", this.onTouchEnd, { passive: false });
+    dom.addEventListener("wheel", this.onWheel, { passive: false });
+
+    this.update(1);
   }
 
   onTap(fn) { this.tapCallbacks.push(fn); }
+  onHover(fn) { this.hoverCallbacks.push(fn); }
+
+  setTargetSpherical(theta, phi, radius) {
+    if (theta != null) this.targetSpherical.theta = theta;
+    if (phi != null) this.targetSpherical.phi = phi;
+    if (radius != null) this.targetSpherical.radius = radius;
+  }
+
+  setLookTarget(v) {
+    this.target.copy(v);
+  }
 
   onDown = (e) => {
     if (e.pointerType === "touch") return;
@@ -43,26 +63,27 @@ export class OrbitTouch {
     this.startX = e.clientX;
     this.startY = e.clientY;
     this.dragMoved = 0;
-    this.dom.setPointerCapture && this.dom.setPointerCapture(e.pointerId);
+    if (this.dom.setPointerCapture) this.dom.setPointerCapture(e.pointerId);
   };
 
   onMove = (e) => {
-    if (!this.dragging || e.pointerType === "touch") return;
+    if (e.pointerType === "touch") return;
+    if (!this.dragging) {
+      this.fireHover(e.clientX, e.clientY);
+      return;
+    }
     const dx = e.clientX - this.startX;
     const dy = e.clientY - this.startY;
     this.dragMoved += Math.abs(dx) + Math.abs(dy);
-    this.spherical.theta = Math.max(this.minTheta, Math.min(this.maxTheta, this.spherical.theta - dx * this.rotateSpeed));
-    this.spherical.phi = Math.max(this.minPolar, Math.min(this.maxPolar, this.spherical.phi - dy * this.rotateSpeed));
+    this.targetSpherical.theta = clamp(this.targetSpherical.theta - dx * this.rotateSpeed, this.minTheta, this.maxTheta);
+    this.targetSpherical.phi = clamp(this.targetSpherical.phi - dy * this.rotateSpeed, this.minPolar, this.maxPolar);
     this.startX = e.clientX;
     this.startY = e.clientY;
-    this.update();
   };
 
   onUp = (e) => {
     if (e.pointerType === "touch") return;
-    if (this.dragging && this.dragMoved < 6) {
-      this.fireTap(e.clientX, e.clientY);
-    }
+    if (this.dragging && this.dragMoved < 6) this.fireTap(e.clientX, e.clientY);
     this.dragging = false;
   };
 
@@ -80,63 +101,65 @@ export class OrbitTouch {
   onTouchMove = (e) => {
     e.preventDefault();
     for (const t of e.changedTouches) {
-      const prev = this.activeTouches.get(t.identifier);
-      if (!prev) continue;
-      const dx = t.clientX - prev.x;
-      const dy = t.clientY - prev.y;
-      prev.moved += Math.abs(dx) + Math.abs(dy);
-      prev.x = t.clientX;
-      prev.y = t.clientY;
+      const p = this.activeTouches.get(t.identifier);
+      if (!p) continue;
+      const dx = t.clientX - p.x, dy = t.clientY - p.y;
+      p.moved += Math.abs(dx) + Math.abs(dy);
+      p.x = t.clientX; p.y = t.clientY;
     }
     if (this.activeTouches.size === 1) {
       const t = [...this.activeTouches.values()][0];
-      const dx = t.x - t.x0;
-      const dy = t.y - t.y0;
-      this.spherical.theta = Math.max(this.minTheta, Math.min(this.maxTheta, this.spherical.theta - dx * this.rotateSpeed));
-      this.spherical.phi = Math.max(this.minPolar, Math.min(this.maxPolar, this.spherical.phi - dy * this.rotateSpeed));
-      t.x0 = t.x;
-      t.y0 = t.y;
-      this.update();
+      const dx = t.x - t.x0, dy = t.y - t.y0;
+      this.targetSpherical.theta = clamp(this.targetSpherical.theta - dx * this.rotateSpeed, this.minTheta, this.maxTheta);
+      this.targetSpherical.phi = clamp(this.targetSpherical.phi - dy * this.rotateSpeed, this.minPolar, this.maxPolar);
+      t.x0 = t.x; t.y0 = t.y;
     } else if (this.activeTouches.size === 2) {
       const [a, b] = [...this.activeTouches.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       const delta = d - this.pinch;
-      this.spherical.radius = Math.max(this.minDist, Math.min(this.maxDist, this.spherical.radius - delta * this.zoomSpeed));
+      this.targetSpherical.radius = clamp(this.targetSpherical.radius - delta * this.zoomSpeed, this.minDist, this.maxDist);
       this.pinch = d;
-      this.update();
     }
   };
 
   onTouchEnd = (e) => {
     e.preventDefault();
     for (const t of e.changedTouches) {
-      const prev = this.activeTouches.get(t.identifier);
-      if (prev && prev.moved < 12 && this.activeTouches.size === 1) {
-        this.fireTap(t.clientX, t.clientY);
-      }
+      const p = this.activeTouches.get(t.identifier);
+      if (p && p.moved < 14 && this.activeTouches.size === 1) this.fireTap(t.clientX, t.clientY);
       this.activeTouches.delete(t.identifier);
     }
   };
 
   onWheel = (e) => {
     e.preventDefault();
-    this.spherical.radius = Math.max(this.minDist, Math.min(this.maxDist, this.spherical.radius + e.deltaY * this.zoomSpeed));
-    this.update();
+    this.targetSpherical.radius = clamp(this.targetSpherical.radius + e.deltaY * this.zoomSpeed, this.minDist, this.maxDist);
   };
 
   fireTap(x, y) {
-    const rect = this.dom.getBoundingClientRect();
-    const ndcX = ((x - rect.left) / rect.width) * 2 - 1;
-    const ndcY = -((y - rect.top) / rect.height) * 2 + 1;
-    this.tapCallbacks.forEach(fn => fn(ndcX, ndcY));
+    const r = this.dom.getBoundingClientRect();
+    const nx = ((x - r.left) / r.width) * 2 - 1;
+    const ny = -((y - r.top) / r.height) * 2 + 1;
+    this.tapCallbacks.forEach(fn => fn(nx, ny, x, y));
   }
 
-  setTarget(v) { this.target.copy(v); this.update(); }
+  fireHover(x, y) {
+    const r = this.dom.getBoundingClientRect();
+    const nx = ((x - r.left) / r.width) * 2 - 1;
+    const ny = -((y - r.top) / r.height) * 2 + 1;
+    this.hoverCallbacks.forEach(fn => fn(nx, ny));
+  }
 
-  update() {
-    const offset = new THREE.Vector3();
-    offset.setFromSpherical(this.spherical);
-    this.camera.position.copy(this.target).add(offset);
-    this.camera.lookAt(this.target);
+  update(dt) {
+    const a = 1 - Math.pow(1 - this.damping, dt * 60);
+    this.spherical.theta += (this.targetSpherical.theta - this.spherical.theta) * a;
+    this.spherical.phi += (this.targetSpherical.phi - this.spherical.phi) * a;
+    this.spherical.radius += (this.targetSpherical.radius - this.spherical.radius) * a;
+    this.smoothTarget.lerp(this.target, a);
+    const offset = new THREE.Vector3().setFromSpherical(this.spherical);
+    this.camera.position.copy(this.smoothTarget).add(offset);
+    this.camera.lookAt(this.smoothTarget);
   }
 }
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }

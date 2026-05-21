@@ -1,18 +1,20 @@
-import { ERA_PAST, ERA_FUTURE, DIAL_SOLUTION, PLATE_SOLUTION, LEVER_SOLUTION } from "../constants.js";
+import { CONSTELLATION_TARGET, CONSTELLATION_TOLERANCE, ALTAR_SOLUTION, CRYSTAL_SOLUTION, CHAMBER_SKY, CHAMBER_ROOT } from "../constants.js";
 import { network } from "../network/Network.js";
 
 export class RoomState {
   constructor() {
-    this.role = null;
-    this.era = ERA_PAST;
-    this.dials = [0, 0, 0];
-    this.dialsLocked = false;
-    this.plates = [false, false, false, false];
-    this.platesLocked = false;
-    this.levers = ["down", "down", "down"];
-    this.leversLocked = false;
-    this.fragments = { dial: false, plate: false, lever: false };
-    this.doorOpen = false;
+    this.chamber = null;
+    this.stars = CONSTELLATION_TARGET.map((t) => ({
+      x: t.x + (Math.random() - 0.5) * 4,
+      y: t.y + (Math.random() - 0.5) * 2.5,
+    }));
+    this.constellationSolved = false;
+    this.vaultOpen = false;
+    this.altarSlots = [null, null, null];
+    this.altarSolved = false;
+    this.crystalRotations = [0, 0, 0];
+    this.crystalSolved = false;
+    this.gateOpen = false;
     this.escaped = false;
     this.listeners = new Set();
   }
@@ -27,80 +29,89 @@ export class RoomState {
   on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   emit(ev) { for (const fn of this.listeners) fn(ev); }
 
-  setRole(role) {
-    this.role = role;
-    this.era = role === "future" ? ERA_FUTURE : ERA_PAST;
-    this.emit({ type: "role" });
-    this.emit({ type: "era" });
+  setChamber(ch) {
+    this.chamber = ch;
+    this.emit({ type: "chamber" });
   }
 
-  setEra(era) {
-    this.era = era;
-    this.emit({ type: "era" });
+  moveStar(idx, dx, dy, broadcast = true) {
+    if (this.constellationSolved) return;
+    this.stars[idx].x += dx;
+    this.stars[idx].y += dy;
+    this.checkConstellation();
+    this.emit({ type: "star", idx });
+    if (broadcast) network.send("star", { idx, x: this.stars[idx].x, y: this.stars[idx].y });
   }
 
-  rotateDial(idx, broadcast = true) {
-    if (this.dialsLocked) return;
-    this.dials[idx] = (this.dials[idx] + 1) % 10;
-    this.checkDials();
-    this.emit({ type: "dial", idx });
-    if (broadcast) network.send("dial", { idx });
+  setStar(idx, x, y) {
+    this.stars[idx].x = x;
+    this.stars[idx].y = y;
+    this.checkConstellation();
+    this.emit({ type: "star", idx });
   }
 
-  checkDials() {
-    const ok = DIAL_SOLUTION.every((v, i) => this.dials[i] === v);
-    if (ok && !this.dialsLocked) {
-      this.dialsLocked = true;
-      this.fragments.dial = true;
-      this.emit({ type: "fragment", which: "dial" });
+  checkConstellation() {
+    if (this.constellationSolved) return;
+    const ok = CONSTELLATION_TARGET.every((t, i) => {
+      const s = this.stars[i];
+      return Math.hypot(s.x - t.x, s.y - t.y) < CONSTELLATION_TOLERANCE;
+    });
+    if (ok) {
+      this.constellationSolved = true;
+      this.vaultOpen = true;
+      this.emit({ type: "constellation-solved" });
+      network.send("constellation-solved", {});
     }
   }
 
-  togglePlate(idx, broadcast = true) {
-    if (this.platesLocked) return;
-    this.plates[idx] = !this.plates[idx];
-    this.checkPlates();
-    this.emit({ type: "plate", idx });
-    if (broadcast) network.send("plate", { idx });
+  placeSigil(slot, sigil, broadcast = true) {
+    if (this.altarSolved) return;
+    if (!this.vaultOpen) return;
+    this.altarSlots[slot] = sigil;
+    this.checkAltar();
+    this.emit({ type: "altar", slot });
+    if (broadcast) network.send("altar", { slot, sigil });
   }
 
-  checkPlates() {
-    const ok = PLATE_SOLUTION.every((v, i) => this.plates[i] === v);
-    if (ok && !this.platesLocked) {
-      this.platesLocked = true;
-      this.fragments.plate = true;
-      this.emit({ type: "fragment", which: "plate" });
+  clearSigil(slot, broadcast = true) {
+    if (this.altarSolved) return;
+    this.altarSlots[slot] = null;
+    this.emit({ type: "altar", slot });
+    if (broadcast) network.send("altar", { slot, sigil: null });
+  }
+
+  checkAltar() {
+    if (this.altarSolved) return;
+    const ok = ALTAR_SOLUTION.every((s, i) => this.altarSlots[i] === s);
+    if (ok) {
+      this.altarSolved = true;
+      this.emit({ type: "altar-solved" });
+      network.send("altar-solved", {});
     }
   }
 
-  toggleLever(idx, broadcast = true) {
-    if (this.leversLocked) return;
-    this.levers[idx] = this.levers[idx] === "up" ? "down" : "up";
-    this.checkLevers();
-    this.emit({ type: "lever", idx });
-    if (broadcast) network.send("lever", { idx });
+  rotateCrystal(idx, broadcast = true) {
+    if (!this.altarSolved) return;
+    if (this.crystalSolved) return;
+    this.crystalRotations[idx] = (this.crystalRotations[idx] + 1) % 3;
+    this.checkCrystal();
+    this.emit({ type: "crystal", idx });
+    if (broadcast) network.send("crystal", { idx });
   }
 
-  checkLevers() {
-    const ok = LEVER_SOLUTION.every((v, i) => this.levers[i] === v);
-    if (ok && !this.leversLocked) {
-      this.leversLocked = true;
-      this.fragments.lever = true;
-      this.emit({ type: "fragment", which: "lever" });
+  checkCrystal() {
+    if (this.crystalSolved) return;
+    const ok = CRYSTAL_SOLUTION.every((v, i) => this.crystalRotations[i] === v);
+    if (ok) {
+      this.crystalSolved = true;
+      this.gateOpen = true;
+      this.emit({ type: "crystal-solved" });
+      network.send("crystal-solved", {});
     }
   }
 
-  tryOpenDoor(broadcast = true) {
-    if (this.doorOpen) return;
-    const all = this.fragments.dial && this.fragments.plate && this.fragments.lever;
-    if (!all) { this.emit({ type: "doorLocked" }); return; }
-    this.doorOpen = true;
-    this.emit({ type: "doorOpen" });
-    if (broadcast) network.send("doorOpen", {});
-  }
-
-  escape(broadcast = true) {
-    if (!this.doorOpen) return;
+  tryEscape(broadcast = true) {
+    if (!this.gateOpen) { this.emit({ type: "gate-locked" }); return; }
     this.escaped = true;
     this.emit({ type: "escaped" });
     if (broadcast) network.send("escape", {});
@@ -109,34 +120,56 @@ export class RoomState {
   applyRemote(msg) {
     if (!msg || !msg.type) return;
     const { type, payload } = msg;
-    if (type === "dial")     this.rotateDial(payload.idx, false);
-    if (type === "plate")    this.togglePlate(payload.idx, false);
-    if (type === "lever")    this.toggleLever(payload.idx, false);
-    if (type === "doorOpen") { this.doorOpen = true; this.emit({ type: "doorOpen" }); }
-    if (type === "escape")   { this.escaped = true; this.emit({ type: "escaped" }); }
-    if (type === "full")     this.applyFull(payload);
-    if (type === "chat")     this.emit({ type: "chat", text: payload, who: "them" });
+    if (type === "star") this.setStar(payload.idx, payload.x, payload.y);
+    if (type === "constellation-solved") {
+      this.constellationSolved = true;
+      this.vaultOpen = true;
+      this.emit({ type: "constellation-solved" });
+    }
+    if (type === "altar") {
+      this.altarSlots[payload.slot] = payload.sigil;
+      this.checkAltar();
+      this.emit({ type: "altar", slot: payload.slot });
+    }
+    if (type === "altar-solved") {
+      this.altarSolved = true;
+      this.emit({ type: "altar-solved" });
+    }
+    if (type === "crystal") {
+      this.crystalRotations[payload.idx] = (this.crystalRotations[payload.idx] + 1) % 3;
+      this.checkCrystal();
+      this.emit({ type: "crystal", idx: payload.idx });
+    }
+    if (type === "crystal-solved") {
+      this.crystalSolved = true;
+      this.gateOpen = true;
+      this.emit({ type: "crystal-solved" });
+    }
+    if (type === "escape") { this.escaped = true; this.emit({ type: "escaped" }); }
+    if (type === "full") this.applyFull(payload);
+    if (type === "chat") this.emit({ type: "chat", text: payload, who: "them" });
   }
 
   applyFull(snap) {
     Object.assign(this, snap);
-    this.checkDials(); this.checkPlates(); this.checkLevers();
     this.emit({ type: "sync" });
   }
 
   broadcastFull() {
     network.send("full", {
-      dials: this.dials, dialsLocked: this.dialsLocked,
-      plates: this.plates, platesLocked: this.platesLocked,
-      levers: this.levers, leversLocked: this.leversLocked,
-      fragments: this.fragments, doorOpen: this.doorOpen, escaped: this.escaped,
+      stars: this.stars,
+      constellationSolved: this.constellationSolved,
+      vaultOpen: this.vaultOpen,
+      altarSlots: this.altarSlots,
+      altarSolved: this.altarSolved,
+      crystalRotations: this.crystalRotations,
+      crystalSolved: this.crystalSolved,
+      gateOpen: this.gateOpen,
+      escaped: this.escaped,
     });
   }
 
-  sendChat(text) {
-    network.send("chat", text);
-    this.emit({ type: "chat", text, who: "me" });
-  }
+  sendChat(text) { network.send("chat", text); this.emit({ type: "chat", text, who: "me" }); }
 }
 
 export const roomState = new RoomState();

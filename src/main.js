@@ -1,17 +1,19 @@
 import { network } from "./network/Network.js";
 import { roomState } from "./state/RoomState.js";
 import { Scene3D } from "./engine/Scene3D.js";
-import { Room } from "./world/Room.js";
-import { Dials } from "./entities/Dials.js";
-import { Plates } from "./entities/Plates.js";
-import { Levers } from "./entities/Levers.js";
-import { Door } from "./entities/Door.js";
+import { ChamberSky } from "./world/ChamberSky.js";
+import { ChamberRoot } from "./world/ChamberRoot.js";
+import { Constellation } from "./entities/Constellation.js";
+import { Vault } from "./entities/Vault.js";
+import { Altar } from "./entities/Altar.js";
+import { Crystal } from "./entities/Crystal.js";
+import { Gate } from "./entities/Gate.js";
 import { HUD } from "./ui/HUD.js";
-import { ERA_PAST, ERA_FUTURE } from "./constants.js";
+import { CHAMBER_SKY, CHAMBER_ROOT, PALETTE_SKY, PALETTE_ROOT } from "./constants.js";
 
 const lobby = document.getElementById("lobby");
 const roleScreen = document.getElementById("role");
-const game = document.getElementById("game");
+const gameScreen = document.getElementById("game");
 const createBtn = document.getElementById("create-btn");
 const createdInfo = document.getElementById("created-info");
 const myCodeEl = document.getElementById("my-code");
@@ -25,18 +27,19 @@ const roleCards = document.querySelectorAll(".role-card");
 const soloBtn = document.getElementById("solo-btn");
 
 let scene3d = null;
-let room = null;
-let dials = null;
-let plates = null;
-let levers = null;
-let door = null;
+let chamber = null;
+let constellation = null;
+let vault = null;
+let altar = null;
+let crystal = null;
+let gate = null;
 let hud = null;
 let solo = false;
 
-function show(id) {
+function showScreen(id) {
   lobby.style.display = id === "lobby" ? "flex" : "none";
   roleScreen.style.display = id === "role" ? "flex" : "none";
-  game.style.display = id === "game" ? "block" : "none";
+  gameScreen.style.display = id === "game" ? "block" : "none";
 }
 
 createBtn.addEventListener("click", () => {
@@ -65,22 +68,23 @@ joinBtn.addEventListener("click", () => {
 
 soloBtn.addEventListener("click", () => {
   solo = true;
-  roomState.setRole("past");
+  roomState.setChamber(CHAMBER_SKY);
   startGame();
 });
 
 network.on((ev) => {
   if (ev.type === "open") {
-    createStatus.textContent = "Συνεργάτης συνδέθηκε!";
+    createStatus.textContent = "Σύντροφος συνδέθηκε!";
     joinStatus.textContent = "Συνδέθηκες!";
-    setTimeout(() => show("role"), 600);
+    setTimeout(() => showScreen("role"), 600);
   }
-  if (ev.type === "data" && ev.msg && ev.msg.type === "role-claim") {
+  if (ev.type === "data" && ev.msg && ev.msg.type === "chamber-claim") {
     const theirs = ev.msg.payload;
-    const card = document.querySelector(`.role-card[data-role="${theirs}"]`);
+    const card = document.querySelector(`.role-card[data-chamber="${theirs}"]`);
     if (card) card.classList.add("taken");
-    if (roleHint && !roomState.role) {
-      roleHint.textContent = `Σύντροφος στο ${theirs === "past" ? "1872" : "2287"}. Διάλεξε την άλλη.`;
+    if (roleHint && !roomState.chamber) {
+      const other = theirs === CHAMBER_SKY ? "Ριζών" : "Ουρανού";
+      roleHint.textContent = `Ο σύντροφος ξύπνησε αλλού. Διάλεξε την Αίθουσα ${other}.`;
     }
   }
 });
@@ -88,35 +92,50 @@ network.on((ev) => {
 roleCards.forEach((card) => {
   card.addEventListener("click", () => {
     if (card.classList.contains("taken")) return;
-    const role = card.dataset.role;
-    roomState.setRole(role);
-    network.send("role-claim", role);
+    const ch = card.dataset.chamber;
+    roomState.setChamber(ch);
+    network.send("chamber-claim", ch);
     startGame();
   });
 });
 
 function startGame() {
-  show("game");
+  showScreen("game");
   roomState.attachNetwork();
   requestAnimationFrame(() => {
     const container = document.getElementById("game-canvas");
-    scene3d = new Scene3D(container);
-    rebuildEra();
+    const palette = roomState.chamber === CHAMBER_SKY ? PALETTE_SKY : PALETTE_ROOT;
+    scene3d = new Scene3D(container, palette);
+    rebuildScene();
     hud = new HUD(roomState);
     hud.setPeer(network.connected);
-    if (solo) hud.showToast("Solo mode: 1/2 αλλαγή εποχής");
+    if (solo) hud.showToast("Solo: 1=Ουρανός · 2=Ρίζες");
 
     roomState.on((ev) => {
-      if (ev.type === "era") rebuildEra();
-      if (ev.type === "dial") dials.refresh();
-      if (ev.type === "plate") plates.refresh();
-      if (ev.type === "lever") levers.refresh();
-      if (ev.type === "fragment") { door.refresh(); hud.showToast(fragMsg(ev.which)); }
-      if (ev.type === "sync") { dials.refresh(); plates.refresh(); levers.refresh(); door.refresh(); }
-      if (ev.type === "doorOpen") { door.refresh(); hud.showToast("Η πύλη άνοιξε."); }
-      if (ev.type === "doorLocked") hud.showToast("Λείπουν θραύσματα.");
-      if (ev.type === "chat") hud.appendChat(ev.text, ev.who === "me" ? "mine" : "them");
+      if (ev.type === "chamber") rebuildScene();
+      if (ev.type === "star") constellation && constellation.refresh();
+      if (ev.type === "constellation-solved") {
+        constellation && constellation.refresh();
+        vault && vault.refresh();
+      }
+      if (ev.type === "altar") altar && altar.refresh();
+      if (ev.type === "altar-solved") {
+        altar && altar.refresh();
+        crystal && crystal.refresh();
+      }
+      if (ev.type === "crystal" || ev.type === "crystal-solved") {
+        crystal && crystal.refresh();
+        gate && gate.refresh();
+      }
+      if (ev.type === "sync") {
+        constellation && constellation.refresh();
+        vault && vault.refresh();
+        altar && altar.refresh();
+        crystal && crystal.refresh();
+        gate && gate.refresh();
+      }
     });
+
     network.on((ev) => {
       if (ev.type === "open") hud.setPeer(true);
       if (ev.type === "close") hud.setPeer(false);
@@ -124,35 +143,36 @@ function startGame() {
 
     if (solo) {
       window.addEventListener("keydown", (e) => {
-        if (e.key === "1") roomState.setEra(ERA_PAST);
-        if (e.key === "2") roomState.setEra(ERA_FUTURE);
+        if (e.key === "1") roomState.setChamber(CHAMBER_SKY);
+        if (e.key === "2") roomState.setChamber(CHAMBER_ROOT);
       });
     }
   });
 }
 
-function rebuildEra() {
+function rebuildScene() {
   if (!scene3d) return;
-  if (room) room.destroy();
-  if (dials) dials.destroy();
-  if (plates) plates.destroy();
-  if (levers) levers.destroy();
-  if (door) door.destroy();
-  scene3d.setEra(roomState.era);
-  scene3d.applyEraLights();
-  const era = roomState.era;
-  room = new Room(scene3d, era);
-  dials = new Dials(scene3d, roomState, era, scene3d.picker);
-  plates = new Plates(scene3d, roomState, era, scene3d.picker);
-  levers = new Levers(scene3d, roomState, era, scene3d.picker);
-  door = new Door(scene3d, roomState, era, scene3d.picker);
+  if (chamber) chamber.destroy();
+  if (constellation) constellation.destroy();
+  if (vault) vault.destroy();
+  if (altar) altar.destroy();
+  if (crystal) crystal.destroy();
+  if (gate) gate.destroy();
+  scene3d.picker.clear();
   scene3d.tickers.length = 0;
-  scene3d.tick((dt) => door.tick(dt));
-}
 
-function fragMsg(which) {
-  if (which === "dial")  return "✦ Πρώτο θραύσμα ξεκλείδωσε.";
-  if (which === "plate") return "✦ Δεύτερο θραύσμα ξεκλείδωσε.";
-  if (which === "lever") return "✦ Τρίτο θραύσμα ξεκλείδωσε.";
-  return "";
+  const palette = roomState.chamber === CHAMBER_SKY ? PALETTE_SKY : PALETTE_ROOT;
+  scene3d.applyPalette(palette);
+
+  if (roomState.chamber === CHAMBER_SKY) {
+    chamber = new ChamberSky(scene3d);
+    constellation = new Constellation(scene3d, roomState, scene3d.picker);
+    crystal = new Crystal(scene3d, roomState, scene3d.picker);
+    gate = new Gate(scene3d, roomState, scene3d.picker, CHAMBER_SKY);
+  } else {
+    chamber = new ChamberRoot(scene3d);
+    vault = new Vault(scene3d, roomState, scene3d.picker);
+    altar = new Altar(scene3d, roomState, scene3d.picker);
+    gate = new Gate(scene3d, roomState, scene3d.picker, CHAMBER_ROOT);
+  }
 }

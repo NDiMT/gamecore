@@ -1,120 +1,109 @@
-import { DIAL_RIDDLE, DIAL_FUTURE_LABELS, DIAL_SOLUTION, PLATE_FUTURE_STATUS, LEVER_HINT_PAST, LEVER_HINT_FUTURE, WIN_MESSAGE } from "../constants.js";
+import { CHAMBER_LABEL, HINTS_SKY, HINTS_ROOT, WIN_MESSAGE, SIGIL_DEFS, ALTAR_SOLUTION } from "../constants.js";
 
 export class HUD {
   constructor(state) {
     this.state = state;
-    this.dom = document.getElementById("hud");
-    this.eraBadge = document.getElementById("era-badge");
-    this.frags = document.getElementById("frag-row");
+    this.title = document.getElementById("chamber-title");
+    this.subtitle = document.getElementById("chamber-sub");
     this.peer = document.getElementById("peer-status");
     this.toast = document.getElementById("toast");
     this.inspectBtn = document.getElementById("inspect-btn");
     this.inspectModal = document.getElementById("inspect-modal");
     this.inspectBody = document.getElementById("inspect-body");
     this.inspectClose = document.getElementById("inspect-close");
-    this.winOverlay = document.getElementById("win-overlay");
-    this.eraToggle = document.getElementById("era-toggle");
     this.chatToggle = document.getElementById("chat-toggle");
     this.chatPanel = document.getElementById("chat-panel");
     this.chatMessages = document.getElementById("chat-messages");
     this.chatInput = document.getElementById("chat-input");
     this.chatSend = document.getElementById("chat-send");
+    this.chatClose = document.getElementById("chat-close");
+    this.winOverlay = document.getElementById("win-overlay");
+    this.winText = document.getElementById("win-text");
+    this.progress = document.getElementById("progress");
+    this.tapRipple = document.getElementById("tap-ripple");
 
-    this.inspectBtn.addEventListener("click", () => this.openInspect());
-    this.inspectClose.addEventListener("click", () => this.closeInspect());
-    this.eraToggle.addEventListener("click", () => {
-      if (this.state.role) return;
-      this.state.setEra(this.state.era === "past" ? "future" : "past");
-    });
-    this.chatToggle.addEventListener("click", () => this.toggleChat());
+    this.inspectBtn.addEventListener("click", () => { this.openInspect(); this.haptic(); });
+    this.inspectClose.addEventListener("click", () => { this.closeInspect(); this.haptic(); });
+    this.chatToggle.addEventListener("click", () => { this.toggleChat(); this.haptic(); });
+    this.chatClose.addEventListener("click", () => this.toggleChat(false));
     this.chatSend.addEventListener("click", () => this.sendChat());
     this.chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
 
-    state.on(() => this.refresh());
+    document.addEventListener("pointerdown", (e) => this.spawnRipple(e.clientX, e.clientY));
+
+    state.on((ev) => this.handleStateEvent(ev));
     this.refresh();
   }
 
+  handleStateEvent(ev) {
+    this.refresh();
+    if (ev.type === "constellation-solved") this.showToast("Ο ουρανός θυμήθηκε. Κάτι ραγίζει αλλού.", "win");
+    if (ev.type === "altar-solved") this.showToast("Οι ρίζες πέρασαν το όνομα. Ο κρύσταλλος ξυπνά.", "win");
+    if (ev.type === "crystal-solved") this.showToast("Η πύλη ξυπνά.", "win");
+    if (ev.type === "gate-locked") this.showToast("Η πύλη δεν είναι έτοιμη.", "fail");
+    if (ev.type === "escaped") this.showWin();
+    if (ev.type === "chat") this.appendChat(ev.text, ev.who === "me" ? "mine" : "them");
+  }
+
   refresh() {
-    if (this.state.era === "past") {
-      this.eraBadge.textContent = "⌛ 1872 · παρελθόν";
-      this.eraBadge.style.background = "#c9a25c";
-      this.eraBadge.style.color = "#1a0e08";
-    } else {
-      this.eraBadge.textContent = "✦ 2287 · μέλλον";
-      this.eraBadge.style.background = "#4a7dc9";
-      this.eraBadge.style.color = "#fff";
+    if (this.state.chamber) {
+      const lab = CHAMBER_LABEL[this.state.chamber];
+      this.title.textContent = lab.short;
+      this.subtitle.textContent = lab.title;
+      document.body.classList.remove("chamber-sky", "chamber-root");
+      document.body.classList.add(this.state.chamber === "sky" ? "chamber-sky" : "chamber-root");
     }
-    this.frags.innerHTML = "";
-    const order = [
-      { key: "dial",  emoji: "◎", color: "#c94f4f" },
-      { key: "plate", emoji: "▣", color: "#4fc97a" },
-      { key: "lever", emoji: "⇅", color: "#4f7fc9" },
+    const stages = [
+      { name: "Αστερισμός", done: this.state.constellationSolved },
+      { name: "Ριζωμένο",   done: this.state.altarSolved },
+      { name: "Κρύσταλλος", done: this.state.crystalSolved },
     ];
-    order.forEach(({ key, emoji, color }) => {
-      const f = document.createElement("div");
-      f.className = "frag";
-      if (this.state.fragments[key]) {
-        f.style.background = color;
-        f.style.color = "#fff";
-        f.style.borderColor = "#fff";
-      }
-      f.textContent = emoji;
-      this.frags.appendChild(f);
+    this.progress.innerHTML = "";
+    stages.forEach((s, i) => {
+      const dot = document.createElement("div");
+      dot.className = "stage" + (s.done ? " done" : "") + ((!s.done && i === stages.findIndex(x => !x.done)) ? " current" : "");
+      dot.title = s.name;
+      this.progress.appendChild(dot);
     });
-    if (this.state.escaped) this.showWin();
   }
 
   setPeer(online) {
-    this.peer.textContent = online ? "● live" : "○ off";
-    this.peer.style.color = online ? "#8df0a8" : "#ff9b95";
+    this.peer.textContent = online ? "● ζωντανός" : "○ off-line";
+    this.peer.dataset.state = online ? "live" : "off";
   }
 
   openInspect() {
-    const era = this.state.era;
-    let html = "";
-    if (era === "past") {
-      html += "<h3>σημείωμα στο τραπέζι</h3>";
-      html += "<div class='paper'>";
-      DIAL_RIDDLE.forEach((r, i) => {
-        html += `<p><strong>${i + 1}.</strong> ${r.replace(/\n/g, "<br>")}</p>`;
+    const ch = this.state.chamber;
+    const hints = ch === "sky" ? HINTS_SKY : HINTS_ROOT;
+    let html = `<div class="paper-title">Φύλλα Σημείωσης</div>`;
+    hints.forEach((h, i) => {
+      html += `<div class="paper-line"><span class="paper-num">${i + 1}</span><span>${h}</span></div>`;
+    });
+    if (ch === "root" && this.state.vaultOpen) {
+      html += `<div class="paper-title">Σύμβολα του χρηματοκιβωτίου</div>`;
+      html += `<div class="paper-glyphs">`;
+      ALTAR_SOLUTION.forEach((s) => {
+        html += `<div class="glyph">${SIGIL_DEFS[s].glyph}<span>${SIGIL_DEFS[s].label}</span></div>`;
       });
-      html += "</div>";
-      html += "<h3>χάραξη στον τοίχο</h3>";
-      html += `<div class='paper' style='font-family: monospace;'>${LEVER_HINT_PAST.replace(/\n/g, "<br>")}</div>`;
-    } else {
-      html += "<h3>επιγραφή πάνω από τους μηχανισμούς</h3>";
-      html += "<div class='paper diary'>";
-      html += "<p>τα τρία γραμμένα σύμβολα:</p>";
-      html += `<p style='font-size:32px; text-align:center; letter-spacing:24px;'>${DIAL_FUTURE_LABELS.join("")}</p>`;
-      html += "</div>";
-      html += "<h3>πινακίδα στο πάτωμα</h3>";
-      html += "<div class='paper diary'>";
-      html += "<p>κατάσταση πλακών (αριστερά → δεξιά):</p>";
-      html += "<ul>";
-      PLATE_FUTURE_STATUS.forEach((s, i) => {
-        html += `<li>Πλάκα ${i + 1}: <em>${s}</em></li>`;
-      });
-      html += "</ul>";
-      html += "</div>";
-      html += "<h3>σκουριασμένος καθρέφτης</h3>";
-      html += `<div class='paper diary'>${LEVER_HINT_FUTURE.replace(/\n/g, "<br>")}</div>`;
+      html += `</div>`;
     }
     this.inspectBody.innerHTML = html;
-    this.inspectModal.style.display = "flex";
+    this.inspectModal.classList.add("open");
   }
 
-  closeInspect() { this.inspectModal.style.display = "none"; }
+  closeInspect() { this.inspectModal.classList.remove("open"); }
+
+  showToast(msg, kind = "info") {
+    this.toast.textContent = msg;
+    this.toast.dataset.kind = kind;
+    this.toast.classList.add("show");
+    clearTimeout(this._toastT);
+    this._toastT = setTimeout(() => this.toast.classList.remove("show"), 2600);
+  }
 
   showWin() {
-    this.winOverlay.style.display = "flex";
-    document.getElementById("win-text").textContent = WIN_MESSAGE;
-  }
-
-  showToast(msg) {
-    this.toast.textContent = msg;
-    this.toast.style.opacity = "1";
-    clearTimeout(this._tt);
-    this._tt = setTimeout(() => this.toast.style.opacity = "0", 2200);
+    this.winOverlay.classList.add("open");
+    this.winText.textContent = WIN_MESSAGE;
   }
 
   toggleChat(force) {
@@ -143,4 +132,15 @@ export class HUD {
       this.chatToggle.classList.add("has-unread");
     }
   }
+
+  spawnRipple(x, y) {
+    const r = document.createElement("div");
+    r.className = "ripple";
+    r.style.left = x + "px";
+    r.style.top = y + "px";
+    document.body.appendChild(r);
+    setTimeout(() => r.remove(), 700);
+  }
+
+  haptic() { if (navigator.vibrate) navigator.vibrate(8); }
 }
