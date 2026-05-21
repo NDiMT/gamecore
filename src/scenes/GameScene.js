@@ -24,7 +24,6 @@ export class GameScene extends Phaser.Scene {
     try {
       this.state = roomState;
       this.state.reset();
-      this.add.text(20, 20, "phaser create() ok", { fontFamily: "monospace", fontSize: 14, color: "#fff" });
       this.buildBackground();
       this.buildPots();
       this.buildSeeds();

@@ -1,4 +1,4 @@
-import { SEEDS, ERA_PAST } from "../constants.js";
+import { SEEDS, ERA_PAST, ERA_FUTURE } from "../constants.js";
 
 export class Pot {
   constructor(scene, def, state) {
