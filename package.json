@@ -5,6 +5,7 @@
   "type": "module",
   "main": "electron/main.cjs",
   "description": "NOCLIP — a Backrooms-style horror game (Electron + Three.js)",
+  "author": "NOCLIP",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -27,6 +28,7 @@
   "build": {
     "appId": "com.noclip.level0",
     "productName": "NOCLIP",
+    "executableName": "NOCLIP",
     "copyright": "Copyright © 2026",
     "files": [
       "dist/**/*",

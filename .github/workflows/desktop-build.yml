@@ -1,0 +1,48 @@
+name: Build desktop apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/horror-game-steam-0XrKf
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist
+            artifact: NOCLIP-windows
+          - os: macos-latest
+            script: dist
+            artifact: NOCLIP-macos
+          - os: ubuntu-latest
+            script: dist
+            artifact: NOCLIP-linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Build ${{ matrix.os }}
+        run: npm run ${{ matrix.script }}
+        env:
+          # electron-builder: don't try to code-sign (no certs in CI)
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.zip

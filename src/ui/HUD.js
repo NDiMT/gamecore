@@ -1,4 +1,4 @@
-import { CHAMBER_LABEL_DUMMY, HINTS_SKY, HINTS_ROOT, COMBO_SYMBOLS, COMBO_NAMES, WIN_MESSAGE } from "../constants.js";
+import { HINTS_SKY, HINTS_ROOT, COMBO_SYMBOLS, COMBO_NAMES, WIN_MESSAGE } from "../constants.js";
 
 const CHAMBER_LABEL = {
   sky:  { title: "Αίθουσα του Σιωπηλού Ουρανού", short: "ΟΥΡΑΝΟΣ" },
