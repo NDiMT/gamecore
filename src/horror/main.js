@@ -6,6 +6,9 @@ import { Player } from "./Player.js";
 import { HorrorAudio } from "./Audio.js";
 import { PostFX } from "./PostFX.js";
 import { HUD } from "./HUD.js";
+import { TouchControls } from "./TouchControls.js";
+
+const isTouch = TouchControls.isTouchDevice();
 
 const titleEl = document.getElementById("title");
 const startBtn = document.getElementById("start-btn");
@@ -35,6 +38,7 @@ const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerH
 camera.position.set(0, 1.65, 0);
 
 let maze, lights, entity, audio, postfx, hud, player;
+let touch = null;
 let running = false;
 let elapsed = 0;
 let tension = 0;
@@ -55,7 +59,20 @@ function init() {
   postfx.setIntensity(0);
   hud = new HUD();
   player = new Player(camera, renderer.domElement, maze);
+  if (isTouch) player.enableTouchMode();
   player.teleport(maze.playerStart);
+}
+
+if (isTouch) {
+  touch = new TouchControls({
+    onMove: (x, y) => { if (player) player.setMove(x, y); },
+    onLook: (dx, dy) => { if (player) player.applyLook(dx, dy); },
+    onRun: (on) => { if (player) player.input.run = on; },
+  });
+  const ctrls = document.querySelector("#title .ctrls");
+  if (ctrls) {
+    ctrls.innerHTML = "<kbd>LEFT</kbd> move &nbsp;·&nbsp; <kbd>RIGHT</kbd> look &nbsp;·&nbsp; push stick to rim to <kbd>RUN</kbd>";
+  }
 }
 
 function startRun() {
@@ -80,7 +97,12 @@ function startRun() {
   player.teleport(maze.playerStart);
   entity.hide();
   running = true;
-  player.lock();
+  if (isTouch) {
+    player.setActive(true);
+    touch.show();
+  } else {
+    player.lock();
+  }
 
   setTimeout(() => {
     if (running) hud.showSubtitle("the carpet is still wet…", 5);
@@ -90,7 +112,12 @@ function startRun() {
 function endRun(winFlag) {
   if (!running) return;
   running = false;
-  player.unlock();
+  if (isTouch) {
+    player.setActive(false);
+    touch.hide();
+  } else {
+    player.unlock();
+  }
   hud.deactivate();
   if (winFlag) {
     audio.win();
@@ -133,19 +160,21 @@ window.addEventListener("resize", () => {
   if (postfx) postfx.setSize(w, h);
 });
 
-document.addEventListener("pointerlockchange", () => {
-  if (running && !player.isLocked() && !dead && !won) {
-    hud.showSubtitle("click to resume", 999);
-  } else if (player.isLocked()) {
-    hud.hideSubtitle();
-  }
-});
+if (!isTouch) {
+  document.addEventListener("pointerlockchange", () => {
+    if (running && !player.isLocked() && !dead && !won) {
+      hud.showSubtitle("click to resume", 999);
+    } else if (player.isLocked()) {
+      hud.hideSubtitle();
+    }
+  });
 
-document.addEventListener("click", () => {
-  if (running && !player.isLocked() && !dead && !won) {
-    player.lock();
-  }
-});
+  document.addEventListener("click", () => {
+    if (running && !player.isLocked() && !dead && !won) {
+      player.lock();
+    }
+  });
+}
 
 let last = performance.now();
 

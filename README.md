@@ -16,7 +16,9 @@ npm run dev
 
 First-person Backrooms-style horror prototype σε Three.js. Vertical slice (~3-5 min).
 
-- **WASD** κίνηση, **Mouse** look, **Shift** τρέξιμο, **ESC** release cursor
+- **Desktop:** **WASD** κίνηση, **Mouse** look, **Shift** τρέξιμο, **ESC** release cursor
+- **Κινητό:** αριστερό μισό = virtual joystick κίνησης, δεξί μισό = drag για κοίταγμα,
+  σπρώξε το stick στο χείλος για τρέξιμο (auto-detect μέσω touch)
 - Procedural maze 22×22 cells με yellow wallpaper, damp carpet, fluorescent ceiling lights
 - Atmospheric audio synth (WebAudio) — hum, drone, footsteps, scare sting
 - VHS post-fx: grain, chromatic aberration, scanlines, vignette
@@ -58,6 +60,34 @@ Electron config: `electron/main.cjs` (fullscreen window, φορτώνει `dist/
    `electron/preload.cjs` (υπάρχει σχόλιο-hook), χρειάζεται το Steamworks SDK
 4. `npm run steam:win` → ανέβασε το `release/win-unpacked/` ως depot μέσω **SteamPipe** (`steamcmd`)
 5. Set up store page, age gate (horror), capsule art → submit for review → release
+
+## Ship to mobile (Android · Capacitor)
+
+Το ίδιο web build τυλίγεται σε **Capacitor** → Android APK. Touch controls
+ενεργοποιούνται αυτόματα σε κινητά. iOS θέλει Mac + Apple dev account, οπότε δεν
+χτίζεται στο CI.
+
+```bash
+npm install
+
+# Build web + sync στο native android project
+npm run mobile:sync
+
+# Build debug APK (χρειάζεται Android SDK εγκατεστημένο)
+npm run mobile:apk      # -> android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+- `capacitor.config.json`: appId `com.noclip.level0`, webDir `dist`
+- `scripts/prepare-mobile.mjs`: προωθεί το `horror.html` σε `index.html` ώστε το APK
+  να φορτώνει το horror game (όχι το Chronos landing)
+- `android/`: native project (committed). Landscape + immersive fullscreen +
+  keep-screen-on ρυθμισμένα σε `MainActivity.java` / `AndroidManifest.xml`
+
+**Χωρίς εγκατάσταση τίποτα:** το GitHub Action `Build Android APK` χτίζει το APK
+σε ubuntu runner (Actions → artifact `NOCLIP-android-apk`). Κατέβασέ το, στείλ' το
+στο τηλέφωνο, ενεργοποίησε "Install from unknown sources", install. Το debug APK
+είναι unsigned — για Google Play χρειάζεσαι signed release (`assembleRelease` +
+keystore).
 
 ## Controls
 

@@ -1,0 +1,8 @@
+{
+  "appId": "com.noclip.level0",
+  "appName": "NOCLIP",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#000000"
+  }
+}

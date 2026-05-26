@@ -12,6 +12,11 @@ export class Player {
     this.bobT = 0;
     this.moving = false;
 
+    this.touchEnabled = false;
+    this.touchActive = false;
+    this.touchMove = { x: 0, y: 0 };
+    this._lookEuler = new THREE.Euler(0, 0, 0, "YXZ");
+
     this._onKey = (e, down) => {
       switch (e.code) {
         case "KeyW": case "ArrowUp": this.input.fwd = down; break;
@@ -29,13 +34,34 @@ export class Player {
   unlock() { this.controls.unlock(); }
   isLocked() { return this.controls.isLocked; }
 
+  enableTouchMode() { this.touchEnabled = true; }
+  setActive(b) {
+    this.touchActive = b;
+    if (!b) { this.touchMove.x = 0; this.touchMove.y = 0; this.input.run = false; }
+  }
+  isActive() { return this.touchEnabled ? this.touchActive : this.controls.isLocked; }
+
+  setMove(x, y) {
+    this.touchMove.x = x;
+    this.touchMove.y = y;
+  }
+
+  applyLook(dx, dy) {
+    const PI_2 = Math.PI / 2;
+    this._lookEuler.setFromQuaternion(this.camera.quaternion);
+    this._lookEuler.y -= dx;
+    this._lookEuler.x -= dy;
+    this._lookEuler.x = Math.max(-PI_2 + 0.02, Math.min(PI_2 - 0.02, this._lookEuler.x));
+    this.camera.quaternion.setFromEuler(this._lookEuler);
+  }
+
   teleport(pos) {
-    this.controls.getObject().position.set(pos.x, this.eyeHeight, pos.z);
+    this.camera.position.set(pos.x, this.eyeHeight, pos.z);
     this.velocity.set(0, 0, 0);
   }
 
   getPosition() {
-    return this.controls.getObject().position.clone();
+    return this.camera.position.clone();
   }
 
   getYaw() {
@@ -44,8 +70,8 @@ export class Player {
   }
 
   update(dt, onFootstep) {
-    const obj = this.controls.getObject();
-    if (!this.controls.isLocked) {
+    const obj = this.camera;
+    if (!this.isActive()) {
       this.moving = false;
       return;
     }
@@ -61,19 +87,26 @@ export class Player {
     const right = new THREE.Vector3(forward.z, 0, -forward.x);
 
     const wish = new THREE.Vector3();
-    if (this.input.fwd) wish.add(forward);
-    if (this.input.back) wish.sub(forward);
-    if (this.input.left) wish.add(right);
-    if (this.input.right) wish.sub(right);
-    if (wish.lengthSq() > 0) wish.normalize().multiplyScalar(speed);
+    if (this.touchEnabled) {
+      wish.addScaledVector(forward, this.touchMove.y);
+      wish.addScaledVector(right, -this.touchMove.x);
+    } else {
+      if (this.input.fwd) wish.add(forward);
+      if (this.input.back) wish.sub(forward);
+      if (this.input.left) wish.add(right);
+      if (this.input.right) wish.sub(right);
+    }
+    const mag = Math.min(1, wish.length());
+    const hasWish = mag > 0.001;
+    if (hasWish) wish.normalize().multiplyScalar(speed * mag);
+    else wish.set(0, 0, 0);
 
     const dv = wish.clone().sub(this.velocity);
-    const a = wish.lengthSq() > 0 ? acc : dec;
-    const step = Math.min(1, a * dt / Math.max(0.001, dv.length() / (a * dt)));
+    const a = hasWish ? acc : dec;
     this.velocity.x += dv.x * Math.min(1, a * dt);
     this.velocity.z += dv.z * Math.min(1, a * dt);
 
-    if (wish.lengthSq() === 0) {
+    if (!hasWish) {
       this.velocity.multiplyScalar(Math.max(0, 1 - dec * dt));
     }
 

@@ -15,9 +15,14 @@
     "dist": "npm run build && electron-builder",
     "steam:win": "npm run build && electron-builder --win dir",
     "steam:linux": "npm run build && electron-builder --linux dir",
-    "steam:mac": "npm run build && electron-builder --mac dir"
+    "steam:mac": "npm run build && electron-builder --mac dir",
+    "mobile:web": "vite build && node scripts/prepare-mobile.mjs",
+    "mobile:sync": "npm run mobile:web && cap sync android",
+    "mobile:apk": "npm run mobile:sync && cd android && ./gradlew assembleDebug"
   },
   "devDependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
     "cross-env": "^7.0.3",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",
@@ -59,5 +64,8 @@
       "target": "AppImage",
       "category": "Game"
     }
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.1"
   }
 }
