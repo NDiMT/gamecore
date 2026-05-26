@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { resolve } from "path";
 
 export default defineConfig({
   base: "./",
@@ -10,5 +11,11 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     target: "es2020",
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, "index.html"),
+        horror: resolve(__dirname, "horror.html"),
+      },
+    },
   },
 });

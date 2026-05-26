@@ -9,7 +9,21 @@ npm install
 npm run dev
 ```
 
-Άνοιξε http://localhost:5173
+- Chronos: http://localhost:5173/
+- **NOCLIP** (Backrooms horror vertical slice): http://localhost:5173/horror.html
+
+## NOCLIP — Level 0
+
+First-person Backrooms-style horror prototype σε Three.js. Vertical slice (~3-5 min).
+
+- **WASD** κίνηση, **Mouse** look, **Shift** τρέξιμο, **ESC** release cursor
+- Procedural maze 22×22 cells με yellow wallpaper, damp carpet, fluorescent ceiling lights
+- Atmospheric audio synth (WebAudio) — hum, drone, footsteps, scare sting
+- VHS post-fx: grain, chromatic aberration, scanlines, vignette
+- Mid-game scripted scare: blackout → entity teleports behind you → flash
+- Win: φτάσε στην κίτρινη φωτεινή έξοδο
+
+Source σε `src/horror/`. Entry: `horror.html`.
 
 ## Controls
 

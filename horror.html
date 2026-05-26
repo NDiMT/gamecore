@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0a08" />
+  <title>NOCLIP — Level 0</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: "Courier New", monospace; color: #d9c98c; }
+    #app { position: fixed; inset: 0; }
+    #canvas { position: absolute; inset: 0; display: block; }
+    #canvas canvas { display: block; }
+
+    #title {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at center, #1a1606 0%, #000 75%);
+      z-index: 30; padding: 24px;
+    }
+    #title h1 {
+      font-family: "Courier New", monospace;
+      font-size: clamp(36px, 8vw, 64px);
+      letter-spacing: 0.4em;
+      color: #e8d68a;
+      text-shadow: 0 0 12px rgba(232,214,138,0.4), 0 0 32px rgba(232,214,138,0.15);
+      margin: 0 0 4px 0; font-weight: 700;
+    }
+    #title .sub { font-size: 12px; letter-spacing: 0.5em; color: #8a7a3a; margin-bottom: 48px; text-transform: uppercase; }
+    #title .body { max-width: 540px; font-size: 14px; line-height: 1.7; color: #b8a96a; text-align: center; margin-bottom: 32px; }
+    #title .body em { color: #e8d68a; font-style: normal; }
+    #title button {
+      background: transparent; border: 1px solid #8a7a3a; color: #e8d68a;
+      padding: 14px 32px; font-family: inherit; font-size: 13px;
+      letter-spacing: 0.4em; text-transform: uppercase; cursor: pointer;
+      transition: all 0.2s;
+    }
+    #title button:hover { background: #1a1606; border-color: #e8d68a; box-shadow: 0 0 24px rgba(232,214,138,0.2); }
+    #title .ctrls { margin-top: 32px; font-size: 11px; color: #6a5a2a; letter-spacing: 0.2em; line-height: 1.8; }
+    #title .ctrls kbd {
+      display: inline-block; padding: 2px 8px; border: 1px solid #4a4020;
+      border-radius: 3px; margin: 0 2px; color: #b8a96a; font-family: inherit;
+    }
+
+    #hud {
+      position: fixed; inset: 0; pointer-events: none; z-index: 20;
+      display: none;
+    }
+    #hud.active { display: block; }
+
+    #crosshair {
+      position: absolute; left: 50%; top: 50%;
+      width: 4px; height: 4px; margin: -2px 0 0 -2px;
+      background: rgba(232,214,138,0.6); border-radius: 50%;
+      box-shadow: 0 0 4px rgba(232,214,138,0.4);
+    }
+
+    #subtitle {
+      position: absolute; left: 50%; bottom: 12%; transform: translateX(-50%);
+      max-width: 80%; text-align: center;
+      font-size: 16px; letter-spacing: 0.1em; color: #e8d68a;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+      opacity: 0; transition: opacity 0.6s;
+    }
+    #subtitle.show { opacity: 1; }
+
+    #vitals {
+      position: absolute; left: 24px; bottom: 24px;
+      font-size: 11px; letter-spacing: 0.2em; color: #8a7a3a;
+      text-transform: uppercase; line-height: 1.6;
+    }
+    #vitals .v { color: #e8d68a; }
+
+    #objective {
+      position: absolute; right: 24px; top: 24px;
+      font-size: 11px; letter-spacing: 0.2em; color: #8a7a3a;
+      text-transform: uppercase; text-align: right; line-height: 1.6;
+    }
+    #objective .o { color: #e8d68a; }
+
+    #ending {
+      position: fixed; inset: 0; background: #000; z-index: 40;
+      display: none; align-items: center; justify-content: center;
+      flex-direction: column; padding: 24px;
+    }
+    #ending.show { display: flex; }
+    #ending h2 {
+      font-size: clamp(28px, 6vw, 44px); letter-spacing: 0.4em;
+      color: #e8d68a; margin: 0 0 24px 0; text-align: center;
+    }
+    #ending p { color: #8a7a3a; max-width: 480px; text-align: center; font-size: 14px; line-height: 1.7; }
+    #ending button {
+      margin-top: 32px; background: transparent; border: 1px solid #8a7a3a;
+      color: #e8d68a; padding: 12px 28px; font-family: inherit; font-size: 12px;
+      letter-spacing: 0.3em; text-transform: uppercase; cursor: pointer;
+    }
+
+    #flashOverlay {
+      position: fixed; inset: 0; background: #fff; z-index: 25;
+      opacity: 0; pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    #darkOverlay {
+      position: fixed; inset: 0; background: #000; z-index: 24;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.08s;
+    }
+
+    .nodisplay { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas"></div>
+
+    <div id="darkOverlay"></div>
+    <div id="flashOverlay"></div>
+
+    <div id="hud">
+      <div id="crosshair"></div>
+      <div id="vitals">
+        <div>STATUS · <span class="v" id="status-val">stable</span></div>
+        <div>TIME &nbsp;&nbsp;· <span class="v" id="time-val">00:00</span></div>
+      </div>
+      <div id="objective">
+        OBJECTIVE<br/>
+        <span class="o" id="obj-val">FIND THE EXIT</span>
+      </div>
+      <div id="subtitle"></div>
+    </div>
+
+    <div id="title">
+      <h1>NOCLIP</h1>
+      <div class="sub">Level 0</div>
+      <div class="body">
+        You shouldn't be here.<br/>
+        The walls smell like <em>damp carpet</em> and the hum never stops.<br/>
+        Find a way out before <em>it</em> finds you.
+      </div>
+      <button id="start-btn">ENTER</button>
+      <div class="ctrls">
+        <kbd>WASD</kbd> move &nbsp;·&nbsp; <kbd>MOUSE</kbd> look &nbsp;·&nbsp; <kbd>SHIFT</kbd> run<br/>
+        <kbd>ESC</kbd> to release cursor
+      </div>
+    </div>
+
+    <div id="ending">
+      <h2 id="ending-title">YOU NOCLIPPED OUT</h2>
+      <p id="ending-text">The hum is gone. The fluorescent buzz is gone. You can almost remember your own name.</p>
+      <button id="restart-btn">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/horror/main.js"></script>
+</body>
+</html>
