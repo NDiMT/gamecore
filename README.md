@@ -25,6 +25,40 @@ First-person Backrooms-style horror prototype σε Three.js. Vertical slice (~3-
 
 Source σε `src/horror/`. Entry: `horror.html`.
 
+## Ship to Steam (Electron)
+
+Το παιχνίδι τυλίγεται σε **Electron** → native executable που δέχεται το Steam.
+
+```bash
+npm install
+
+# Δοκιμή σε παράθυρο (dev server) — άνοιξε άλλο terminal με `npm run dev` πρώτα
+npm run electron:dev
+
+# Native build + τρέξιμο τοπικά (fullscreen)
+npm run electron:start
+
+# Steam-ready unpacked builds (ανέβα τον φάκελο μέσω SteamPipe)
+npm run steam:win      # -> release/win-unpacked/
+npm run steam:linux    # -> release/linux-unpacked/
+npm run steam:mac      # -> release/mac/
+
+# Installers (.exe / .dmg / .AppImage) αντί για Steam
+npm run dist
+```
+
+Electron config: `electron/main.cjs` (fullscreen window, φορτώνει `dist/horror.html`),
+`electron/preload.cjs` (context-isolated bridge).
+
+### Βήματα δημοσίευσης στο Steam
+
+1. **Steamworks account** + $100 Steam Direct fee → παίρνεις το δικό σου App ID
+2. Βάλε το πραγματικό App ID στο `steam_appid.txt` (τώρα έχει `480` = Spacewar test app)
+3. (Προαιρετικό) Achievements/overlay: πρόσθεσε `steamworks.js`, αρχικοποίησέ το στο
+   `electron/preload.cjs` (υπάρχει σχόλιο-hook), χρειάζεται το Steamworks SDK
+4. `npm run steam:win` → ανέβασε το `release/win-unpacked/` ως depot μέσω **SteamPipe** (`steamcmd`)
+5. Set up store page, age gate (horror), capsule art → submit for review → release
+
 ## Controls
 
 - `1` — Δωμάτιο Παρελθόντος
