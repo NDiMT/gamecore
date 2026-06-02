@@ -13,7 +13,10 @@ export const MSG = {
 
 // Hero-turn intents (client -> host, wrapped in INTENT).
 export const ACT = {
-  MOVE: 'move', //   { heroId, x, y }
-  ATTACK: 'attack', //{ heroId, targetId }
-  END: 'end', //     { heroId }
+  MOVE: 'move', //     { heroId, x, y }
+  ATTACK: 'attack', // { heroId, targetId }
+  CAST: 'cast', //     { heroId, spellId, targetId }
+  SEARCH: 'search', // { heroId }
+  DRINK: 'drink', //   { heroId }  (free action)
+  END: 'end', //       { heroId }
 };

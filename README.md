@@ -12,9 +12,22 @@ monsters) and streams state to the other players peer-to-peer.
 2. Up to three others enter the code and join.
 3. Everyone picks a hero (Barbarian, Dwarf, Elf, Wizard) and the host begins.
 4. On your turn: click a **glowing tile** to move (you roll 2d6 each turn) and
-   click an adjacent **monster** to attack. End your turn when done.
+   click an adjacent **monster** to attack. You get **one main action** per
+   turn (attack, cast a spell, or search). End your turn when done.
 5. Explore the fog-shrouded dungeon, defeat the monsters, and get a hero to the
    glowing **stairs** to win. If the whole party falls, it's defeat.
+
+### Spells, treasure & potions
+
+- **Spells** — the **Wizard** and **Elf** have spellbooks (limited charges for
+  the quest). Click a spell to arm it, then click a target: damage spells hit a
+  visible monster (no defence roll), the heal spell restores an ally's body.
+- **Search** — in a room you haven't searched, spend your action to find gold
+  and sometimes a **healing potion**. The noise has a chance of drawing a
+  *wandering monster*, so search with care.
+- **Potions** — drinking a potion is a **free action** (it doesn't cost your
+  main action) and restores body.
+- Looted gold is tallied on the victory screen.
 
 ### Combat
 

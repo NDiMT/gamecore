@@ -3,6 +3,7 @@ import { rollMovement, resolveAttack } from './rules.js';
 import { runMonsterTurn } from './MonsterAI.js';
 import { HERO_CLASSES } from '../data/heroes.js';
 import { MONSTERS } from '../data/monsters.js';
+import { spellbookFor } from '../data/spells.js';
 import { CORRIDOR_SIGHT } from '../config.js';
 
 // Authoritative game model. The host owns the only mutating instance; clients
@@ -34,6 +35,9 @@ export class GameState {
         attack: cls.attack,
         defend: cls.defend,
         alive: true,
+        gold: 0,
+        potions: 0,
+        spells: spellbookFor(p.cls),
       };
     });
     const monsters = monsterSpawns.map((s, i) => {
@@ -59,9 +63,11 @@ export class GameState {
       phase: 'playing',
       heroes,
       monsters,
-      turn: { order: heroes.map((h) => h.id), idx: 0, movePoints: 0, attacked: false, phase: 'hero' },
+      turn: { order: heroes.map((h) => h.id), idx: 0, movePoints: 0, acted: false, phase: 'hero' },
       revealedRooms: [],
       revealedCorridor: [],
+      roomSearched: [],
+      nextMonsterId: monsters.length,
       log: [],
     };
 
@@ -136,7 +142,7 @@ export class GameState {
     const t = this.state.turn;
     t.idx = i;
     t.phase = 'hero';
-    t.attacked = false;
+    t.acted = false;
     t.movePoints = rollMovement(this.rng);
     const hero = this.activeHero();
     this.log(`${hero.name}'s turn — moves ${t.movePoints}`, 'sys');
@@ -209,26 +215,140 @@ export class GameState {
 
   attack(peerId, heroId, targetId) {
     if (!this.canControl(peerId, heroId)) return false;
-    if (this.state.turn.attacked) return false;
+    if (this.state.turn.acted) return false;
     const hero = this.activeHero();
     const target = this.monsterById(targetId);
     if (!target || !target.alive) return false;
     if (!isAdjacent(hero.x, hero.y, target.x, target.y)) return false;
 
     const r = resolveAttack(this.rng, hero.attack, target.defend, true);
-    this.state.turn.attacked = true;
+    this.state.turn.acted = true;
     this.logDice(`${hero.name} attacks ${target.name}`, r);
-    if (r.damage > 0) {
-      target.body -= r.damage;
-      this.log(`${target.name} takes ${r.damage} damage`, 'good');
+    this._damageMonster(target, r.damage, r.damage > 0 ? null : `${target.name} shrugs it off`);
+    return true;
+  }
+
+  castSpell(peerId, heroId, spellId, targetId) {
+    if (!this.canControl(peerId, heroId)) return false;
+    if (this.state.turn.acted) return false;
+    const hero = this.activeHero();
+    const spell = hero.spells.find((s) => s.id === spellId);
+    if (!spell || spell.charges <= 0) return false;
+
+    if (spell.kind === 'damage') {
+      const target = this.monsterById(targetId);
+      if (!target || !target.alive || !this.isRevealed(target.x, target.y)) return false;
+      spell.charges--;
+      this.state.turn.acted = true;
+      this.log(`${hero.name} casts ${spell.name} at ${target.name} for ${spell.power}`, 'good');
+      this._damageMonster(target, spell.power, null);
+      return true;
+    }
+
+    if (spell.kind === 'heal') {
+      const target = this.heroById(targetId);
+      if (!target || !target.alive) return false;
+      spell.charges--;
+      this.state.turn.acted = true;
+      const healed = Math.min(spell.power, target.maxBody - target.body);
+      target.body += healed;
+      this.log(`${hero.name} casts ${spell.name} on ${target.name} (+${healed} body)`, 'good');
+      return true;
+    }
+    return false;
+  }
+
+  search(peerId, heroId) {
+    if (!this.canControl(peerId, heroId)) return false;
+    if (this.state.turn.acted) return false;
+    const hero = this.activeHero();
+    const room = this.roomAt(hero.x, hero.y);
+    if (room < 0 || this.state.roomSearched.includes(room)) return false;
+
+    this.state.roomSearched.push(room);
+    this.state.turn.acted = true;
+
+    // Treasure: a handful of gold, sometimes a healing potion...
+    const gold = this.rng.int(1, 5) * 5;
+    hero.gold += gold;
+    let msg = `${hero.name} searches and finds ${gold} gold`;
+    if (this.rng() < 0.35) {
+      hero.potions += 1;
+      msg += ' and a healing potion';
+    }
+    this.log(msg, 'good');
+
+    // ...but the noise may draw a wandering monster.
+    if (this.rng() < 0.25) {
+      const spot = this._freeAdjacent(hero.x, hero.y);
+      if (spot) {
+        this._spawnMonster('goblin', spot.x, spot.y);
+        this.log(`A wandering Goblin appears, drawn by the commotion!`, 'hit');
+      }
+    }
+    return true;
+  }
+
+  drinkPotion(peerId, heroId) {
+    // A free action — does not consume the turn's main action.
+    if (!this.canControl(peerId, heroId)) return false;
+    const hero = this.activeHero();
+    if (hero.potions <= 0 || hero.body >= hero.maxBody) return false;
+    hero.potions--;
+    const healed = Math.min(4, hero.maxBody - hero.body);
+    hero.body += healed;
+    this.log(`${hero.name} drinks a potion (+${healed} body)`, 'good');
+    return true;
+  }
+
+  // ---- Shared helpers ------------------------------------------------------
+  _damageMonster(target, damage, missMsg) {
+    if (damage > 0) {
+      target.body -= damage;
+      this.log(`${target.name} takes ${damage} damage`, 'good');
       if (target.body <= 0) {
         target.alive = false;
         this.log(`${target.name} is slain!`, 'good');
       }
-    } else {
-      this.log(`${target.name} shrugs it off`, 'hit');
+    } else if (missMsg) {
+      this.log(missMsg, 'hit');
     }
-    return true;
+  }
+
+  _spawnMonster(type, x, y) {
+    const def = MONSTERS[type];
+    const id = 'm' + this.state.nextMonsterId++;
+    this.state.monsters.push({
+      id,
+      type,
+      name: def.name,
+      color: def.color,
+      boss: !!def.boss,
+      x,
+      y,
+      body: def.body,
+      maxBody: def.body,
+      attack: def.attack,
+      defend: def.defend,
+      move: def.move,
+      alive: true,
+    });
+    return id;
+  }
+
+  _freeAdjacent(x, y) {
+    const occ = this.occupancy(null);
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (isWalkable(this.map, nx, ny) && !occ.has(key(nx, ny))) return { x: nx, y: ny };
+    }
+    return null;
   }
 
   endTurn(peerId, heroId) {

@@ -19,6 +19,7 @@ export class Tokens {
     scene.add(this.activeRing);
 
     this.monsterMeshes = []; // for raycasting attacks
+    this.heroMeshes = []; //   for raycasting heal-spell targets
   }
 
   _heroMesh(hero) {
@@ -44,6 +45,10 @@ export class Tokens {
     head.position.y = 0.86;
     head.castShadow = true;
     g.add(head);
+    g.userData = { heroId: hero.id };
+    body.userData = { heroId: hero.id };
+    head.userData = { heroId: hero.id };
+    base.userData = { heroId: hero.id };
     return g;
   }
 
@@ -85,6 +90,7 @@ export class Tokens {
   sync(snap) {
     const seen = new Set();
     this.monsterMeshes = [];
+    this.heroMeshes = [];
 
     for (const hero of snap.heroes) {
       if (!hero.alive) continue;
@@ -99,6 +105,7 @@ export class Tokens {
       }
       const w = this.board.worldFromTile(hero.x, hero.y);
       entry.target.set(w.x, 0, w.z);
+      this.heroMeshes.push(entry.group);
     }
 
     for (const m of snap.monsters) {

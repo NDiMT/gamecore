@@ -34,8 +34,15 @@ export class App {
       onPick: (cls) => this._pick(cls),
       onStart: () => this._startGame(),
     });
+    this.pendingSpell = null; // armed heal/damage spell awaiting a target
     this.hud = new HUD(document.getElementById('hud'), document.getElementById('party'), {
-      onEndTurn: (heroId) => this._intent({ t: ACT.END, heroId }),
+      onEndTurn: (heroId) => {
+        this.pendingSpell = null;
+        this._intent({ t: ACT.END, heroId });
+      },
+      onSearch: (heroId) => this._intent({ t: ACT.SEARCH, heroId }),
+      onDrink: (heroId) => this._intent({ t: ACT.DRINK, heroId }),
+      onSelectSpell: (heroId, spellId) => this._selectSpell(heroId, spellId),
     });
     this.log = new Log(document.getElementById('log'));
     this.toastEl = document.getElementById('toast');
@@ -180,6 +187,7 @@ export class App {
     this.board = new Board3D(this.renderer.scene, map);
     this.tokens = new Tokens(this.renderer.scene, this.board, map);
     this.picker = new Picker(this.renderer, this.board, this.tokens, (pick) => this._onPick(pick));
+    this.hud.map = map;
 
     this.lobby.hide();
     this.hud.show();
@@ -189,12 +197,36 @@ export class App {
   // ---- Snapshot application (render) ---------------------------------------
   _applySnapshot(snap) {
     this.snap = snap;
+    // A new snapshot means the turn state advanced; drop any armed spell that
+    // is no longer castable (acted, not my turn, charges spent).
+    if (this.pendingSpell && !this._canCastPending()) this.pendingSpell = null;
     this.board.updateFog(snap);
     this.tokens.sync(snap);
-    this.hud.update(snap, this.myId);
+    this._refreshHud();
     this.log.update(snap);
     this._updateReachable();
     this._checkEnd(snap);
+  }
+
+  _refreshHud() {
+    this.hud.update(this.snap, this.myId, { pendingSpell: this.pendingSpell });
+  }
+
+  _canCastPending() {
+    const hero = this._activeHeroForMe();
+    if (!hero || this.snap.turn.acted) return false;
+    const s = hero.spells?.find((sp) => sp.id === this.pendingSpell.id);
+    return !!s && s.charges > 0;
+  }
+
+  _selectSpell(heroId, spellId) {
+    const hero = this._activeHeroForMe();
+    if (!hero || hero.id !== heroId) return;
+    const spell = hero.spells?.find((s) => s.id === spellId);
+    if (!spell || spell.charges <= 0 || this.snap.turn.acted) return;
+    // Toggle: clicking the armed spell again cancels targeting.
+    this.pendingSpell = this.pendingSpell?.id === spellId ? null : spell;
+    this._refreshHud();
   }
 
   _activeHeroForMe() {
@@ -233,6 +265,21 @@ export class App {
   _onPick(pick) {
     const hero = this._activeHeroForMe();
     if (!hero) return;
+
+    // Spell targeting takes priority while a spell is armed.
+    if (this.pendingSpell) {
+      const spell = this.pendingSpell;
+      if (spell.kind === 'damage' && pick.type === 'monster') {
+        this._intent({ t: ACT.CAST, heroId: hero.id, spellId: spell.id, targetId: pick.id });
+        this.pendingSpell = null;
+      } else if (spell.kind === 'heal' && pick.type === 'hero') {
+        this._intent({ t: ACT.CAST, heroId: hero.id, spellId: spell.id, targetId: pick.id });
+        this.pendingSpell = null;
+      }
+      this._refreshHud();
+      return;
+    }
+
     if (pick.type === 'tile') {
       this._intent({ t: ACT.MOVE, heroId: hero.id, x: pick.x, y: pick.y });
     } else if (pick.type === 'monster') {
@@ -259,6 +306,15 @@ export class App {
       case ACT.ATTACK:
         changed = this.gs.attack(from, action.heroId, action.targetId);
         break;
+      case ACT.CAST:
+        changed = this.gs.castSpell(from, action.heroId, action.spellId, action.targetId);
+        break;
+      case ACT.SEARCH:
+        changed = this.gs.search(from, action.heroId);
+        break;
+      case ACT.DRINK:
+        changed = this.gs.drinkPotion(from, action.heroId);
+        break;
       case ACT.END:
         changed = this.gs.endTurn(from, action.heroId);
         break;
@@ -268,9 +324,14 @@ export class App {
 
   // ---- End states ----------------------------------------------------------
   _checkEnd(snap) {
-    if (snap.phase === 'won') this._toast('🏆 Victory!');
-    else if (snap.phase === 'lost') this._toast('💀 Defeat');
-    else this.toastEl.style.display = 'none';
+    if (snap.phase === 'won') {
+      const gold = snap.heroes.reduce((sum, h) => sum + (h.gold || 0), 0);
+      this._toast(`🏆 Victory!${gold ? ` · ${gold} gold looted` : ''}`);
+    } else if (snap.phase === 'lost') {
+      this._toast('💀 Defeat');
+    } else {
+      this.toastEl.style.display = 'none';
+    }
   }
 
   _toast(text) {

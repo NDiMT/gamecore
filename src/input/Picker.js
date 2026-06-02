@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 // Translates clicks into game picks. Distinguishes a click from an orbit-drag
-// by measuring pointer travel, then raycasts monsters first (attack) and floor
-// tiles second (move). Calls onPick({ type:'monster', id }) or
-// ({ type:'tile', x, y }).
+// by measuring pointer travel, then raycasts tokens (monsters and heroes)
+// before floor tiles. Calls onPick with { type:'monster'|'hero', id } or
+// { type:'tile', x, y }.
 export class Picker {
   constructor(renderer, board, tokens, onPick) {
     this.renderer = renderer;
@@ -32,11 +32,14 @@ export class Picker {
     this.ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this.ray.setFromCamera(this.ndc, this.renderer.camera);
 
-    const monsterHits = this.ray.intersectObjects(this.tokens.monsterMeshes, true);
-    if (monsterHits.length) {
-      const id = findMonsterId(monsterHits[0].object);
-      if (id) {
-        this.onPick({ type: 'monster', id });
+    const tokenHits = this.ray.intersectObjects(
+      [...this.tokens.monsterMeshes, ...this.tokens.heroMeshes],
+      true
+    );
+    if (tokenHits.length) {
+      const found = findToken(tokenHits[0].object);
+      if (found) {
+        this.onPick(found);
         return;
       }
     }
@@ -51,10 +54,11 @@ export class Picker {
   }
 }
 
-function findMonsterId(obj) {
+function findToken(obj) {
   let cur = obj;
   while (cur) {
-    if (cur.userData && cur.userData.monsterId) return cur.userData.monsterId;
+    if (cur.userData?.monsterId) return { type: 'monster', id: cur.userData.monsterId };
+    if (cur.userData?.heroId) return { type: 'hero', id: cur.userData.heroId };
     cur = cur.parent;
   }
   return null;
