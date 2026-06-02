@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GameCore — HeroQuest</title>
+    <style>
+      :root {
+        --bg: #0c0a14;
+        --panel: rgba(20, 16, 34, 0.92);
+        --panel-border: #3a2f5c;
+        --gold: #e6b450;
+        --gold-dim: #b8893a;
+        --text: #e8e2d4;
+        --muted: #9b93b0;
+        --good: #6fcf6f;
+        --bad: #e06464;
+        --accent: #7c5cff;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+      }
+      #scene { position: fixed; inset: 0; }
+      #scene canvas { display: block; }
+
+      /* ---- Overlay scaffolding ---- */
+      .overlay { position: fixed; z-index: 10; }
+      button {
+        font-family: inherit;
+        cursor: pointer;
+        border-radius: 8px;
+        border: 1px solid var(--gold-dim);
+        background: linear-gradient(#3a2f5c, #241d3d);
+        color: var(--gold);
+        padding: 10px 16px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        transition: transform 0.08s ease, filter 0.12s ease;
+      }
+      button:hover:not(:disabled) { filter: brightness(1.2); transform: translateY(-1px); }
+      button:active:not(:disabled) { transform: translateY(0); }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      button.primary { background: linear-gradient(var(--gold), var(--gold-dim)); color: #1a1326; border-color: var(--gold); }
+      input {
+        font-family: inherit;
+        background: #15102a;
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        width: 100%;
+      }
+
+      /* ---- Lobby ---- */
+      #lobby {
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 30%, #1a1430, #06040c 75%);
+      }
+      .card {
+        width: min(440px, 92vw);
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 28px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      }
+      .card h1 {
+        margin: 0 0 4px;
+        font-size: 30px;
+        color: var(--gold);
+        text-shadow: 0 2px 12px rgba(230,180,80,0.35);
+        letter-spacing: 1px;
+      }
+      .card .sub { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+      .field { margin-bottom: 14px; }
+      .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+      .row { display: flex; gap: 10px; }
+      .row > * { flex: 1; }
+      .hidden { display: none !important; }
+      .roomcode {
+        font-family: 'Courier New', monospace;
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--gold);
+        background: #15102a;
+        border: 1px dashed var(--gold-dim);
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        letter-spacing: 2px;
+        cursor: copy;
+      }
+      .classgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+      .classcard {
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 10px;
+        cursor: pointer;
+        background: #15102a;
+        transition: border-color 0.12s, background 0.12s;
+      }
+      .classcard:hover { border-color: var(--gold-dim); }
+      .classcard.sel { border-color: var(--gold); background: #221a3c; }
+      .classcard.taken { opacity: 0.35; pointer-events: none; }
+      .classcard .cn { font-weight: 700; color: var(--gold); }
+      .classcard .cs { font-size: 11px; color: var(--muted); margin-top: 4px; }
+      .playerlist { list-style: none; padding: 0; margin: 8px 0 0; }
+      .playerlist li { padding: 6px 0; border-bottom: 1px solid var(--panel-border); font-size: 14px; }
+      .playerlist .me { color: var(--gold); }
+      .status { font-size: 12px; color: var(--muted); margin-top: 12px; min-height: 16px; }
+      .status.err { color: var(--bad); }
+
+      /* ---- In-game HUD ---- */
+      #hud { top: 12px; left: 12px; display: none; }
+      #turnbar {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        min-width: 220px;
+      }
+      #turnbar .phase { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+      #turnbar .active { font-size: 18px; font-weight: 700; color: var(--gold); margin-top: 2px; }
+      #turnbar .move { font-size: 13px; color: var(--text); margin-top: 6px; }
+      #actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+      #party { position: fixed; top: 12px; right: 12px; z-index: 10; display: none; flex-direction: column; gap: 8px; width: 220px; }
+      .herochip {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 8px 10px;
+      }
+      .herochip.active { border-color: var(--gold); box-shadow: 0 0 12px rgba(230,180,80,0.3); }
+      .herochip.dead { opacity: 0.4; }
+      .herochip .hn { font-size: 13px; font-weight: 700; }
+      .herochip .hyou { font-size: 10px; color: var(--accent); }
+      .bar { height: 7px; border-radius: 4px; background: #2a2342; margin-top: 5px; overflow: hidden; }
+      .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--bad), var(--good)); }
+      .herochip .stat { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+      #log {
+        position: fixed; bottom: 12px; left: 12px; z-index: 10;
+        width: min(360px, 60vw); max-height: 28vh; overflow-y: auto;
+        background: var(--panel); border: 1px solid var(--panel-border);
+        border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.5;
+        display: none;
+      }
+      #log .e { color: var(--muted); }
+      #log .e.hit { color: var(--bad); }
+      #log .e.good { color: var(--good); }
+      #log .e.sys { color: var(--gold); }
+
+      #toast {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+        z-index: 30; background: var(--panel); border: 1px solid var(--gold);
+        border-radius: 14px; padding: 24px 36px; font-size: 24px; font-weight: 700;
+        color: var(--gold); text-align: center; display: none;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      }
+      .dieface {
+        display: inline-block; width: 22px; height: 22px; line-height: 22px;
+        text-align: center; border-radius: 5px; margin: 0 2px; font-size: 14px; font-weight: 700;
+      }
+      .die-skull { background: #3a1414; color: #ff7676; }
+      .die-white { background: #e8e2d4; color: #1a1326; }
+      .die-black { background: #15102a; color: #9b93b0; border: 1px solid #3a2f5c; }
+    </style>
+  </head>
+  <body>
+    <div id="scene"></div>
+    <div id="hud" class="overlay"></div>
+    <div id="party" class="overlay"></div>
+    <div id="log"></div>
+    <div id="lobby" class="overlay"></div>
+    <div id="toast"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
