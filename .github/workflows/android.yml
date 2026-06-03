@@ -67,11 +67,18 @@ jobs:
       - name: Import project
         run: godot --headless --path . --import 2>&1 | tail -n 20 || true
 
+      - name: Diagnostics
+        run: |
+          echo "--- export templates ---"; ls -la "${GODOT_TEMPLATES_DIR}" || true
+          echo "--- build-tools ---"; ls "${ANDROID_SDK_ROOT}/build-tools" || true
+          echo "--- cmdline-tools ---"; ls "${ANDROID_SDK_ROOT}/cmdline-tools" || true
+          echo "--- editor settings ---"; cat ~/.config/godot/editor_settings-4.3.tres
+
       - name: Export debug APK
         run: |
           mkdir -p build
-          godot --headless --path . --export-debug "Android" build/gamecore.apk
-          ls -lh build/gamecore.apk
+          godot --headless --verbose --path . --export-debug "Android" build/gamecore.apk 2>&1 | tee export.log | tail -n 80
+          test -f build/gamecore.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
