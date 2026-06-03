@@ -2,8 +2,8 @@
 .godot/
 .import/
 /export/
-export_presets.cfg
 *.translation
+# Note: export_presets.cfg IS committed so CI can build the Android APK.
 
 # OS noise
 .DS_Store

@@ -26,12 +26,32 @@ other players; clients send only their intents.
 > browser/WebRTC build there is no public broker — this keeps the project fully
 > self-contained with no backend.
 
+## Mobile (Android)
+
+This is built as a **mobile game** (touch controls, mobile renderer,
+landscape). To get an APK for your phone:
+
+- **Automatic (recommended):** every push runs the **Build Android APK** GitHub
+  Action (`.github/workflows/android.yml`). Open the workflow run on GitHub and
+  download the `gamecore-android-apk` artifact, then sideload it
+  (`adb install gamecore.apk`, or copy to the phone and tap it with "install
+  from unknown sources" enabled). The sandbox that wrote this code can't reach
+  Google's SDK servers, so the build is delegated to CI, whose runners can.
+- **Manual:** in the Godot editor install the Android build templates and SDK
+  (Editor → Manage Export Templates; Editor Settings → Export → Android), then
+  Project → Export → **Android** → Export Project.
+
+**Touch controls:** one-finger **tap** to move/attack, one-finger **drag** to
+orbit the camera, two-finger **pinch** to zoom. Multiplayer over ENet works
+between devices on the **same Wi-Fi/LAN** (one hosts, others enter its local IP
+and port `8910`); over the internet the host needs a reachable address.
+
 ## How to play
 
-- On your turn, click a **glowing tile** to move (you roll 2d6 each turn) and
-  click an adjacent **monster** to attack. You get **one main action** per turn
+- On your turn, **tap** a **glowing tile** to move (you roll 2d6 each turn) and
+  tap an adjacent **monster** to attack. You get **one main action** per turn
   (attack, cast a spell, or search).
-- **Camera:** right-drag to orbit, mouse wheel to zoom.
+- **Camera:** drag to orbit, pinch to zoom (mouse drag / wheel on desktop).
 - Explore the fog-shrouded dungeon, defeat the monsters, and get a hero onto
   the glowing **stairs** to win. If the whole party falls, it's defeat.
 
