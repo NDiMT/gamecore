@@ -2,6 +2,7 @@
 .godot/
 .import/
 /export/
+/build/
 *.translation
 # Note: export_presets.cfg IS committed so CI can build the Android APK.
 
