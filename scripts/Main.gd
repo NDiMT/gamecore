@@ -24,11 +24,12 @@ var _yaw := 0.6
 var _pitch := 0.95
 var _dist := 24.0
 var _target := Vector3.ZERO
-var _orbiting := false
 
-# Touch state (mobile): index -> position, index -> accumulated drag distance.
-var _touches := {}
-var _touch_moved := {}
+# Pointer state. Single-finger gestures arrive as emulated mouse events (so GUI
+# controls keep working on touch); two-finger pinch is read from raw touches.
+var _dragging := false
+var _drag_moved := 0.0
+var _touch_points := {}   # active touch index -> position
 var _pinch_dist := 0.0
 
 # Untyped on purpose: these hold script instances whose methods aren't declared
@@ -45,6 +46,9 @@ func _ready() -> void:
 	_setup_world()
 	_setup_ui()
 	_connect_net()
+	# Center the window on desktop (no-op on mobile / headless).
+	if DisplayServer.get_name() != "headless":
+		get_window().move_to_center.call_deferred()
 
 # ---- Scene construction -----------------------------------------------------
 func _setup_world() -> void:
@@ -142,58 +146,54 @@ func _update_camera() -> void:
 	_camera.look_at(_target, Vector3.UP)
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Track raw touches so we can detect a two-finger pinch. Single-finger
+	# input is handled below via the emulated mouse events.
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_touch_points[event.index] = event.position
+		else:
+			_touch_points.erase(event.index)
+		if _touch_points.size() < 2:
+			_pinch_dist = 0.0
+		return
+	if event is InputEventScreenDrag:
+		_touch_points[event.index] = event.position
+		if _touch_points.size() >= 2:
+			var d := _two_touch_distance()
+			if _pinch_dist > 0.0:
+				_dist *= _pinch_dist / maxf(d, 1.0)
+				_update_camera()
+			_pinch_dist = d
+		return
+
+	# Don't orbit/pick with the emulated mouse while a pinch is in progress.
+	if _touch_points.size() >= 2:
+		return
+
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_RIGHT:
-			_orbiting = event.pressed
+		if event.button_index == MOUSE_BUTTON_LEFT or event.button_index == MOUSE_BUTTON_RIGHT:
+			if event.pressed:
+				_dragging = true
+				_drag_moved = 0.0
+			else:
+				_dragging = false
+				# A near-stationary left release is a tap → pick.
+				if event.button_index == MOUSE_BUTTON_LEFT and _drag_moved < 10.0:
+					_try_pick(event.position)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			_dist *= 0.9
 			_update_camera()
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			_dist *= 1.1
 			_update_camera()
-		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			_try_pick(event.position)
-	elif event is InputEventMouseMotion and _orbiting:
-		_yaw -= event.relative.x * 0.01
-		_pitch += event.relative.y * 0.01
-		_update_camera()
-	elif event is InputEventScreenTouch:
-		_handle_touch(event)
-	elif event is InputEventScreenDrag:
-		_handle_drag(event)
-
-func _handle_touch(event: InputEventScreenTouch) -> void:
-	if event.pressed:
-		_touches[event.index] = event.position
-		_touch_moved[event.index] = 0.0
-		if _touches.size() == 2:
-			_pinch_dist = _two_touch_distance()
-	else:
-		# A short, near-stationary single-finger tap is a pick.
-		if _touches.has(event.index) and _touches.size() == 1 and _touch_moved.get(event.index, 999.0) < 12.0:
-			_try_pick(event.position)
-		_touches.erase(event.index)
-		_touch_moved.erase(event.index)
-		_pinch_dist = 0.0
-
-func _handle_drag(event: InputEventScreenDrag) -> void:
-	_touches[event.index] = event.position
-	_touch_moved[event.index] = _touch_moved.get(event.index, 0.0) + event.relative.length()
-	if _touches.size() >= 2:
-		# Two fingers: pinch to zoom.
-		var d := _two_touch_distance()
-		if _pinch_dist > 0.0:
-			_dist *= _pinch_dist / max(d, 1.0)
-			_update_camera()
-		_pinch_dist = d
-	else:
-		# One finger: orbit.
+	elif event is InputEventMouseMotion and _dragging:
+		_drag_moved += event.relative.length()
 		_yaw -= event.relative.x * 0.01
 		_pitch += event.relative.y * 0.01
 		_update_camera()
 
 func _two_touch_distance() -> float:
-	var pts := _touches.values()
+	var pts := _touch_points.values()
 	if pts.size() < 2:
 		return 0.0
 	return pts[0].distance_to(pts[1])
