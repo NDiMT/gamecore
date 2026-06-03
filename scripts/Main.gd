@@ -26,6 +26,11 @@ var _dist := 24.0
 var _target := Vector3.ZERO
 var _orbiting := false
 
+# Touch state (mobile): index -> position, index -> accumulated drag distance.
+var _touches := {}
+var _touch_moved := {}
+var _pinch_dist := 0.0
+
 # Untyped on purpose: these hold script instances whose methods aren't declared
 # on the Node3D/Control base types, so static typing would reject the calls.
 var board
@@ -72,7 +77,12 @@ func _setup_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 
+	# A shared theme bumps font/control sizes for comfortable touch targets.
+	var theme := Theme.new()
+	theme.default_font_size = 22
+
 	lobby = LobbyScript.new()
+	lobby.theme = theme
 	layer.add_child(lobby)
 	lobby.host_requested.connect(_on_host_requested)
 	lobby.join_requested.connect(_on_join_requested)
@@ -80,6 +90,7 @@ func _setup_ui() -> void:
 	lobby.start_requested.connect(_on_start_requested)
 
 	hud = HUDScript.new()
+	hud.theme = theme
 	layer.add_child(hud)
 	hud.end_pressed.connect(_on_end_pressed)
 	hud.search_pressed.connect(func(id): _send_intent({"t": "search", "heroId": id}))
@@ -87,10 +98,12 @@ func _setup_ui() -> void:
 	hud.spell_pressed.connect(_on_spell_pressed)
 
 	log_ui = LogScript.new()
+	log_ui.theme = theme
 	layer.add_child(log_ui)
 
 	# Centred win/lose toast.
 	_toast_root = Control.new()
+	_toast_root.theme = theme
 	_toast_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_toast_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_toast_root)
@@ -144,6 +157,46 @@ func _unhandled_input(event: InputEvent) -> void:
 		_yaw -= event.relative.x * 0.01
 		_pitch += event.relative.y * 0.01
 		_update_camera()
+	elif event is InputEventScreenTouch:
+		_handle_touch(event)
+	elif event is InputEventScreenDrag:
+		_handle_drag(event)
+
+func _handle_touch(event: InputEventScreenTouch) -> void:
+	if event.pressed:
+		_touches[event.index] = event.position
+		_touch_moved[event.index] = 0.0
+		if _touches.size() == 2:
+			_pinch_dist = _two_touch_distance()
+	else:
+		# A short, near-stationary single-finger tap is a pick.
+		if _touches.has(event.index) and _touches.size() == 1 and _touch_moved.get(event.index, 999.0) < 12.0:
+			_try_pick(event.position)
+		_touches.erase(event.index)
+		_touch_moved.erase(event.index)
+		_pinch_dist = 0.0
+
+func _handle_drag(event: InputEventScreenDrag) -> void:
+	_touches[event.index] = event.position
+	_touch_moved[event.index] = _touch_moved.get(event.index, 0.0) + event.relative.length()
+	if _touches.size() >= 2:
+		# Two fingers: pinch to zoom.
+		var d := _two_touch_distance()
+		if _pinch_dist > 0.0:
+			_dist *= _pinch_dist / max(d, 1.0)
+			_update_camera()
+		_pinch_dist = d
+	else:
+		# One finger: orbit.
+		_yaw -= event.relative.x * 0.01
+		_pitch += event.relative.y * 0.01
+		_update_camera()
+
+func _two_touch_distance() -> float:
+	var pts := _touches.values()
+	if pts.size() < 2:
+		return 0.0
+	return pts[0].distance_to(pts[1])
 
 # ---- Lobby: hosting / joining ----------------------------------------------
 func _on_host_requested(name: String) -> void:
