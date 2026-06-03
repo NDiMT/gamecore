@@ -1,5 +1,9 @@
-node_modules/
-dist/
+# Godot 4 editor / import caches and exports
+.godot/
+.import/
+/export/
+export_presets.cfg
+*.translation
+
+# OS noise
 .DS_Store
-*.log
-.vite/
