@@ -43,6 +43,12 @@ jobs:
           unzip -q templates.tpz -d tpz
           mv tpz/templates/* "${GODOT_TEMPLATES_DIR}/"
 
+      # Import FIRST: this generates the .godot cache and a default editor
+      # settings file. It runs in a minimal mode that drops the Android export
+      # settings, so we must write them *after* this step.
+      - name: Import project
+        run: godot --headless --path . --import 2>&1 | tail -n 20 || true
+
       - name: Generate a debug keystore
         run: |
           keytool -keyalg RSA -genkeypair -alias androiddebugkey \
@@ -50,6 +56,8 @@ jobs:
             -storepass android -dname "CN=Android Debug,O=Android,C=US" \
             -validity 9999 -deststoretype pkcs12
 
+      # Written after import so it survives into the export pass. The keystore
+      # file already exists, so Godot keeps our path instead of overriding it.
       - name: Point Godot at the SDK and keystore
         run: |
           mkdir -p ~/.config/godot
@@ -64,14 +72,10 @@ jobs:
           export/android/debug_keystore_pass = "android"
           EOF
 
-      - name: Import project
-        run: godot --headless --path . --import 2>&1 | tail -n 20 || true
-
       - name: Diagnostics
         run: |
           echo "--- export templates ---"; ls -la "${GODOT_TEMPLATES_DIR}" || true
           echo "--- build-tools ---"; ls "${ANDROID_SDK_ROOT}/build-tools" || true
-          echo "--- cmdline-tools ---"; ls "${ANDROID_SDK_ROOT}/cmdline-tools" || true
           echo "--- editor settings ---"; cat ~/.config/godot/editor_settings-4.3.tres
 
       - name: Export debug APK
