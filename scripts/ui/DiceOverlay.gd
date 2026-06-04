@@ -16,6 +16,8 @@ var _title: Label
 var _result: Label
 var _legend: Label
 
+var _skull_tex: ImageTexture
+var _shield_tex: ImageTexture
 var _queue: Array = []
 var _phase := 0          # 0 idle, 1 rolling, 2 settling, 3 holding
 var _t := 0.0
@@ -166,11 +168,28 @@ func _add_die(face: String, x: float, _is_attack: bool) -> void:
 			mat.albedo_color = Color("2a2438")
 	cube.material_override = mat
 	node.add_child(cube)
+	# Billboard symbol (skull / shield), revealed once the die settles.
+	var spr := Sprite3D.new()
+	spr.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	spr.pixel_size = 0.011
+	spr.no_depth_test = true
+	if face == "skull":
+		spr.texture = _skull()
+		spr.modulate = Color("f2ece0")
+	elif face == "white":
+		spr.texture = _shield()
+		spr.modulate = Color("f2ece0")
+	else:
+		spr.texture = _shield()
+		spr.modulate = Color("9a93a8")
+	spr.position = Vector3(0, 0.5, 0)   # float above the die, not inside it
+	spr.visible = false
+	node.add_child(spr)
 	node.position = Vector3(x, 0, 0)
 	node.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
 	_dice_root.add_child(node)
 	var spin := Vector3(randf_range(6, 12), randf_range(6, 12), randf_range(6, 12))
-	_dice.append({"node": node, "spin": spin})
+	_dice.append({"node": node, "spin": spin, "label": spr})
 
 func _add_move_die(value: int, x: float) -> void:
 	var node := Node3D.new()
@@ -249,3 +268,63 @@ func _show_result() -> void:
 	else:
 		_result.text = "Blocked!"
 		_result.add_theme_color_override("font_color", Color("6fcf6f"))
+
+# ---- Procedurally drawn dice symbols ----------------------------------------
+func _skull() -> ImageTexture:
+	if _skull_tex == null:
+		_skull_tex = _make_skull()
+	return _skull_tex
+
+func _shield() -> ImageTexture:
+	if _shield_tex == null:
+		_shield_tex = _make_shield()
+	return _shield_tex
+
+func _make_skull() -> ImageTexture:
+	var n := 48
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var white := Color("ffffff")
+	var dark := Color("17121f")
+	_disc(img, n * 0.5, n * 0.40, n * 0.30, white)            # cranium
+	_rect(img, int(n * 0.34), int(n * 0.55), int(n * 0.32), int(n * 0.22), white)  # jaw
+	_disc(img, n * 0.39, n * 0.42, n * 0.085, dark)           # eye
+	_disc(img, n * 0.61, n * 0.42, n * 0.085, dark)           # eye
+	_disc(img, n * 0.5, n * 0.53, n * 0.045, dark)            # nose
+	for tx in [0.42, 0.5, 0.58]:                               # teeth gaps
+		_rect(img, int(n * tx), int(n * 0.6), 1, int(n * 0.16), dark)
+	return ImageTexture.create_from_image(img)
+
+func _make_shield() -> ImageTexture:
+	var n := 48
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var col := Color("ffffff")
+	var cx := n * 0.5
+	var top := n * 0.13
+	var span := n * 0.80
+	for y in range(int(top), int(top + span)):
+		var ty := (y - top) / span               # 0..1 down the shield
+		var half := n * 0.33
+		if ty > 0.5:
+			half = n * 0.33 * (1.0 - (ty - 0.5) / 0.5)  # taper to a point
+		for x in range(int(cx - half), int(cx + half) + 1):
+			if x >= 0 and x < n:
+				img.set_pixel(x, y, col)
+	return ImageTexture.create_from_image(img)
+
+func _disc(img: Image, cx: float, cy: float, r: float, col: Color) -> void:
+	var r2 := r * r
+	for y in range(int(cy - r), int(cy + r) + 1):
+		for x in range(int(cx - r), int(cx + r) + 1):
+			if x >= 0 and x < img.get_width() and y >= 0 and y < img.get_height():
+				var dx := x - cx
+				var dy := y - cy
+				if dx * dx + dy * dy <= r2:
+					img.set_pixel(x, y, col)
+
+func _rect(img: Image, x: int, y: int, w: int, h: int, col: Color) -> void:
+	for yy in range(y, y + h):
+		for xx in range(x, x + w):
+			if xx >= 0 and xx < img.get_width() and yy >= 0 and yy < img.get_height():
+				img.set_pixel(xx, yy, col)

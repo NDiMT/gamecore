@@ -65,7 +65,16 @@ func _test_spells_and_search() -> void:
 	var wiz = gs.state.heroes[0]
 	assert(wiz.spells.size() == 9, "wizard should have 3 groups x 3 spells")
 
-	assert(gs.search(1, wiz.id), "search should succeed in start room")
+	# Heroes start in a corridor now; move into a room and clear it to search.
+	var rm = gs.map.rooms[0]
+	wiz.x = rm.cx
+	wiz.y = rm.cy
+	var hr := gs.room_at(wiz.x, wiz.y)
+	for m in gs.state.monsters:
+		if gs.room_at(m.x, m.y) == hr:
+			m.alive = false
+	gs.state.turn.acted = false
+	assert(gs.search(1, wiz.id), "search should succeed in a cleared room")
 	assert(not gs.search(1, wiz.id), "second search same room should fail")
 
 	# Heal: damage then cast a heal spell on self.
@@ -74,12 +83,17 @@ func _test_spells_and_search() -> void:
 	assert(gs.cast_spell(1, wiz.id, "mend", wiz.id), "heal should succeed")
 	assert(wiz.body == wiz.maxBody, "heal should cap at maxBody")
 
-	# Damage spell on a revealed monster.
-	var mon = gs.state.monsters[0]
-	if not gs.state.revealedRooms.has(gs.room_at(mon.x, mon.y)):
-		gs.state.revealedRooms.append(gs.room_at(mon.x, mon.y))
-	gs.state.turn.acted = false
-	assert(gs.cast_spell(1, wiz.id, "fire_bolt", mon.id), "damage spell should succeed")
+	# Damage spell on any still-living, revealed monster.
+	var mon = null
+	for m in gs.state.monsters:
+		if m.alive:
+			mon = m
+			break
+	if mon != null:
+		if not gs.state.revealedRooms.has(gs.room_at(mon.x, mon.y)):
+			gs.state.revealedRooms.append(gs.room_at(mon.x, mon.y))
+		gs.state.turn.acted = false
+		assert(gs.cast_spell(1, wiz.id, "fire_bolt", mon.id), "damage spell should succeed")
 
 	# Self-buff spells need no target.
 	gs.state.turn.acted = false

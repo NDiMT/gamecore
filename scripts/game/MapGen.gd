@@ -1,95 +1,137 @@
 class_name MapGen
-## Procedurally generates a connected dungeon of rectangular rooms joined by
-## width-1 corridors, with doors where a corridor meets a room edge. Runs only
-## on the host. Returns { map, start_tiles:Array[Vector2i], monster_spawns:Array }.
+## Generates a HeroQuest-style board: the whole interior is corridor floor, with
+## rectangular rooms outlined by walls and entered through visible doors. Runs
+## only on the host. Returns { map, start_tiles, monster_spawns, traps,
+## secret_doors }. Layouts are verified connected (with retries), so a fixed
+## seed always yields the same playable board.
 
 ## `spec` may carry: pool (monster id Array), boss (id or ""), density ([min,max]).
 static func generate(rng: RandomNumberGenerator, spec: Dictionary = {}) -> Dictionary:
+	for attempt in 60:
+		var r := _try_build(rng, spec)
+		if not r.is_empty():
+			return r
+	return _fallback(spec)
+
+static func _try_build(rng: RandomNumberGenerator, spec: Dictionary) -> Dictionary:
 	var pool: Array = spec.get("pool", Data.FODDER)
 	var boss: String = spec.get("boss", "gargoyle")
 	var density: Array = spec.get("density", [1, 2])
 	var w := Data.MAP_W
 	var h := Data.MAP_H
 	var type := PackedInt32Array()
-	type.resize(w * h)            # defaults to 0 == WALL
+	type.resize(w * h)
+	type.fill(Data.FLOOR)          # the whole interior starts as corridor
 	var room := PackedInt32Array()
 	room.resize(w * h)
-	room.fill(-1)                 # -1 == corridor / none
+	room.fill(-1)
 	var map := {"w": w, "h": h, "type": type, "room": room, "rooms": [], "start": Vector2i.ZERO, "exit": Vector2i.ZERO}
 
-	# --- Place non-overlapping rooms (with a 1-tile margin). ---
+	# Outer wall.
+	for x in w:
+		type[Grid.idx(map, x, 0)] = Data.WALL
+		type[Grid.idx(map, x, h - 1)] = Data.WALL
+	for y in h:
+		type[Grid.idx(map, 0, y)] = Data.WALL
+		type[Grid.idx(map, w - 1, y)] = Data.WALL
+
+	# Place rooms with a margin so corridor lanes run between them.
 	var rooms: Array = []
-	var max_rooms := 8
-	var attempt := 0
-	while attempt < 80 and rooms.size() < max_rooms:
-		attempt += 1
+	var tries := 0
+	while tries < 70 and rooms.size() < 7:
+		tries += 1
 		var rw := rng.randi_range(4, 6)
-		var rh := rng.randi_range(4, 6)
-		var rx := rng.randi_range(1, w - rw - 2)
-		var ry := rng.randi_range(1, h - rh - 2)
-		var overlaps := false
+		var rh := rng.randi_range(3, 5)
+		var rx := rng.randi_range(2, w - rw - 3)
+		var ry := rng.randi_range(2, h - rh - 3)
+		var bad := false
 		for r in rooms:
-			if rx <= r.x + r.w and rx + rw >= r.x - 1 and ry <= r.y + r.h and ry + rh >= r.y - 1:
-				overlaps = true
+			if rx < r.x + r.w + 2 and r.x < rx + rw + 2 and ry < r.y + r.h + 2 and r.y < ry + rh + 2:
+				bad = true
 				break
-		if overlaps:
+		if bad:
 			continue
 		var id := rooms.size()
-		var rm := {"id": id, "x": rx, "y": ry, "w": rw, "h": rh, "cx": int(rx + rw / 2.0), "cy": int(ry + rh / 2.0)}
-		rooms.append(rm)
-		for y in range(ry, ry + rh):
-			for x in range(rx, rx + rw):
-				type[Grid.idx(map, x, y)] = Data.FLOOR
-				room[Grid.idx(map, x, y)] = id
+		rooms.append({"id": id, "x": rx, "y": ry, "w": rw, "h": rh, "cx": int(rx + rw / 2.0), "cy": int(ry + rh / 2.0)})
+		for yy in range(ry, ry + rh):
+			for xx in range(rx, rx + rw):
+				type[Grid.idx(map, xx, yy)] = Data.FLOOR
+				room[Grid.idx(map, xx, yy)] = id
 	map.rooms = rooms
+	if rooms.size() < 3:
+		return {}
 
-	# --- Carve corridors: chain the rooms (guarantees connectivity) + loops.
-	for i in range(1, rooms.size()):
-		_tunnel(map, rng, rooms[i - 1], rooms[i])
-	var extra := clampi(rooms.size() - 2, 0, 2)
-	for i in extra:
-		var a = rooms[rng.randi_range(0, rooms.size() - 1)]
-		var b = rooms[rng.randi_range(0, rooms.size() - 1)]
-		if a != b:
-			_tunnel(map, rng, a, b)
+	# Outline each room with walls (only over corridor, never another room).
+	for r in rooms:
+		for xx in range(r.x - 1, r.x + r.w + 1):
+			_wallify(map, xx, r.y - 1)
+			_wallify(map, xx, r.y + r.h)
+		for yy in range(r.y - 1, r.y + r.h + 1):
+			_wallify(map, r.x - 1, yy)
+			_wallify(map, r.x + r.w, yy)
 
-	# --- Doors: room-edge floor tiles that touch a corridor become doors.
-	for y in h:
-		for x in w:
-			var rid := room[Grid.idx(map, x, y)]
-			if rid < 0 or type[Grid.idx(map, x, y)] != Data.FLOOR:
-				continue
-			for d in Grid.DIRS:
-				var nx: int = x + d.x
-				var ny: int = y + d.y
-				if not Grid.in_bounds(map, nx, ny):
-					continue
-				if type[Grid.idx(map, nx, ny)] != Data.WALL and room[Grid.idx(map, nx, ny)] == -1:
-					type[Grid.idx(map, x, y)] = Data.DOOR
-					break
+	# Carve 1-2 doors per room from its wall into the corridor.
+	for r in rooms:
+		var cands := _door_candidates(map, r)
+		_shuffle(cands, rng)
+		if cands.is_empty():
+			return {}   # sealed room -> reject layout
+		var n: int = min(rng.randi_range(1, 2), cands.size())
+		for i in n:
+			type[Grid.idx(map, cands[i].x, cands[i].y)] = Data.DOOR
 
-	# --- Start room = first; exit = centre of the farthest room.
-	var start_room = rooms[0]
-	var exit_room = rooms[rooms.size() - 1]
+	# Start: a corridor tile near the top-left; party fans out around it.
+	var start := Vector2i(-1, -1)
+	for y in range(1, h - 1):
+		for x in range(1, w - 1):
+			if type[Grid.idx(map, x, y)] == Data.FLOOR and room[Grid.idx(map, x, y)] == -1:
+				start = Vector2i(x, y)
+				break
+		if start.x != -1:
+			break
+	if start.x == -1:
+		return {}
+	map.start = start
+
+	# Exit: centre of the room farthest from the start.
+	var exit_room = rooms[0]
 	var best := -1
 	for r in rooms:
-		var dd: int = abs(r.cx - start_room.cx) + abs(r.cy - start_room.cy)
-		if dd > best:
-			best = dd
+		var d: int = abs(r.cx - start.x) + abs(r.cy - start.y)
+		if d > best:
+			best = d
 			exit_room = r
-	map.start = Vector2i(start_room.cx, start_room.cy)
 	map.exit = Vector2i(exit_room.cx, exit_room.cy)
 
-	var start_tiles := _room_floor_tiles(map, start_room).filter(
-		func(t): return type[Grid.idx(map, t.x, t.y)] == Data.FLOOR)
+	# Verify everything is reachable on foot before committing.
+	var seen := Grid.bfs(map, start, Grid.HUGE, {})
+	if not seen.has(map.exit):
+		return {}
+	for r in rooms:
+		var reached := false
+		for yy in range(r.y, r.y + r.h):
+			for xx in range(r.x, r.x + r.w):
+				if seen.has(Vector2i(xx, yy)):
+					reached = true
+					break
+			if reached:
+				break
+		if not reached:
+			return {}
 
-	# --- Monster spawns: fodder in ordinary rooms, a boss guarding the exit.
+	# Party start tiles (corridor squares around the start).
+	var start_tiles: Array = [start]
+	for d in Grid.DIRS + [Vector2i(1, 1), Vector2i(-1, 1)]:
+		var n: Vector2i = start + d
+		if Grid.is_walkable(map, n.x, n.y) and not start_tiles.has(n):
+			start_tiles.append(n)
+		if start_tiles.size() >= 4:
+			break
+
+	# Monsters: fodder in rooms, boss in the exit room. Reachability already checked.
 	var monster_spawns: Array = []
 	for r in rooms:
-		if r.id == start_room.id:
-			continue
-		var tiles := _room_floor_tiles(map, r).filter(
-			func(t): return type[Grid.idx(map, t.x, t.y)] == Data.FLOOR and t != map.exit)
+		var tiles := _room_floor_tiles(map, r).filter(func(t): return t != map.exit and seen.has(t))
 		_shuffle(tiles, rng)
 		var i := 0
 		if r.id == exit_room.id and boss != "" and tiles.size() > 0:
@@ -102,79 +144,72 @@ static func generate(rng: RandomNumberGenerator, spec: Dictionary = {}) -> Dicti
 			placed += 1
 			i += 1
 
-	# --- Hidden traps on corridor tiles (avoid start/exit/monster tiles). ---
+	# Hidden traps on corridor tiles away from the start.
 	var occupied := {}
 	for s in monster_spawns:
 		occupied[Vector2i(s.x, s.y)] = true
-	occupied[map.start] = true
-	occupied[map.exit] = true
-	var corridor_tiles: Array = []
-	for y in h:
-		for x in w:
-			if type[Grid.idx(map, x, y)] == Data.FLOOR and room[Grid.idx(map, x, y)] == -1:
-				if not occupied.has(Vector2i(x, y)):
-					corridor_tiles.append(Vector2i(x, y))
-	_shuffle(corridor_tiles, rng)
-	var traps: Array = []
-	var trap_count: int = clampi(rooms.size(), 2, 5)
-	for i in range(min(trap_count, corridor_tiles.size())):
-		var t: Vector2i = corridor_tiles[i]
-		var kind := "pit" if rng.randf() < 0.5 else "spear"
-		traps.append({"x": t.x, "y": t.y, "kind": kind, "found": false, "sprung": false})
-
-	# --- Secret doors: wall tiles separating two different rooms. Optional
-	# shortcuts, so they never block the main path. Stored as type WALL until
-	# found; movement/render consult the secret list.
-	var secret_candidates: Array = []
+	for st in start_tiles:
+		occupied[st] = true
+	var corridor: Array = []
 	for y in range(1, h - 1):
 		for x in range(1, w - 1):
-			if type[Grid.idx(map, x, y)] != Data.WALL:
-				continue
-			var rl := room[Grid.idx(map, x - 1, y)]
-			var rr := room[Grid.idx(map, x + 1, y)]
-			var ru := room[Grid.idx(map, x, y - 1)]
-			var rd := room[Grid.idx(map, x, y + 1)]
-			var horiz := type[Grid.idx(map, x - 1, y)] != Data.WALL and type[Grid.idx(map, x + 1, y)] != Data.WALL and rl >= 0 and rr >= 0 and rl != rr
-			var vert := type[Grid.idx(map, x, y - 1)] != Data.WALL and type[Grid.idx(map, x, y + 1)] != Data.WALL and ru >= 0 and rd >= 0 and ru != rd
-			if horiz or vert:
-				secret_candidates.append(Vector2i(x, y))
+			var p := Vector2i(x, y)
+			if type[Grid.idx(map, x, y)] == Data.FLOOR and room[Grid.idx(map, x, y)] == -1 \
+				and not occupied.has(p) and Grid.manhattan(p, start) > 3:
+				corridor.append(p)
+	_shuffle(corridor, rng)
+	var traps: Array = []
+	for i in range(min(clampi(rooms.size(), 2, 5), corridor.size())):
+		var t: Vector2i = corridor[i]
+		traps.append({"x": t.x, "y": t.y, "kind": ("pit" if rng.randf() < 0.5 else "spear"), "found": false, "sprung": false})
+
+	# Secret doors: a wall tile that could be a hidden room entrance.
+	var secret_candidates: Array = []
+	for r in rooms:
+		for c in _door_candidates(map, r):
+			if type[Grid.idx(map, c.x, c.y)] == Data.WALL:
+				secret_candidates.append(c)
 	_shuffle(secret_candidates, rng)
 	var secret_doors: Array = []
 	for i in range(min(2, secret_candidates.size())):
-		var s: Vector2i = secret_candidates[i]
-		secret_doors.append({"x": s.x, "y": s.y, "found": false})
+		secret_doors.append({"x": secret_candidates[i].x, "y": secret_candidates[i].y, "found": false})
 
-	return {
-		"map": map, "start_tiles": start_tiles, "monster_spawns": monster_spawns,
-		"traps": traps, "secret_doors": secret_doors,
-	}
+	return {"map": map, "start_tiles": start_tiles, "monster_spawns": monster_spawns, "traps": traps, "secret_doors": secret_doors}
 
-static func _tunnel(map: Dictionary, rng: RandomNumberGenerator, a: Dictionary, b: Dictionary) -> void:
-	var x: int = a.cx
-	var y: int = a.cy
-	var horiz_first := rng.randf() < 0.5
-	_carve(map, x, y)
-	if horiz_first:
-		while x != b.cx:
-			x += 1 if x < b.cx else -1
-			_carve(map, x, y)
-		while y != b.cy:
-			y += 1 if y < b.cy else -1
-			_carve(map, x, y)
-	else:
-		while y != b.cy:
-			y += 1 if y < b.cy else -1
-			_carve(map, x, y)
-		while x != b.cx:
-			x += 1 if x < b.cx else -1
-			_carve(map, x, y)
+# Turn a corridor tile into a wall (never overwrite room floor or perimeter).
+static func _wallify(map: Dictionary, x: int, y: int) -> void:
+	if not Grid.in_bounds(map, x, y):
+		return
+	if map.type[Grid.idx(map, x, y)] == Data.FLOOR and map.room[Grid.idx(map, x, y)] == -1:
+		map.type[Grid.idx(map, x, y)] = Data.WALL
 
-static func _carve(map: Dictionary, x: int, y: int) -> void:
-	if map.type[Grid.idx(map, x, y)] == Data.WALL:
-		map.type[Grid.idx(map, x, y)] = Data.FLOOR  # corridor; room stays -1
+# Wall tiles on a room's edge with room-floor inside and corridor outside.
+static func _door_candidates(map: Dictionary, r: Dictionary) -> Array:
+	var out: Array = []
+	var edges: Array = []
+	for x in range(r.x, r.x + r.w):
+		edges.append(Vector2i(x, r.y - 1))
+		edges.append(Vector2i(x, r.y + r.h))
+	for y in range(r.y, r.y + r.h):
+		edges.append(Vector2i(r.x - 1, y))
+		edges.append(Vector2i(r.x + r.w, y))
+	for p in edges:
+		if not Grid.in_bounds(map, p.x, p.y) or map.type[Grid.idx(map, p.x, p.y)] != Data.WALL:
+			continue
+		for d in Grid.DIRS:
+			var inside: Vector2i = p - d
+			var outside: Vector2i = p + d
+			if not Grid.in_bounds(map, outside.x, outside.y):
+				continue
+			var inside_room: bool = Grid.in_bounds(map, inside.x, inside.y) and map.room[Grid.idx(map, inside.x, inside.y)] == r.id
+			var outside_corridor: bool = map.type[Grid.idx(map, outside.x, outside.y)] == Data.FLOOR and map.room[Grid.idx(map, outside.x, outside.y)] == -1
+			if inside_room and outside_corridor:
+				out.append(p)
+				break
+	return out
 
 static func _room_floor_tiles(map: Dictionary, r: Dictionary) -> Array:
-	var out: Array[Vector2i] = []
+	var out: Array = []
 	for y in range(r.y, r.y + r.h):
 		for x in range(r.x, r.x + r.w):
 			if map.type[Grid.idx(map, x, y)] != Data.WALL:
@@ -187,3 +222,26 @@ static func _shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
 		var tmp = arr[i]
 		arr[i] = arr[j]
 		arr[j] = tmp
+
+# Trivial guaranteed-connected board, only used if every attempt failed.
+static func _fallback(spec: Dictionary) -> Dictionary:
+	var w := Data.MAP_W
+	var h := Data.MAP_H
+	var type := PackedInt32Array()
+	type.resize(w * h)
+	type.fill(Data.FLOOR)
+	var room := PackedInt32Array()
+	room.resize(w * h)
+	room.fill(-1)
+	var map := {"w": w, "h": h, "type": type, "room": room, "rooms": [], "start": Vector2i(1, 1), "exit": Vector2i(w - 2, h - 2)}
+	for x in w:
+		type[Grid.idx(map, x, 0)] = Data.WALL
+		type[Grid.idx(map, x, h - 1)] = Data.WALL
+	for y in h:
+		type[Grid.idx(map, 0, y)] = Data.WALL
+		type[Grid.idx(map, w - 1, y)] = Data.WALL
+	var boss: String = spec.get("boss", "gargoyle")
+	var spawns: Array = []
+	if boss != "":
+		spawns.append({"type": boss, "x": w - 3, "y": h - 3})
+	return {"map": map, "start_tiles": [Vector2i(1, 1), Vector2i(2, 1), Vector2i(1, 2), Vector2i(2, 2)], "monster_spawns": spawns, "traps": [], "secret_doors": []}

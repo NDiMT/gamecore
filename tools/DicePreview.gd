@@ -11,12 +11,12 @@ func _ready() -> void:
 	_ov = DiceScript.new()
 	layer.add_child(_ov)
 	await get_tree().process_frame
-	_ov.enqueue({"kind": "move", "attacker": "Barbarian", "dice": [4, 3], "total": 7})
-	await get_tree().create_timer(1.5).timeout
-	await _shoot("res://dice_move_preview.png")
 	_ov.enqueue({"attacker": "Barbarian", "target": "Orc", "atk": ["skull", "skull", "white"], "def": ["black"], "damage": 2})
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.7).timeout
 	await _shoot("res://dice_combat_preview.png")
+	_ov.enqueue({"kind": "move", "attacker": "Barbarian", "dice": [4, 3], "total": 7})
+	await get_tree().create_timer(1.7).timeout
+	await _shoot("res://dice_move_preview.png")
 	get_tree().quit()
 func _shoot(path: String) -> void:
 	for i in 4:
