@@ -42,6 +42,88 @@ var MONSTERS := {
 }
 const FODDER := ["goblin", "goblin", "orc", "skeleton", "zombie"]
 
+# ---- Treasure deck ----------------------------------------------------------
+# Weighted outcomes when a hero searches a room for treasure. Original content.
+const TREASURE := [
+	{"kind": "gold", "min": 10, "max": 35, "weight": 5},
+	{"kind": "gold", "min": 40, "max": 90, "weight": 2},
+	{"kind": "potion", "weight": 3},
+	{"kind": "nothing", "weight": 3},
+	{"kind": "hazard", "damage": 1, "weight": 2},
+	{"kind": "wander", "weight": 2},
+]
+
+# ---- Equipment (bought between quests with gold) ----------------------------
+# `atk`/`def` are bonus combat dice; `slot` allows one weapon + one armour.
+const EQUIPMENT := [
+	{"id": "shortsword", "name": "Shortsword", "cost": 0, "atk": 1, "def": 0, "slot": "weapon"},
+	{"id": "broadsword", "name": "Broadsword", "cost": 250, "atk": 2, "def": 0, "slot": "weapon"},
+	{"id": "battleaxe", "name": "Battle Axe", "cost": 450, "atk": 3, "def": 0, "slot": "weapon"},
+	{"id": "crossbow", "name": "Crossbow", "cost": 350, "atk": 2, "def": 0, "slot": "weapon"},
+	{"id": "shield", "name": "Shield", "cost": 150, "atk": 0, "def": 1, "slot": "armour"},
+	{"id": "helmet", "name": "Helmet", "cost": 125, "atk": 0, "def": 1, "slot": "armour"},
+	{"id": "chainmail", "name": "Chain Mail", "cost": 500, "atk": 0, "def": 2, "slot": "armour"},
+	{"id": "toolkit", "name": "Tool Kit", "cost": 250, "atk": 0, "def": 0, "slot": "tool"},
+]
+
+# ---- Spell groups -----------------------------------------------------------
+# Four elemental groups, three spells each. Casters pick groups at the start.
+# kind: damage (no defence roll) / heal / shield (bonus defend dice next turn) /
+# rage (bonus attack dice this turn). Original spell names.
+var SPELL_GROUPS := {
+	"fire": {
+		"name": "Fire",
+		"spells": [
+			{"id": "fire_bolt", "name": "Fire Bolt", "kind": "damage", "power": 3},
+			{"id": "flame_wall", "name": "Wall of Flame", "kind": "damage", "power": 2},
+			{"id": "inner_fire", "name": "Inner Fire", "kind": "rage", "power": 2},
+		],
+	},
+	"water": {
+		"name": "Water",
+		"spells": [
+			{"id": "mend", "name": "Mending Tide", "kind": "heal", "power": 4},
+			{"id": "frost", "name": "Frost Spear", "kind": "damage", "power": 2},
+			{"id": "calm", "name": "Calm", "kind": "heal", "power": 2},
+		],
+	},
+	"earth": {
+		"name": "Earth",
+		"spells": [
+			{"id": "stone_skin", "name": "Stone Skin", "kind": "shield", "power": 2},
+			{"id": "rock_fall", "name": "Rockfall", "kind": "damage", "power": 2},
+			{"id": "heal_earth", "name": "Earthmend", "kind": "heal", "power": 3},
+		],
+	},
+	"air": {
+		"name": "Air",
+		"spells": [
+			{"id": "gust", "name": "Gust", "kind": "damage", "power": 2},
+			{"id": "swift", "name": "Swiftness", "kind": "rage", "power": 1},
+			{"id": "ward", "name": "Wind Ward", "kind": "shield", "power": 2},
+		],
+	},
+}
+const SPELL_GROUP_ORDER := ["fire", "water", "earth", "air"]
+
+# Build a hero's spell list from chosen group ids, each spell gets 1 charge.
+func spells_from_groups(group_ids: Array) -> Array:
+	var out: Array = []
+	for gid in group_ids:
+		if not SPELL_GROUPS.has(gid):
+			continue
+		for s in SPELL_GROUPS[gid].spells:
+			var spell: Dictionary = s.duplicate(true)
+			spell["charges"] = 1
+			out.append(spell)
+	return out
+
+# Trap kinds and their damage.
+const TRAPS := {
+	"pit": {"name": "Pit Trap", "damage": 1},
+	"spear": {"name": "Spear Trap", "damage": 1},
+}
+
 # ---- Spellbooks -------------------------------------------------------------
 # Returns a fresh, independent copy so each hero owns its own charges.
 func spellbook_for(cls: String) -> Array:

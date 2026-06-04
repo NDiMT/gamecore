@@ -36,7 +36,8 @@ static func run(gs: GameState) -> void:
 			target = _adjacent_hero(gs, m)
 
 		if target != null:
-			var r := Rules.resolve_attack(gs.rng, m.attack, target.defend, false)
+			var def_dice: int = target.defend + target.get("shield", 0)
+			var r := Rules.resolve_attack(gs.rng, m.attack, def_dice, false)
 			gs.record_roll(m.name, target.name, r)
 			gs.log_dice("%s attacks %s" % [m.name, target.name], r)
 			if r.damage > 0:

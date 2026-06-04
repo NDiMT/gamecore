@@ -14,21 +14,30 @@ func _init(_map: Dictionary, _rng: RandomNumberGenerator) -> void:
 	rng = _rng
 
 # ---- Host construction ------------------------------------------------------
-## `players` = [{ id:int, name:String, cls:String }]
-func start(players: Array, start_tiles: Array, monster_spawns: Array) -> Dictionary:
+## `players` = [{ id, name, cls, groups:Array, equipment:Array }]
+## `gen` = { start_tiles, monster_spawns, traps, secret_doors }
+func start(players: Array, gen: Dictionary) -> Dictionary:
+	var start_tiles: Array = gen.start_tiles
+	var monster_spawns: Array = gen.monster_spawns
 	var heroes: Array = []
 	for i in players.size():
 		var p = players[i]
 		var cls: Dictionary = Data.HERO_CLASSES[p.cls]
 		var tile: Vector2i = start_tiles[i % start_tiles.size()]
-		heroes.append({
+		var groups: Array = p.get("groups", _default_groups(p.cls))
+		var equip: Array = p.get("equipment", ["shortsword"])
+		var hero := {
 			"id": "h%d" % i, "owner": p.id, "cls": p.cls,
 			"name": p.name if p.name != "" else cls.name, "color": cls.color,
 			"x": tile.x, "y": tile.y,
 			"body": cls.body, "maxBody": cls.body, "mind": cls.mind,
+			"base_attack": cls.attack, "base_defend": cls.defend,
 			"attack": cls.attack, "defend": cls.defend, "alive": true,
-			"gold": 0, "potions": 0, "spells": Data.spellbook_for(p.cls),
-		})
+			"gold": p.get("gold", 0), "potions": 0, "equipment": equip.duplicate(),
+			"spells": Data.spells_from_groups(groups), "shield": 0, "rage_pending": 0,
+		}
+		_recompute_stats(hero)
+		heroes.append(hero)
 	var monsters: Array = []
 	for i in monster_spawns.size():
 		var s = monster_spawns[i]
@@ -45,14 +54,33 @@ func start(players: Array, start_tiles: Array, monster_spawns: Array) -> Diction
 		order.append(hh.id)
 	state = {
 		"phase": "playing", "heroes": heroes, "monsters": monsters,
-		"turn": {"order": order, "idx": 0, "movePoints": 0, "acted": false, "phase": "hero"},
+		"turn": {"order": order, "idx": 0, "movePoints": 0, "acted": false, "phase": "hero", "rage": 0},
 		"revealedRooms": [], "revealedCorridor": {}, "roomSearched": [],
 		"nextMonsterId": monsters.size(), "log": [],
 		"rollSeq": 0, "lastRoll": {},
+		"traps": gen.get("traps", []), "secret": gen.get("secret_doors", []),
 	}
 	reveal_around()
 	begin_hero_turn(0)
 	return state
+
+func _default_groups(cls: String) -> Array:
+	match cls:
+		"wizard": return ["fire", "water", "earth"]
+		"elf": return ["air"]
+		_: return []
+
+# Effective combat dice = base class dice + equipment bonuses.
+func _recompute_stats(hero: Dictionary) -> void:
+	var atk: int = hero.base_attack
+	var df: int = hero.base_defend
+	for id in hero.equipment:
+		for item in Data.EQUIPMENT:
+			if item.id == id:
+				atk += item["atk"]
+				df += item["def"]
+	hero.attack = atk
+	hero.defend = df
 
 # ---- Lookups ----------------------------------------------------------------
 func hero_by_id(id: String):
@@ -129,7 +157,11 @@ func begin_hero_turn(i: int) -> void:
 	t.phase = "hero"
 	t.acted = false
 	t.movePoints = Rules.roll_movement(rng)
-	log_line("%s's turn — moves %d" % [active_hero().name, t.movePoints], "sys")
+	var hero = active_hero()
+	t.rage = hero.get("rage_pending", 0)   # attack buff cast last turn
+	hero.rage_pending = 0
+	hero.shield = 0                          # defence buff lasted through the GM turn
+	log_line("%s's turn — moves %d" % [hero.name, t.movePoints], "sys")
 
 func advance_turn() -> void:
 	var order: Array = state.turn.order
@@ -167,18 +199,31 @@ func move_hero(peer_id: int, hero_id: String, x: int, y: int) -> bool:
 	if not can_control(peer_id, hero_id):
 		return false
 	var hero = active_hero()
-	var blocked := occupancy(hero.id)
+	var blocked := _blocked_set(hero.id)
 	var target := Vector2i(x, y)
 	if not Grid.is_walkable(map, x, y) or blocked.has(target):
 		return false
 	var seen := Grid.bfs(map, Vector2i(hero.x, hero.y), state.turn.movePoints, blocked)
 	if not seen.has(target) or seen[target].dist == 0:
 		return false
-	hero.x = x
-	hero.y = y
-	state.turn.movePoints -= seen[target].dist
+	# Walk the path; an undiscovered trap stops the hero where it springs.
+	var path := Grid.reconstruct(seen, target)
+	var steps := 0
+	var sprung := false
+	for tile in path:
+		hero.x = tile.x
+		hero.y = tile.y
+		steps += 1
+		var tr = _trap_at(tile.x, tile.y)
+		if tr != null and not tr.found:
+			_spring_trap(tr, hero)
+			sprung = true
+			break
+	state.turn.movePoints -= steps
+	if sprung:
+		state.turn.movePoints = 0
 	reveal_around()
-	if target == map.exit:
+	if hero.alive and not sprung and Vector2i(hero.x, hero.y) == map.exit:
 		state.phase = "won"
 		log_line("%s reaches the stairs. Victory!" % hero.name, "good")
 	return true
@@ -192,7 +237,9 @@ func attack(peer_id: int, hero_id: String, target_id: String) -> bool:
 		return false
 	if not Grid.is_adjacent(hero.x, hero.y, target.x, target.y):
 		return false
-	var r := Rules.resolve_attack(rng, hero.attack, target.defend, true)
+	var bonus: int = state.turn.get("rage", 0)
+	var r := Rules.resolve_attack(rng, hero.attack + bonus, target.defend, true)
+	state.turn.rage = 0
 	state.turn.acted = true
 	state.turn.movePoints = 0  # beginning the action phase forfeits movement
 	record_roll(hero.name, target.name, r)
@@ -242,6 +289,22 @@ func cast_spell(peer_id: int, hero_id: String, spell_id: String, target_id: Stri
 		target.body += healed
 		log_line("%s casts %s on %s (+%d body)" % [hero.name, spell.name, target.name, healed], "good")
 		return true
+
+	if spell.kind == "shield":
+		spell.charges -= 1
+		state.turn.acted = true
+		state.turn.movePoints = 0
+		hero.shield += spell.power
+		log_line("%s casts %s (+%d defend until next turn)" % [hero.name, spell.name, spell.power], "good")
+		return true
+
+	if spell.kind == "rage":
+		spell.charges -= 1
+		state.turn.acted = true
+		state.turn.movePoints = 0
+		hero.rage_pending += spell.power
+		log_line("%s casts %s (+%d attack next turn)" % [hero.name, spell.name, spell.power], "good")
+		return true
 	return false
 
 func search(peer_id: int, hero_id: String) -> bool:
@@ -260,20 +323,103 @@ func search(peer_id: int, hero_id: String) -> bool:
 	state.turn.acted = true
 	state.turn.movePoints = 0
 
-	var gold := rng.randi_range(1, 5) * 5
-	hero.gold += gold
-	var msg := "%s searches and finds %d gold" % [hero.name, gold]
-	if rng.randf() < 0.35:
-		hero.potions += 1
-		msg += " and a healing potion"
-	log_line(msg, "good")
-
-	if rng.randf() < 0.25:
-		var spot := _free_adjacent(hero.x, hero.y)
-		if spot != Vector2i(-1, -1):
-			_spawn_monster("goblin", spot.x, spot.y)
-			log_line("A wandering Goblin appears, drawn by the commotion!", "hit")
+	# Reveal nearby hidden traps.
+	for tr in state.traps:
+		if not tr.found and Grid.chebyshev(Vector2i(hero.x, hero.y), Vector2i(tr.x, tr.y)) <= 5:
+			tr.found = true
+			log_line("%s spots a %s!" % [hero.name, Data.TRAPS[tr.kind].name], "sys")
+	# Reveal secret doors bordering this room (host opens them in its map copy).
+	for sd in state.secret:
+		if sd.found:
+			continue
+		for d in Grid.DIRS:
+			if room_at(sd.x + d.x, sd.y + d.y) == room:
+				sd.found = true
+				map.type[Grid.idx(map, sd.x, sd.y)] = Data.DOOR
+				log_line("%s discovers a secret door!" % hero.name, "sys")
+				break
+	# Draw treasure.
+	_draw_treasure(hero)
 	return true
+
+# Weighted draw from the treasure table.
+func _draw_treasure(hero: Dictionary) -> void:
+	var total := 0
+	for o in Data.TREASURE:
+		total += o.weight
+	var roll := rng.randf() * total
+	var pick = Data.TREASURE[0]
+	for o in Data.TREASURE:
+		roll -= o.weight
+		if roll <= 0:
+			pick = o
+			break
+	match pick.kind:
+		"gold":
+			var g := rng.randi_range(pick.min, pick.max)
+			hero.gold += g
+			log_line("%s finds %d gold!" % [hero.name, g], "good")
+		"potion":
+			hero.potions += 1
+			log_line("%s finds a healing potion!" % hero.name, "good")
+		"hazard":
+			hero.body -= pick.damage
+			log_line("%s triggers a hidden hazard (-%d body)!" % [hero.name, pick.damage], "hit")
+			_check_hero_death(hero)
+		"wander":
+			var spot := _free_adjacent(hero.x, hero.y)
+			if spot != Vector2i(-1, -1):
+				_spawn_monster("goblin", spot.x, spot.y)
+				log_line("A wandering Goblin appears!", "hit")
+			else:
+				log_line("%s finds nothing." % hero.name, "")
+		_:
+			log_line("%s finds nothing of value." % hero.name, "")
+
+func _check_hero_death(hero: Dictionary) -> void:
+	if hero.body <= 0:
+		hero.body = 0
+		hero.alive = false
+		log_line("%s has fallen!" % hero.name, "hit")
+		if alive_heroes().is_empty():
+			state.phase = "lost"
+			log_line("The whole party has perished. Defeat.", "hit")
+
+# Disarm an adjacent, discovered trap (costs the action).
+func disarm(peer_id: int, hero_id: String) -> bool:
+	if not can_control(peer_id, hero_id) or state.turn.acted:
+		return false
+	var hero = active_hero()
+	for tr in state.traps:
+		if tr.found and not tr.sprung and not tr.get("disarmed", false) and Grid.is_adjacent(hero.x, hero.y, tr.x, tr.y):
+			tr["disarmed"] = true
+			state.turn.acted = true
+			state.turn.movePoints = 0
+			log_line("%s disarms the %s." % [hero.name, Data.TRAPS[tr.kind].name], "good")
+			return true
+	return false
+
+func _trap_at(x: int, y: int):
+	for tr in state.traps:
+		if tr.x == x and tr.y == y and not tr.sprung and not tr.get("disarmed", false):
+			return tr
+	return null
+
+func _spring_trap(tr: Dictionary, hero: Dictionary) -> void:
+	tr.sprung = true
+	tr.found = true
+	var dmg: int = Data.TRAPS[tr.kind].damage
+	hero.body -= dmg
+	log_line("%s springs a %s (-%d body)!" % [hero.name, Data.TRAPS[tr.kind].name, dmg], "hit")
+	_check_hero_death(hero)
+
+# Occupancy plus discovered (still-armed) traps, which block pathing.
+func _blocked_set(except_id: String) -> Dictionary:
+	var s := occupancy(except_id)
+	for tr in state.traps:
+		if tr.found and not tr.sprung and not tr.get("disarmed", false):
+			s[Vector2i(tr.x, tr.y)] = true
+	return s
 
 func drink_potion(peer_id: int, hero_id: String) -> bool:
 	# A free action — does not consume the turn's main action.

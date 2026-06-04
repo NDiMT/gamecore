@@ -5,6 +5,7 @@ extends Control
 
 signal end_pressed(hero_id: String)
 signal search_pressed(hero_id: String)
+signal disarm_pressed(hero_id: String)
 signal drink_pressed(hero_id: String)
 signal spell_pressed(hero_id: String, spell_id: String)
 
@@ -115,6 +116,19 @@ func _rebuild_actions(snap: Dictionary, active, my_turn: bool, pending) -> void:
 		sb.disabled = acted or not searchable
 		sb.pressed.connect(func(): search_pressed.emit(active.id))
 		_actions.add_child(sb)
+
+	# Disarm: shown when standing next to a discovered, still-armed trap.
+	var can_disarm := false
+	for tr in snap.get("traps", []):
+		if tr.found and not tr.sprung and not tr.get("disarmed", false) and Grid.is_adjacent(active.x, active.y, tr.x, tr.y):
+			can_disarm = true
+			break
+	if can_disarm:
+		var tb := Button.new()
+		tb.text = "Disarm trap"
+		tb.disabled = acted
+		tb.pressed.connect(func(): disarm_pressed.emit(active.id))
+		_actions.add_child(tb)
 
 	if active.potions > 0:
 		var db := Button.new()

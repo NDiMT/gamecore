@@ -14,6 +14,7 @@ var tile_meshes := {}   # Vector2i -> MeshInstance3D (floor/door)
 var wall_meshes := {}   # Vector2i -> MeshInstance3D
 var _highlighted: Array[Vector2i] = []
 var exit_portal: MeshInstance3D
+var trap_markers := {}   # Vector2i -> MeshInstance3D
 
 static func world_from_tile(x: int, y: int) -> Vector3:
 	return Vector3(x * Data.TILE + Data.TILE * 0.5, 0.0, y * Data.TILE + Data.TILE * 0.5)
@@ -100,3 +101,55 @@ func set_reachable(tiles: Array) -> void:
 			mat.emission = REACH_COLOR
 			mat.emission_energy_multiplier = 0.5
 			_highlighted.append(t)
+
+# Show discovered/sprung traps that sit on a revealed tile.
+func update_traps(snap: Dictionary) -> void:
+	for tr in snap.get("traps", []):
+		var key := Vector2i(tr.x, tr.y)
+		var shown: bool = (tr.found or tr.sprung) and Vis.tile_revealed(map, snap, tr.x, tr.y)
+		if not shown:
+			if trap_markers.has(key):
+				trap_markers[key].visible = false
+			continue
+		if not trap_markers.has(key):
+			var disc := CylinderMesh.new()
+			disc.top_radius = 0.3
+			disc.bottom_radius = 0.3
+			disc.height = 0.05
+			var mi := MeshInstance3D.new()
+			mi.mesh = disc
+			mi.material_override = StandardMaterial3D.new()
+			mi.position = world_from_tile(tr.x, tr.y) + Vector3(0, 0.14, 0)
+			add_child(mi)
+			trap_markers[key] = mi
+		var m: MeshInstance3D = trap_markers[key]
+		var mat: StandardMaterial3D = m.material_override
+		if tr.get("disarmed", false):
+			mat.albedo_color = Color("4caf6f")
+			mat.emission_enabled = false
+		else:
+			mat.albedo_color = Color("e0552f") if tr.kind == "spear" else Color("201a2c")
+			mat.emission_enabled = true
+			mat.emission = Color("ff5a3c")
+			mat.emission_energy_multiplier = 0.0 if tr.sprung else 0.8
+		m.visible = true
+
+# Convert a discovered secret-door wall tile into a passable door tile.
+func reveal_secret(x: int, y: int) -> void:
+	var key := Vector2i(x, y)
+	if wall_meshes.has(key):
+		wall_meshes[key].visible = false
+	if tile_meshes.has(key):
+		return
+	var tile_mesh := BoxMesh.new()
+	tile_mesh.size = Vector3(Data.TILE * 0.97, 0.12, Data.TILE * 0.97)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = DOOR_COLOR
+	mat.roughness = 0.9
+	var mi := MeshInstance3D.new()
+	mi.mesh = tile_mesh
+	mi.material_override = mat
+	mi.position = world_from_tile(x, y)
+	mi.visible = true
+	add_child(mi)
+	tile_meshes[key] = mi

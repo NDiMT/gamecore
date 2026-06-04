@@ -10,6 +10,7 @@ const LobbyScript := preload("res://scripts/ui/Lobby.gd")
 const HUDScript := preload("res://scripts/ui/HUD.gd")
 const LogScript := preload("res://scripts/ui/Log.gd")
 const DiceScript := preload("res://scripts/ui/DiceOverlay.gd")
+const ShopScript := preload("res://scripts/ui/Shop.gd")
 
 var is_host := false
 var my_id := 1
@@ -42,7 +43,11 @@ var lobby
 var hud
 var log_ui
 var dice_overlay
+var shop_ui
 var _last_roll_seq := 0
+var _applied_secrets := {}
+var _quest_index := 0
+var _in_shop := false
 var _toast: Label
 var _toast_root: Control
 
@@ -102,6 +107,7 @@ func _setup_ui() -> void:
 	layer.add_child(hud)
 	hud.end_pressed.connect(_on_end_pressed)
 	hud.search_pressed.connect(func(id): _send_intent({"t": "search", "heroId": id}))
+	hud.disarm_pressed.connect(func(id): _send_intent({"t": "disarm", "heroId": id}))
 	hud.drink_pressed.connect(func(id): _send_intent({"t": "drink", "heroId": id}))
 	hud.spell_pressed.connect(_on_spell_pressed)
 
@@ -112,6 +118,12 @@ func _setup_ui() -> void:
 	dice_overlay = DiceScript.new()
 	dice_overlay.theme = theme
 	layer.add_child(dice_overlay)
+
+	shop_ui = ShopScript.new()
+	shop_ui.theme = theme
+	layer.add_child(shop_ui)
+	shop_ui.buy_requested.connect(func(item): _send_intent({"t": "buy", "item": item}))
+	shop_ui.continue_requested.connect(_begin_next_quest)
 
 	# Centred win/lose toast.
 	_toast_root = Control.new()
@@ -141,6 +153,7 @@ func _connect_net() -> void:
 	Net.lobby_received.connect(func(p): lobby.set_players(p, my_id))
 	Net.init_received.connect(_build_game)
 	Net.state_received.connect(_apply_snapshot)
+	Net.shop_received.connect(_on_shop_received)
 
 # ---- Camera -----------------------------------------------------------------
 func _update_camera() -> void:
@@ -247,15 +260,16 @@ func _on_connected_to_host() -> void:
 	lobby.show_room(false, "Connected. Pick your hero.")
 	Net.say_hello(my_name)
 
-func _on_pick_requested(cls: String) -> void:
+func _on_pick_requested(cls: String, groups: Array) -> void:
 	if is_host:
 		var taken := _class_taken_by_other(cls, my_id)
 		for p in players:
 			if p.id == my_id and not taken:
 				p.cls = cls
+				p.groups = groups
 		_push_lobby()
 	else:
-		Net.send_pick(cls, my_name)
+		Net.send_pick(cls, my_name, groups)
 
 func _on_hello(id: int, name: String) -> void:
 	if gs != null:
@@ -268,13 +282,14 @@ func _on_hello(id: int, name: String) -> void:
 	players.append({"id": id, "name": name, "cls": null})
 	_push_lobby()
 
-func _on_pick_remote(id: int, cls: String, name: String) -> void:
+func _on_pick_remote(id: int, cls: String, name: String, groups: Array) -> void:
 	for p in players:
 		if p.id == id:
 			if name != "":
 				p.name = name
 			if not _class_taken_by_other(cls, id):
 				p.cls = cls
+				p.groups = groups
 	_push_lobby()
 
 func _class_taken_by_other(cls: String, owner_id: int) -> bool:
@@ -303,17 +318,106 @@ func _on_peer_left(id: int) -> void:
 func _on_start_requested() -> void:
 	if not is_host:
 		return
-	var ready := players.filter(func(p): return p.cls != null and p.cls != "")
-	if ready.is_empty():
+	if players.filter(func(p): return p.cls != null and p.cls != "").is_empty():
 		return
+	# Seed persistent carry-over fields used across the campaign.
+	for p in players:
+		if not p.has("gold"):
+			p["gold"] = 0
+		if not p.has("equipment"):
+			p["equipment"] = ["shortsword"]
+	_quest_index = 0
+	_in_shop = false
+	_start_quest(_quest_index)
+
+func _start_quest(index: int) -> void:
+	var q := Quests.get_quest(index)
 	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var gen := MapGen.generate(rng)
+	rng.seed = q.seed
+	var gen := MapGen.generate(rng, q.spec)
 	gs = GameState.new(gen.map, rng)
-	gs.start(ready, gen.start_tiles, gen.monster_spawns)
+	gs.start(_ready_carry(), gen)
+	gs.log_line("Quest %d — %s" % [index + 1, q.title], "sys")
+	gs.log_line(q.intro, "sys")
 	Net.broadcast_init(gen.map)
 	_build_game(gen.map)
 	_broadcast_state()
+
+func _ready_carry() -> Array:
+	var out: Array = []
+	for p in players:
+		if p.cls == null or p.cls == "":
+			continue
+		out.append({
+			"id": p.id, "name": p.name, "cls": p.cls, "groups": p.get("groups", []),
+			"gold": p.get("gold", 0), "equipment": p.get("equipment", ["shortsword"]),
+		})
+	return out
+
+func _begin_next_quest() -> void:
+	if not is_host or not _in_shop or _quest_index >= Quests.count() - 1:
+		return
+	_quest_index += 1
+	_in_shop = false
+	shop_ui.visible = false
+	_start_quest(_quest_index)
+
+func _on_quest_won() -> void:
+	_in_shop = true
+	for h in snap.heroes:
+		for p in players:
+			if p.id == h.owner:
+				p["gold"] = h.gold
+				p["equipment"] = h.equipment.duplicate()
+	var shop := _make_shop()
+	Net.broadcast_shop(shop)
+	_on_shop_received(shop)
+
+func _make_shop() -> Dictionary:
+	var done := _quest_index >= Quests.count() - 1
+	var pl: Array = []
+	for p in players:
+		if p.cls == null or p.cls == "":
+			continue
+		pl.append({"id": p.id, "name": p.name, "cls": p.cls, "gold": p.get("gold", 0), "equipment": p.get("equipment", [])})
+	var next_title := "" if done else String(Quests.get_quest(_quest_index + 1).title)
+	return {"players": pl, "next_title": next_title, "done": done}
+
+func _on_shop_received(shop: Dictionary) -> void:
+	hud.visible = false
+	log_ui.visible = false
+	dice_overlay.visible = false
+	shop_ui.show_shop(shop, my_id, is_host)
+
+func _shop_buy(from: int, item_id: String) -> void:
+	if not is_host or not _in_shop:
+		return
+	var item = _find_item(item_id)
+	if item == null:
+		return
+	for p in players:
+		if p.id == from and p.get("gold", 0) >= item.cost:
+			p["gold"] = p.get("gold", 0) - item.cost
+			var eq: Array = p.get("equipment", []).duplicate()
+			if item.slot != "tool":
+				eq = eq.filter(func(e): return _slot_of(e) != item.slot)
+			if not eq.has(item.id):
+				eq.append(item.id)
+			p["equipment"] = eq
+			var shop := _make_shop()
+			Net.broadcast_shop(shop)
+			_on_shop_received(shop)
+			return
+
+func _find_item(id: String):
+	for item in Data.EQUIPMENT:
+		if item.id == id:
+			return item
+	return null
+
+func _slot_of(id: String) -> String:
+	var item = _find_item(id)
+	return item.slot if item != null else ""
 
 func _broadcast_state() -> void:
 	var s := gs.snapshot()
@@ -323,6 +427,13 @@ func _broadcast_state() -> void:
 # ---- Build the 3D view (host and client) ------------------------------------
 func _build_game(_map: Dictionary) -> void:
 	map = _map
+	# Tear down any previous quest's board before building the new one.
+	if board != null:
+		board.queue_free()
+	if tokens != null:
+		tokens.queue_free()
+	_applied_secrets = {}
+	_last_roll_seq = 0
 	board = BoardScript.new()
 	add_child(board)
 	board.build(map)
@@ -336,6 +447,7 @@ func _build_game(_map: Dictionary) -> void:
 	_update_camera()
 
 	lobby.visible = false
+	shop_ui.visible = false
 	hud.map = map
 	hud.visible = true
 	log_ui.visible = true
@@ -346,6 +458,14 @@ func _apply_snapshot(s: Dictionary) -> void:
 	if pending_spell != null and not _can_cast_pending():
 		pending_spell = null
 	board.update_fog(snap)
+	# Reconcile newly-discovered secret doors into the local map + view.
+	for sd in snap.get("secret", []):
+		var key := Vector2i(sd.x, sd.y)
+		if sd.found and not _applied_secrets.has(key):
+			_applied_secrets[key] = true
+			map.type[Grid.idx(map, sd.x, sd.y)] = Data.DOOR
+			board.reveal_secret(sd.x, sd.y)
+	board.update_traps(snap)
 	tokens.sync(snap)
 	hud.update_view(snap, my_id, {"pending_spell": pending_spell})
 	log_ui.update_view(snap)
@@ -355,6 +475,9 @@ func _apply_snapshot(s: Dictionary) -> void:
 		dice_overlay.play(snap.lastRoll)
 	_update_reachable()
 	_check_end(snap)
+	# Host drives the between-quest shop when a quest is cleared.
+	if is_host and snap.phase == "won" and not _in_shop:
+		_on_quest_won()
 
 func _active_hero_for_me():
 	if snap.is_empty() or snap.phase != "playing":
@@ -460,6 +583,11 @@ func _on_spell_pressed(hero_id: String, spell_id: String) -> void:
 			break
 	if spell == null or spell.charges <= 0:
 		return
+	# Self-buff spells need no target — cast immediately.
+	if spell.kind == "shield" or spell.kind == "rage":
+		pending_spell = null
+		_send_intent({"t": "cast", "heroId": hero.id, "spellId": spell.id, "targetId": hero.id})
+		return
 	pending_spell = null if (pending_spell != null and pending_spell.id == spell_id) else spell
 	hud.update_view(snap, my_id, {"pending_spell": pending_spell})
 
@@ -475,6 +603,9 @@ func _send_intent(action: Dictionary) -> void:
 		Net.send_intent(action)
 
 func _apply_intent(from: int, action: Dictionary) -> void:
+	if action.t == "buy":
+		_shop_buy(from, action.item)
+		return
 	if gs == null:
 		return
 	var changed := false
@@ -487,6 +618,8 @@ func _apply_intent(from: int, action: Dictionary) -> void:
 			changed = gs.cast_spell(from, action.heroId, action.spellId, action.targetId)
 		"search":
 			changed = gs.search(from, action.heroId)
+		"disarm":
+			changed = gs.disarm(from, action.heroId)
 		"drink":
 			changed = gs.drink_potion(from, action.heroId)
 		"end":
@@ -496,12 +629,8 @@ func _apply_intent(from: int, action: Dictionary) -> void:
 
 # ---- End states -------------------------------------------------------------
 func _check_end(s: Dictionary) -> void:
-	if s.phase == "won":
-		var gold := 0
-		for h in s.heroes:
-			gold += h.gold
-		_show_toast("🏆 Victory!  %d gold looted" % gold)
-	elif s.phase == "lost":
+	# Victory is handled by the between-quest shop flow (see _on_quest_won).
+	if s.phase == "lost":
 		_show_toast("💀 Defeat")
 	else:
 		_toast_root.visible = false

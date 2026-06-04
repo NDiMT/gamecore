@@ -30,7 +30,7 @@ func _test_full_game() -> void:
 	gs.start([
 		{"id": 1, "name": "Conan", "cls": "barbarian"},
 		{"id": 2, "name": "Gimli", "cls": "dwarf"},
-	], gen.start_tiles, gen.monster_spawns)
+	], gen)
 	print("Started: heroes=%d monsters=%d" % [gs.state.heroes.size(), gs.state.monsters.size()])
 
 	var guard := 0
@@ -61,26 +61,32 @@ func _test_spells_and_search() -> void:
 	rng.seed = 3
 	var gen := MapGen.generate(rng)
 	var gs := GameState.new(gen.map, rng)
-	gs.start([{"id": 1, "name": "Merlin", "cls": "wizard"}], gen.start_tiles, gen.monster_spawns)
+	gs.start([{"id": 1, "name": "Merlin", "cls": "wizard"}], gen)
 	var wiz = gs.state.heroes[0]
+	assert(wiz.spells.size() == 9, "wizard should have 3 groups x 3 spells")
 
 	assert(gs.search(1, wiz.id), "search should succeed in start room")
-	assert(wiz.gold > 0, "search should grant gold")
 	assert(not gs.search(1, wiz.id), "second search same room should fail")
 
-	# Heal: damage then cast heal on self.
+	# Heal: damage then cast a heal spell on self.
 	wiz.body = 1
 	gs.state.turn.acted = false
-	assert(gs.cast_spell(1, wiz.id, "heal", wiz.id), "heal should succeed")
+	assert(gs.cast_spell(1, wiz.id, "mend", wiz.id), "heal should succeed")
 	assert(wiz.body == wiz.maxBody, "heal should cap at maxBody")
 
-	# Fireball a revealed monster.
+	# Damage spell on a revealed monster.
 	var mon = gs.state.monsters[0]
 	if not gs.state.revealedRooms.has(gs.room_at(mon.x, mon.y)):
 		gs.state.revealedRooms.append(gs.room_at(mon.x, mon.y))
 	gs.state.turn.acted = false
-	assert(gs.cast_spell(1, wiz.id, "fireball", mon.id), "fireball should succeed")
+	assert(gs.cast_spell(1, wiz.id, "fire_bolt", mon.id), "damage spell should succeed")
+
+	# Self-buff spells need no target.
+	gs.state.turn.acted = false
+	assert(gs.cast_spell(1, wiz.id, "stone_skin", wiz.id), "shield spell should succeed")
+	assert(wiz.shield > 0, "shield should raise defend")
 
 	# Ownership guard: a different peer can't act.
 	assert(not gs.search(2, wiz.id), "wrong owner must be rejected")
+	print("Spells: wizard has %d spells; buffs/heal/damage OK" % wiz.spells.size())
 	print("Spells/search/ownership OK")

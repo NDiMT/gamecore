@@ -63,7 +63,15 @@ HeroQuest combat dice: 3 skulls, 2 white shields, 1 black shield per die.
 Attackers count skulls; defending **heroes block with white shields**, defending
 **monsters block with black shields**. Damage = skulls − shields.
 
-### Spells, treasure & potions
+### Campaign, shop & progression
+
+A short authored **campaign** of escalating quests (The Goblin Warren → Crypt of
+Bones → Halls of Chaos → The Gargoyle's Lair). Clear a quest to reach the
+between-quest **armoury**, where each hero spends looted **gold** on weapons and
+armour (extra attack/defend dice) that carry into the next quest. The host
+begins the next quest when the party is ready.
+
+### Spells, treasure, traps & secrets
 
 - **Spells** — Wizard and Elf have spellbooks with limited charges. Click a
   spell to arm it, then click a target: damage spells hit a visible monster (no

@@ -3,7 +3,11 @@ class_name MapGen
 ## width-1 corridors, with doors where a corridor meets a room edge. Runs only
 ## on the host. Returns { map, start_tiles:Array[Vector2i], monster_spawns:Array }.
 
-static func generate(rng: RandomNumberGenerator) -> Dictionary:
+## `spec` may carry: pool (monster id Array), boss (id or ""), density ([min,max]).
+static func generate(rng: RandomNumberGenerator, spec: Dictionary = {}) -> Dictionary:
+	var pool: Array = spec.get("pool", Data.FODDER)
+	var boss: String = spec.get("boss", "gargoyle")
+	var density: Array = spec.get("density", [1, 2])
 	var w := Data.MAP_W
 	var h := Data.MAP_H
 	var type := PackedInt32Array()
@@ -88,17 +92,62 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 			func(t): return type[Grid.idx(map, t.x, t.y)] == Data.FLOOR and t != map.exit)
 		_shuffle(tiles, rng)
 		var i := 0
-		if r.id == exit_room.id and tiles.size() > 0:
-			monster_spawns.append({"type": "gargoyle", "x": tiles[0].x, "y": tiles[0].y})
+		if r.id == exit_room.id and boss != "" and tiles.size() > 0:
+			monster_spawns.append({"type": boss, "x": tiles[0].x, "y": tiles[0].y})
 			i = 1
-		var count := rng.randi_range(1, 2)
+		var count := rng.randi_range(density[0], density[1])
 		var placed := 0
 		while placed < count and i < tiles.size():
-			monster_spawns.append({"type": Data.FODDER[rng.randi_range(0, Data.FODDER.size() - 1)], "x": tiles[i].x, "y": tiles[i].y})
+			monster_spawns.append({"type": pool[rng.randi_range(0, pool.size() - 1)], "x": tiles[i].x, "y": tiles[i].y})
 			placed += 1
 			i += 1
 
-	return {"map": map, "start_tiles": start_tiles, "monster_spawns": monster_spawns}
+	# --- Hidden traps on corridor tiles (avoid start/exit/monster tiles). ---
+	var occupied := {}
+	for s in monster_spawns:
+		occupied[Vector2i(s.x, s.y)] = true
+	occupied[map.start] = true
+	occupied[map.exit] = true
+	var corridor_tiles: Array = []
+	for y in h:
+		for x in w:
+			if type[Grid.idx(map, x, y)] == Data.FLOOR and room[Grid.idx(map, x, y)] == -1:
+				if not occupied.has(Vector2i(x, y)):
+					corridor_tiles.append(Vector2i(x, y))
+	_shuffle(corridor_tiles, rng)
+	var traps: Array = []
+	var trap_count: int = clampi(rooms.size(), 2, 5)
+	for i in range(min(trap_count, corridor_tiles.size())):
+		var t: Vector2i = corridor_tiles[i]
+		var kind := "pit" if rng.randf() < 0.5 else "spear"
+		traps.append({"x": t.x, "y": t.y, "kind": kind, "found": false, "sprung": false})
+
+	# --- Secret doors: wall tiles separating two different rooms. Optional
+	# shortcuts, so they never block the main path. Stored as type WALL until
+	# found; movement/render consult the secret list.
+	var secret_candidates: Array = []
+	for y in range(1, h - 1):
+		for x in range(1, w - 1):
+			if type[Grid.idx(map, x, y)] != Data.WALL:
+				continue
+			var rl := room[Grid.idx(map, x - 1, y)]
+			var rr := room[Grid.idx(map, x + 1, y)]
+			var ru := room[Grid.idx(map, x, y - 1)]
+			var rd := room[Grid.idx(map, x, y + 1)]
+			var horiz := type[Grid.idx(map, x - 1, y)] != Data.WALL and type[Grid.idx(map, x + 1, y)] != Data.WALL and rl >= 0 and rr >= 0 and rl != rr
+			var vert := type[Grid.idx(map, x, y - 1)] != Data.WALL and type[Grid.idx(map, x, y + 1)] != Data.WALL and ru >= 0 and rd >= 0 and ru != rd
+			if horiz or vert:
+				secret_candidates.append(Vector2i(x, y))
+	_shuffle(secret_candidates, rng)
+	var secret_doors: Array = []
+	for i in range(min(2, secret_candidates.size())):
+		var s: Vector2i = secret_candidates[i]
+		secret_doors.append({"x": s.x, "y": s.y, "found": false})
+
+	return {
+		"map": map, "start_tiles": start_tiles, "monster_spawns": monster_spawns,
+		"traps": traps, "secret_doors": secret_doors,
+	}
 
 static func _tunnel(map: Dictionary, rng: RandomNumberGenerator, a: Dictionary, b: Dictionary) -> void:
 	var x: int = a.cx
