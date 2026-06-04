@@ -4,14 +4,17 @@ extends Node3D
 ## and the move-range highlight.
 
 # Color(hex) isn't a const expression, so these are runtime vars.
-var FLOOR_COLOR := Color("2b2840")
-var DOOR_COLOR := Color("6e4a26")
-var WALL_COLOR := Color("4a4560")
-var REACH_COLOR := Color("2a4cff")
+var FLOOR_A := Color("2c2940")
+var FLOOR_B := Color("33304a")
+var DOOR_COLOR := Color("7c5326")
+var WALL_BODY := Color("3f3b4d")
+var WALL_CAP := Color("57536b")
+var BACKDROP := Color("09070f")
+var REACH_COLOR := Color("3a6bff")
 
 var map: Dictionary
 var tile_meshes := {}   # Vector2i -> MeshInstance3D (floor/door)
-var wall_meshes := {}   # Vector2i -> MeshInstance3D
+var wall_meshes := {}   # Vector2i -> Node3D (body + cap)
 var _highlighted: Array[Vector2i] = []
 var exit_portal: MeshInstance3D
 var trap_markers := {}   # Vector2i -> MeshInstance3D
@@ -21,13 +24,31 @@ static func world_from_tile(x: int, y: int) -> Vector3:
 
 func build(_map: Dictionary) -> void:
 	map = _map
-	var tile_mesh := BoxMesh.new()
-	tile_mesh.size = Vector3(Data.TILE * 0.97, 0.12, Data.TILE * 0.97)
-	var wall_mesh := BoxMesh.new()
-	wall_mesh.size = Vector3(Data.TILE, Data.WALL_H, Data.TILE)
-	var wall_mat := StandardMaterial3D.new()
-	wall_mat.albedo_color = WALL_COLOR
-	wall_mat.roughness = 0.95
+	var wall_h := 1.35
+	var tile_geo := BoxMesh.new()
+	tile_geo.size = Vector3(Data.TILE * 0.98, 0.14, Data.TILE * 0.98)
+	var wall_body_geo := BoxMesh.new()
+	wall_body_geo.size = Vector3(Data.TILE, wall_h, Data.TILE)
+	var wall_cap_geo := BoxMesh.new()
+	wall_cap_geo.size = Vector3(Data.TILE, 0.16, Data.TILE)
+	var body_mat := StandardMaterial3D.new()
+	body_mat.albedo_color = WALL_BODY
+	body_mat.roughness = 1.0
+	var cap_mat := StandardMaterial3D.new()
+	cap_mat.albedo_color = WALL_CAP
+	cap_mat.roughness = 0.85
+
+	# Dark backdrop slab so the dungeon doesn't float in the void (catches shadow).
+	var back := MeshInstance3D.new()
+	var back_mesh := BoxMesh.new()
+	back_mesh.size = Vector3(map.w * Data.TILE + 6, 0.2, map.h * Data.TILE + 6)
+	back.mesh = back_mesh
+	var back_mat := StandardMaterial3D.new()
+	back_mat.albedo_color = BACKDROP
+	back_mat.roughness = 1.0
+	back.material_override = back_mat
+	back.position = Vector3(map.w * Data.TILE * 0.5, -0.12, map.h * Data.TILE * 0.5)
+	add_child(back)
 
 	for y in map.h:
 		for x in map.w:
@@ -35,38 +56,50 @@ func build(_map: Dictionary) -> void:
 			var pos := world_from_tile(x, y)
 			if t == Data.FLOOR or t == Data.DOOR:
 				var mat := StandardMaterial3D.new()
-				mat.albedo_color = DOOR_COLOR if t == Data.DOOR else FLOOR_COLOR
-				mat.roughness = 0.9
+				if t == Data.DOOR:
+					mat.albedo_color = DOOR_COLOR
+				else:
+					mat.albedo_color = FLOOR_A if (x + y) % 2 == 0 else FLOOR_B
+				mat.roughness = 0.95
 				var mi := MeshInstance3D.new()
-				mi.mesh = tile_mesh
+				mi.mesh = tile_geo
 				mi.material_override = mat
 				mi.position = pos
 				mi.visible = false
 				add_child(mi)
 				tile_meshes[Vector2i(x, y)] = mi
 			elif _wall_borders_floor(x, y):
-				var mi := MeshInstance3D.new()
-				mi.mesh = wall_mesh
-				mi.material_override = wall_mat
-				mi.position = Vector3(pos.x, Data.WALL_H * 0.5, pos.z)
-				mi.visible = false
-				add_child(mi)
-				wall_meshes[Vector2i(x, y)] = mi
+				var g := Node3D.new()
+				var body := MeshInstance3D.new()
+				body.mesh = wall_body_geo
+				body.material_override = body_mat
+				body.position = Vector3(0, wall_h * 0.5, 0)
+				body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+				g.add_child(body)
+				var cap := MeshInstance3D.new()
+				cap.mesh = wall_cap_geo
+				cap.material_override = cap_mat
+				cap.position = Vector3(0, wall_h + 0.08, 0)
+				g.add_child(cap)
+				g.position = Vector3(pos.x, 0, pos.z)
+				g.visible = false
+				add_child(g)
+				wall_meshes[Vector2i(x, y)] = g
 
 	# Glowing exit portal.
 	var portal_mesh := CylinderMesh.new()
-	portal_mesh.top_radius = Data.TILE * 0.32
-	portal_mesh.bottom_radius = Data.TILE * 0.4
-	portal_mesh.height = 0.06
+	portal_mesh.top_radius = Data.TILE * 0.34
+	portal_mesh.bottom_radius = Data.TILE * 0.42
+	portal_mesh.height = 0.08
 	var portal_mat := StandardMaterial3D.new()
 	portal_mat.albedo_color = Color("2fe0c0")
 	portal_mat.emission_enabled = true
-	portal_mat.emission = Color("1fb89a")
-	portal_mat.emission_energy_multiplier = 1.4
+	portal_mat.emission = Color("2fe0c0")
+	portal_mat.emission_energy_multiplier = 2.0
 	exit_portal = MeshInstance3D.new()
 	exit_portal.mesh = portal_mesh
 	exit_portal.material_override = portal_mat
-	exit_portal.position = world_from_tile(map.exit.x, map.exit.y) + Vector3(0, 0.12, 0)
+	exit_portal.position = world_from_tile(map.exit.x, map.exit.y) + Vector3(0, 0.14, 0)
 	exit_portal.visible = false
 	add_child(exit_portal)
 

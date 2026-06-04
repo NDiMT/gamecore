@@ -63,23 +63,29 @@ func _ready() -> void:
 func _setup_world() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("07060d")
+	env.background_color = Color("0b0913")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("4a4668")
-	env.ambient_light_energy = 0.7
-	env.fog_enabled = true
-	env.fog_light_color = Color("07060d")
-	env.fog_density = 0.015
+	env.ambient_light_color = Color("5a5478")
+	env.ambient_light_energy = 0.85
+	env.glow_enabled = true
+	env.glow_intensity = 0.9
+	env.glow_bloom = 0.2
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
 	var key := DirectionalLight3D.new()
 	key.light_color = Color("ffe9c0")
-	key.light_energy = 1.1
-	key.rotation_degrees = Vector3(-55, -35, 0)
+	key.light_energy = 1.4
+	key.rotation_degrees = Vector3(-58, -42, 0)
 	key.shadow_enabled = true
 	add_child(key)
+	var fill := OmniLight3D.new()
+	fill.light_color = Color("8aa0ff")
+	fill.light_energy = 1.0
+	fill.omni_range = 60
+	fill.position = Vector3(12, 16, 9)
+	add_child(fill)
 
 	_camera = Camera3D.new()
 	_camera.current = true

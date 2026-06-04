@@ -74,46 +74,71 @@ func _ensure(id: String, builder: Callable) -> void:
 
 func _build_hero(hero: Dictionary) -> Node3D:
 	var g := Node3D.new()
-	g.add_child(_disk(Color("1a1626")))
+	g.add_child(_disk(Color("12101c")))
+	# Glowing base ring in the class colour — instantly identifies each hero.
+	var ring := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.33
+	tm.outer_radius = 0.46
+	ring.mesh = tm
+	ring.material_override = _mat(hero.color, hero.color, 1.4)
+	ring.position = Vector3(0, 0.06, 0)
+	g.add_child(ring)
 	var body := MeshInstance3D.new()
 	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.22
-	capsule.height = 0.78
+	capsule.radius = 0.25
+	capsule.height = 0.86
 	body.mesh = capsule
-	body.material_override = _mat(hero.color, 0.0)
-	body.position = Vector3(0, 0.5, 0)
+	body.material_override = _mat(hero.color.lightened(0.12))
+	body.material_override.metallic = 0.2
+	body.position = Vector3(0, 0.62, 0)
+	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	g.add_child(body)
 	var head := MeshInstance3D.new()
 	var sph := SphereMesh.new()
-	sph.radius = 0.15
-	sph.height = 0.3
+	sph.radius = 0.18
+	sph.height = 0.36
 	head.mesh = sph
-	head.material_override = _mat(Color("e8c9a0"), 0.0)
-	head.position = Vector3(0, 0.92, 0)
+	head.material_override = _mat(Color("e8c9a0"))
+	head.position = Vector3(0, 1.08, 0)
 	g.add_child(head)
 	g.position = Board3D.world_from_tile(hero.x, hero.y)
 	return g
 
 func _build_monster(m: Dictionary) -> Node3D:
 	var g := Node3D.new()
-	var scale := 1.4 if m.boss else 1.0
-	g.add_child(_disk(Color("140f1c")))
+	var scale: float = 1.5 if m.boss else 1.0
+	g.add_child(_disk(Color("0e0a16")))
 	var body := MeshInstance3D.new()
 	if m.boss:
 		var sph := SphereMesh.new()
-		sph.radius = 0.42
-		sph.height = 0.84
+		sph.radius = 0.44
+		sph.height = 0.9
 		body.mesh = sph
-		body.position = Vector3(0, 0.6, 0)
+		body.position = Vector3(0, 0.66, 0)
+		body.material_override = _mat(m.color, Color("ff3a22"), 0.7)
 	else:
 		var cone := CylinderMesh.new()
 		cone.top_radius = 0.0
-		cone.bottom_radius = 0.28
-		cone.height = 0.7
+		cone.bottom_radius = 0.32
+		cone.height = 0.82
 		body.mesh = cone
-		body.position = Vector3(0, 0.5, 0)
-	body.material_override = _mat(m.color, 0.6 if m.boss else 0.0)
+		body.position = Vector3(0, 0.54, 0)
+		body.material_override = _mat(m.color, m.color, 0.12)
+	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	g.add_child(body)
+	# Glowing eyes give monsters a readable, menacing front.
+	var eye_col := Color("ff5a3c") if m.boss else Color("ffd24a")
+	var eye_y: float = 0.74 if m.boss else 0.64
+	for sx in [-0.1, 0.1]:
+		var e := MeshInstance3D.new()
+		var es := SphereMesh.new()
+		es.radius = 0.055
+		es.height = 0.11
+		e.mesh = es
+		e.material_override = _mat(eye_col, eye_col, 4.0)
+		e.position = Vector3(sx, eye_y, 0.2)
+		g.add_child(e)
 	g.scale = Vector3(scale, scale, scale)
 	g.position = Board3D.world_from_tile(m.x, m.y)
 	return g
@@ -121,20 +146,20 @@ func _build_monster(m: Dictionary) -> Node3D:
 func _disk(col: Color) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
-	cyl.top_radius = 0.34
-	cyl.bottom_radius = 0.38
+	cyl.top_radius = 0.36
+	cyl.bottom_radius = 0.4
 	cyl.height = 0.08
 	mi.mesh = cyl
-	mi.material_override = _mat(col, 0.0)
+	mi.material_override = _mat(col)
 	mi.position = Vector3(0, 0.1, 0)
 	return mi
 
-func _mat(col: Color, emission: float) -> StandardMaterial3D:
+func _mat(col: Color, emissive_col := Color.BLACK, energy := 0.0) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = col
-	m.roughness = 0.6
-	if emission > 0.0:
+	m.roughness = 0.55
+	if energy > 0.0:
 		m.emission_enabled = true
-		m.emission = Color("551122")
-		m.emission_energy_multiplier = emission
+		m.emission = emissive_col
+		m.emission_energy_multiplier = energy
 	return m
