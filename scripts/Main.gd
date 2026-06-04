@@ -526,6 +526,12 @@ func _update_reachable() -> void:
 		board.set_reachable([])
 		return
 	var blocked := _occupancy(hero.id)
+	# Closed doors block the move preview too.
+	var opened: Dictionary = snap.get("openDoors", {})
+	for y in map.h:
+		for x in map.w:
+			if map.type[Grid.idx(map, x, y)] == Data.DOOR and not opened.has(Vector2i(x, y)):
+				blocked[Vector2i(x, y)] = true
 	var seen := Grid.bfs(map, Vector2i(hero.x, hero.y), snap.turn.movePoints, blocked)
 	var tiles: Array[Vector2i] = []
 	for k in seen:
@@ -573,6 +579,12 @@ func _on_pick(gx: int, gy: int) -> void:
 			_send_intent({"t": "cast", "heroId": hero.id, "spellId": pending_spell.id, "targetId": ally.id})
 			pending_spell = null
 		hud.update_view(snap, my_id, {"pending_spell": pending_spell})
+		return
+
+	# Tap an adjacent closed door to open it (free action, reveals the room).
+	if map.type[Grid.idx(map, gx, gy)] == Data.DOOR and not snap.get("openDoors", {}).has(Vector2i(gx, gy)) \
+		and Grid.is_adjacent(hero.x, hero.y, gx, gy):
+		_send_intent({"t": "open_door", "heroId": hero.id, "x": gx, "y": gy})
 		return
 
 	if mon != null:
@@ -638,6 +650,8 @@ func _apply_intent(from: int, action: Dictionary) -> void:
 			changed = gs.cast_spell(from, action.heroId, action.spellId, action.targetId)
 		"search":
 			changed = gs.search(from, action.heroId)
+		"open_door":
+			changed = gs.open_door(from, action.heroId, action.x, action.y)
 		"disarm":
 			changed = gs.disarm(from, action.heroId)
 		"drink":

@@ -18,6 +18,7 @@ var wall_meshes := {}   # Vector2i -> Node3D (body + cap)
 var _highlighted: Array[Vector2i] = []
 var exit_portal: MeshInstance3D
 var trap_markers := {}   # Vector2i -> MeshInstance3D
+var door_slabs := {}     # Vector2i -> MeshInstance3D (shown while the door is shut)
 
 static func world_from_tile(x: int, y: int) -> Vector3:
 	return Vector3(x * Data.TILE + Data.TILE * 0.5, 0.0, y * Data.TILE + Data.TILE * 0.5)
@@ -68,6 +69,19 @@ func build(_map: Dictionary) -> void:
 				mi.visible = false
 				add_child(mi)
 				tile_meshes[Vector2i(x, y)] = mi
+				if t == Data.DOOR:
+					var slab := MeshInstance3D.new()
+					var sg := BoxMesh.new()
+					sg.size = Vector3(Data.TILE * 0.78, 0.9, Data.TILE * 0.78)
+					slab.mesh = sg
+					var smat := StandardMaterial3D.new()
+					smat.albedo_color = Color("6b431f")
+					smat.roughness = 0.85
+					slab.material_override = smat
+					slab.position = Vector3(pos.x, 0.45, pos.z)
+					slab.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+					add_child(slab)
+					door_slabs[Vector2i(x, y)] = slab
 			elif _wall_borders_floor(x, y):
 				var g := Node3D.new()
 				var body := MeshInstance3D.new()
@@ -115,10 +129,14 @@ func _wall_borders_floor(x: int, y: int) -> bool:
 	return false
 
 func update_fog(snap: Dictionary) -> void:
+	# Whole board structure is always shown; only room floors stay hidden until
+	# the room is opened. Door slabs show while the door is shut.
 	for k in tile_meshes:
 		tile_meshes[k].visible = Vis.tile_revealed(map, snap, k.x, k.y)
 	for k in wall_meshes:
-		wall_meshes[k].visible = Vis.wall_visible(map, snap, k.x, k.y)
+		wall_meshes[k].visible = true
+	for k in door_slabs:
+		door_slabs[k].visible = not Vis.door_open(snap, k.x, k.y)
 	exit_portal.visible = Vis.tile_revealed(map, snap, map.exit.x, map.exit.y)
 
 ## Highlight the tiles the active hero can reach this turn.

@@ -46,18 +46,16 @@ func _ready() -> void:
 		{"id": 3, "name": "Elf", "cls": "elf"},
 		{"id": 4, "name": "Wiz", "cls": "wizard"},
 	], gen)
-	# Reveal everything for the screenshot.
-	var rooms := {}
-	for i in gen.map.room.size():
-		if gen.map.room[i] >= 0:
-			rooms[gen.map.room[i]] = true
-	gs.state.revealedRooms = rooms.keys()
+	# Open ONE room (and its doors) to show the reveal-on-open mechanic; the
+	# rest stay shut so you can see closed doors and hidden rooms.
+	var show_id: int = gen.map.rooms[min(1, gen.map.rooms.size() - 1)].id
+	gs.state.openedRooms = [show_id]
 	for y in gen.map.h:
 		for x in gen.map.w:
-			if Grid.is_walkable(gen.map, x, y) and gen.map.room[Grid.idx(gen.map, x, y)] == -1:
-				gs.state.revealedCorridor[Vector2i(x, y)] = true
-	for tr in gs.state.traps:
-		tr.found = true
+			if gen.map.type[Grid.idx(gen.map, x, y)] == Data.DOOR:
+				for d in Grid.DIRS:
+					if gen.map.room[Grid.idx(gen.map, x + d.x, y + d.y)] == show_id:
+						gs.state.openDoors[Vector2i(x, y)] = true
 
 	var board := BoardScript.new()
 	add_child(board)

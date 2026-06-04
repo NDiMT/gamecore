@@ -16,7 +16,7 @@ static func run(gs: GameState) -> void:
 
 		var target = _adjacent_hero(gs, m)
 		if target == null:
-			var blocked := gs.occupancy(m.id)
+			var blocked := gs._blocked_set(m.id)
 			var seen := Grid.bfs(gs.map, Vector2i(m.x, m.y), Grid.HUGE, blocked)
 			var best_tile := Vector2i(-1, -1)
 			var best_dist := Grid.HUGE

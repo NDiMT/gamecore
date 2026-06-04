@@ -55,12 +55,11 @@ func start(players: Array, gen: Dictionary) -> Dictionary:
 	state = {
 		"phase": "playing", "heroes": heroes, "monsters": monsters,
 		"turn": {"order": order, "idx": 0, "movePoints": 0, "acted": false, "phase": "hero", "rage": 0, "moveDice": [0, 0], "moveSeq": 0},
-		"revealedRooms": [], "revealedCorridor": {}, "roomSearched": [],
+		"openedRooms": [], "openDoors": {}, "roomSearched": [],
 		"nextMonsterId": monsters.size(), "log": [],
 		"rollSeq": 0, "rolls": [],
 		"traps": gen.get("traps", []), "secret": gen.get("secret_doors", []),
 	}
-	reveal_around()
 	begin_hero_turn(0)
 	return state
 
@@ -105,10 +104,12 @@ func room_at(x: int, y: int) -> int:
 	return map.room[Grid.idx(map, x, y)]
 
 func is_revealed(x: int, y: int) -> bool:
+	# The whole board structure is always visible; only room contents are
+	# hidden until that room's door is opened.
 	var r := room_at(x, y)
 	if r >= 0:
-		return state.revealedRooms.has(r)
-	return state.revealedCorridor.has(Vector2i(x, y))
+		return state.openedRooms.has(r)
+	return true
 
 ## Tiles occupied by living tokens (Dictionary used as a set). `except_id` ""
 ## means none excluded.
@@ -122,22 +123,38 @@ func occupancy(except_id: String) -> Dictionary:
 			set[Vector2i(m.x, m.y)] = true
 	return set
 
-# ---- Fog of war -------------------------------------------------------------
-func reveal_around() -> void:
-	for h in alive_heroes():
-		var r := room_at(h.x, h.y)
-		if r >= 0 and not state.revealedRooms.has(r):
-			state.revealedRooms.append(r)
-		for dy in range(-Data.CORRIDOR_SIGHT, Data.CORRIDOR_SIGHT + 1):
-			for dx in range(-Data.CORRIDOR_SIGHT, Data.CORRIDOR_SIGHT + 1):
-				var x: int = h.x + dx
-				var y: int = h.y + dy
-				if Grid.chebyshev(Vector2i(h.x, h.y), Vector2i(x, y)) > Data.CORRIDOR_SIGHT:
-					continue
-				if not Grid.is_walkable(map, x, y):
-					continue
-				if room_at(x, y) == -1:
-					state.revealedCorridor[Vector2i(x, y)] = true
+# ---- Doors & room reveal ----------------------------------------------------
+# DOOR tiles that haven't been opened block movement and sight.
+func closed_doors() -> Dictionary:
+	var set := {}
+	for y in map.h:
+		for x in map.w:
+			if map.type[Grid.idx(map, x, y)] == Data.DOOR and not state.openDoors.has(Vector2i(x, y)):
+				set[Vector2i(x, y)] = true
+	return set
+
+# Open an adjacent door (free action): reveals the room(s) beyond it.
+func open_door(peer_id: int, hero_id: String, x: int, y: int) -> bool:
+	if not can_control(peer_id, hero_id):
+		return false
+	if map.type[Grid.idx(map, x, y)] != Data.DOOR:
+		return false
+	var key := Vector2i(x, y)
+	if state.openDoors.has(key):
+		return false
+	var hero = active_hero()
+	if not Grid.is_adjacent(hero.x, hero.y, x, y):
+		return false
+	state.openDoors[key] = true
+	_open_rooms_around(x, y)
+	log_line("%s opens a door." % hero.name, "sys")
+	return true
+
+func _open_rooms_around(x: int, y: int) -> void:
+	for d in Grid.DIRS:
+		var r := room_at(x + d.x, y + d.y)
+		if r >= 0 and not state.openedRooms.has(r):
+			state.openedRooms.append(r)
 
 # ---- Logging ----------------------------------------------------------------
 func log_line(text: String, kind: String = "") -> void:
@@ -226,7 +243,6 @@ func move_hero(peer_id: int, hero_id: String, x: int, y: int) -> bool:
 	state.turn.movePoints -= steps
 	if sprung:
 		state.turn.movePoints = 0
-	reveal_around()
 	if hero.alive and not sprung and Vector2i(hero.x, hero.y) == map.exit:
 		state.phase = "won"
 		log_line("%s reaches the stairs. Victory!" % hero.name, "good")
@@ -342,6 +358,8 @@ func search(peer_id: int, hero_id: String) -> bool:
 			if room_at(sd.x + d.x, sd.y + d.y) == room:
 				sd.found = true
 				map.type[Grid.idx(map, sd.x, sd.y)] = Data.DOOR
+				state.openDoors[Vector2i(sd.x, sd.y)] = true   # opens as a usable passage
+				_open_rooms_around(sd.x, sd.y)
 				log_line("%s discovers a secret door!" % hero.name, "sys")
 				break
 	# Draw treasure.
@@ -419,12 +437,14 @@ func _spring_trap(tr: Dictionary, hero: Dictionary) -> void:
 	log_line("%s springs a %s (-%d body)!" % [hero.name, Data.TRAPS[tr.kind].name, dmg], "hit")
 	_check_hero_death(hero)
 
-# Occupancy plus discovered (still-armed) traps, which block pathing.
+# Occupancy + discovered armed traps + still-closed doors all block pathing.
 func _blocked_set(except_id: String) -> Dictionary:
 	var s := occupancy(except_id)
 	for tr in state.traps:
 		if tr.found and not tr.sprung and not tr.get("disarmed", false):
 			s[Vector2i(tr.x, tr.y)] = true
+	for k in closed_doors():
+		s[k] = true
 	return s
 
 func drink_potion(peer_id: int, hero_id: String) -> bool:
