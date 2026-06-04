@@ -54,7 +54,7 @@ func start(players: Array, gen: Dictionary) -> Dictionary:
 		order.append(hh.id)
 	state = {
 		"phase": "playing", "heroes": heroes, "monsters": monsters,
-		"turn": {"order": order, "idx": 0, "movePoints": 0, "acted": false, "phase": "hero", "rage": 0},
+		"turn": {"order": order, "idx": 0, "movePoints": 0, "acted": false, "phase": "hero", "rage": 0, "moveDice": [0, 0], "moveSeq": 0},
 		"revealedRooms": [], "revealedCorridor": {}, "roomSearched": [],
 		"nextMonsterId": monsters.size(), "log": [],
 		"rollSeq": 0, "rolls": [],
@@ -156,12 +156,16 @@ func begin_hero_turn(i: int) -> void:
 	t.idx = i
 	t.phase = "hero"
 	t.acted = false
-	t.movePoints = Rules.roll_movement(rng)
+	var d1 := rng.randi_range(1, 6)
+	var d2 := rng.randi_range(1, 6)
+	t.movePoints = d1 + d2
+	t.moveDice = [d1, d2]
+	t.moveSeq += 1
 	var hero = active_hero()
 	t.rage = hero.get("rage_pending", 0)   # attack buff cast last turn
 	hero.rage_pending = 0
 	hero.shield = 0                          # defence buff lasted through the GM turn
-	log_line("%s's turn — moves %d" % [hero.name, t.movePoints], "sys")
+	log_line("%s's turn — rolls %d + %d = %d to move" % [hero.name, d1, d2, t.movePoints], "sys")
 
 func advance_turn() -> void:
 	var order: Array = state.turn.order

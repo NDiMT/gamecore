@@ -14,6 +14,7 @@ var _vp: SubViewport
 var _dice_root: Node3D
 var _title: Label
 var _result: Label
+var _legend: Label
 
 var _queue: Array = []
 var _phase := 0          # 0 idle, 1 rolling, 2 settling, 3 holding
@@ -83,6 +84,7 @@ func _ready() -> void:
 	legend.add_theme_font_size_override("font_size", 12)
 	legend.add_theme_color_override("font_color", Color("9b93b0"))
 	v.add_child(legend)
+	_legend = legend
 
 func _mk_ambient() -> WorldEnvironment:
 	var env := WorldEnvironment.new()
@@ -109,26 +111,37 @@ func _advance() -> void:
 
 func _start_roll(roll: Dictionary) -> void:
 	visible = true
-	_title.text = "%s  ⚔  %s" % [roll.get("attacker", "?"), roll.get("target", "?")]
 	_result.text = ""
 	for c in _dice_root.get_children():
 		c.queue_free()
 	_dice.clear()
 
-	var atk: Array = roll.get("atk", [])
-	var dfn: Array = roll.get("def", [])
-	var total := atk.size() + dfn.size()
-	var spacing := 0.66
-	var gap := 0.5 if dfn.size() > 0 else 0.0
-	var width := (total - 1) * spacing + gap
-	var x := -width * 0.5
-	for i in atk.size():
-		_add_die(atk[i], x, true)
-		x += spacing
-	x += gap
-	for i in dfn.size():
-		_add_die(dfn[i], x, false)
-		x += spacing
+	var is_move := roll.get("kind", "combat") == "move"
+	_legend.visible = not is_move
+	if is_move:
+		_title.text = "%s rolls to move" % roll.get("attacker", "?")
+		var dvals: Array = roll.get("dice", [1, 1])
+		var spacing := 0.7
+		var x := -(dvals.size() - 1) * spacing * 0.5
+		for v in dvals:
+			_add_move_die(int(v), x)
+			x += spacing
+	else:
+		_title.text = "%s  vs  %s" % [roll.get("attacker", "?"), roll.get("target", "?")]
+		var atk: Array = roll.get("atk", [])
+		var dfn: Array = roll.get("def", [])
+		var total := atk.size() + dfn.size()
+		var spacing := 0.66
+		var gap := 0.5 if dfn.size() > 0 else 0.0
+		var width := (total - 1) * spacing + gap
+		var x := -width * 0.5
+		for i in atk.size():
+			_add_die(atk[i], x, true)
+			x += spacing
+		x += gap
+		for i in dfn.size():
+			_add_die(dfn[i], x, false)
+			x += spacing
 
 	_phase = 1
 	_t = 0.0
@@ -159,6 +172,34 @@ func _add_die(face: String, x: float, _is_attack: bool) -> void:
 	var spin := Vector3(randf_range(6, 12), randf_range(6, 12), randf_range(6, 12))
 	_dice.append({"node": node, "spin": spin})
 
+func _add_move_die(value: int, x: float) -> void:
+	var node := Node3D.new()
+	var cube := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.55, 0.55, 0.55)
+	cube.mesh = bm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("efe9dc")
+	mat.roughness = 0.5
+	cube.material_override = mat
+	node.add_child(cube)
+	# Billboarded number so the rolled value is always readable.
+	var lbl := Label3D.new()
+	lbl.text = str(value)
+	lbl.font_size = 140
+	lbl.pixel_size = 0.004
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.modulate = Color("1a1326")
+	lbl.outline_modulate = Color("efe9dc")
+	lbl.outline_size = 16
+	lbl.position = Vector3(0, 0.55, 0)
+	lbl.visible = false
+	node.add_child(lbl)
+	node.position = Vector3(x, 0, 0)
+	node.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
+	_dice_root.add_child(node)
+	_dice.append({"node": node, "spin": Vector3(randf_range(6, 12), randf_range(6, 12), randf_range(6, 12)), "label": lbl})
+
 func _process(delta: float) -> void:
 	if _phase == 0:
 		return
@@ -185,6 +226,18 @@ func _process(delta: float) -> void:
 			_advance()
 
 func _show_result() -> void:
+	# Reveal any numeric labels (movement dice) now that they've settled.
+	for d in _dice:
+		if d.has("label"):
+			d.label.visible = true
+	if _cur.get("kind", "combat") == "move":
+		var dvals: Array = _cur.get("dice", [])
+		var parts: Array = []
+		for v in dvals:
+			parts.append(str(v))
+		_result.text = "Move %d  (%s)" % [_cur.get("total", 0), " + ".join(parts)]
+		_result.add_theme_color_override("font_color", Color("e6b450"))
+		return
 	var skulls := 0
 	for f in _cur.get("atk", []):
 		if f == "skull":

@@ -45,6 +45,7 @@ var log_ui
 var dice_overlay
 var shop_ui
 var _last_roll_seq := 0
+var _last_move_seq := 0
 var _applied_secrets := {}
 var _quest_index := 0
 var _in_shop := false
@@ -440,6 +441,7 @@ func _build_game(_map: Dictionary) -> void:
 		tokens.queue_free()
 	_applied_secrets = {}
 	_last_roll_seq = 0
+	_last_move_seq = 0
 	board = BoardScript.new()
 	add_child(board)
 	board.build(map)
@@ -480,6 +482,17 @@ func _apply_snapshot(s: Dictionary) -> void:
 		if roll.seq > _last_roll_seq:
 			_last_roll_seq = roll.seq
 			dice_overlay.enqueue(roll)
+	# Show the movement dice throw on your own turn (tabletop ritual).
+	var t: Dictionary = snap.turn
+	var active_now = null
+	if snap.phase == "playing" and t.phase == "hero":
+		for h in snap.heroes:
+			if h.id == t.order[t.idx]:
+				active_now = h
+				break
+	if active_now != null and active_now.owner == my_id and t.get("moveSeq", 0) != _last_move_seq:
+		_last_move_seq = t.moveSeq
+		dice_overlay.enqueue({"kind": "move", "attacker": active_now.name, "dice": t.get("moveDice", [1, 1]), "total": t.movePoints})
 	_update_reachable()
 	_check_end(snap)
 	# Host drives the between-quest shop when a quest is cleared.
