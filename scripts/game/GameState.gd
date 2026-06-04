@@ -57,7 +57,7 @@ func start(players: Array, gen: Dictionary) -> Dictionary:
 		"turn": {"order": order, "idx": 0, "movePoints": 0, "acted": false, "phase": "hero", "rage": 0},
 		"revealedRooms": [], "revealedCorridor": {}, "roomSearched": [],
 		"nextMonsterId": monsters.size(), "log": [],
-		"rollSeq": 0, "lastRoll": {},
+		"rollSeq": 0, "rolls": [],
 		"traps": gen.get("traps", []), "secret": gen.get("secret_doors", []),
 	}
 	reveal_around()
@@ -250,10 +250,12 @@ func attack(peer_id: int, hero_id: String, target_id: String) -> bool:
 # Stash the latest combat roll so every client can animate the dice.
 func record_roll(attacker_name: String, target_name: String, r: Dictionary) -> void:
 	state.rollSeq += 1
-	state.lastRoll = {
+	state.rolls.append({
 		"seq": state.rollSeq, "attacker": attacker_name, "target": target_name,
 		"atk": r.atk, "def": r.def, "damage": r.damage,
-	}
+	})
+	while state.rolls.size() > 16:
+		state.rolls.pop_front()
 
 func cast_spell(peer_id: int, hero_id: String, spell_id: String, target_id: String) -> bool:
 	if not can_control(peer_id, hero_id) or state.turn.acted:

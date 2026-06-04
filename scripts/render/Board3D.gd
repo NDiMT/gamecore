@@ -4,12 +4,12 @@ extends Node3D
 ## and the move-range highlight.
 
 # Color(hex) isn't a const expression, so these are runtime vars.
-var FLOOR_A := Color("2c2940")
-var FLOOR_B := Color("33304a")
-var DOOR_COLOR := Color("7c5326")
-var WALL_BODY := Color("3f3b4d")
-var WALL_CAP := Color("57536b")
-var BACKDROP := Color("09070f")
+var FLOOR_A := Color("2f2d36")  # flagstone, light square
+var FLOOR_B := Color("282730")  # flagstone, dark square
+var DOOR_COLOR := Color("8a5a2a")  # timber door
+var WALL_BODY := Color("46433a")  # dungeon stone
+var WALL_CAP := Color("6c6655")  # lit stone top
+var BACKDROP := Color("0d0b08")  # table
 var REACH_COLOR := Color("3a6bff")
 
 var map: Dictionary

@@ -1,27 +1,25 @@
 extends Control
-## Animated combat-dice overlay. When a new roll arrives in the snapshot it
-## shows who attacks whom, tumbles the attack and defend dice, then settles on
-## the real faces and prints the damage. Pure 2D so the dice are always big and
-## readable on a phone. Combat die faces: skull (hit), white shield (hero
-## block), black shield (monster block).
+## Tabletop dice roller. Combat rolls are queued and played one at a time so
+## every attack is visible. Each roll tumbles real 3D dice in a small viewport,
+## then they settle and the result is spelled out. Slower, board-game pacing.
+##
+## Die colours: red = skull (a hit), white = white shield, dark = black shield.
+## Heroes block with white shields, monsters with black shields.
 
-const ROLL_TIME := 0.55
-const HOLD_TIME := 1.6
+const ROLL_TIME := 1.1   # tumbling
+const SETTLE_TIME := 0.3 # easing flat
+const HOLD_TIME := 1.5   # showing the result
 
-var _panel: PanelContainer
+var _vp: SubViewport
+var _dice_root: Node3D
 var _title: Label
-var _atk_row: HBoxContainer
-var _def_row: HBoxContainer
 var _result: Label
 
-var _atk_dice: Array = []
-var _def_dice: Array = []
-var _final_atk: Array = []
-var _final_def: Array = []
-var _rolling := false
+var _queue: Array = []
+var _phase := 0          # 0 idle, 1 rolling, 2 settling, 3 holding
 var _t := 0.0
-var _gen := 0
-var _pending_damage := 0
+var _dice: Array = []    # [{ node, spin:Vector3 }]
+var _cur: Dictionary = {}
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -30,126 +28,171 @@ func _ready() -> void:
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	center.offset_top = 64
+	center.offset_top = 56
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
-
-	_panel = PanelContainer.new()
-	center.add_child(_panel)
+	var panel := PanelContainer.new()
+	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for s in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + s, 16)
-	_panel.add_child(margin)
+		margin.add_theme_constant_override("margin_" + s, 12)
+	panel.add_child(margin)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 8)
+	v.add_theme_constant_override("separation", 4)
 	margin.add_child(v)
 
-	_title = _mk_label(v, 20, Color("e8e2d4"))
-	_atk_row = _mk_dice_row(v, "Attack")
-	_def_row = _mk_dice_row(v, "Defend")
-	_result = _mk_label(v, 26, Color("e6b450"))
+	_title = Label.new()
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title.add_theme_font_size_override("font_size", 22)
+	_title.add_theme_color_override("font_color", Color("e8e2d4"))
+	v.add_child(_title)
 
-func _mk_label(parent: Control, size: int, col: Color) -> Label:
-	var l := Label.new()
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", col)
-	parent.add_child(l)
-	return l
+	var vpc := SubViewportContainer.new()
+	vpc.stretch = true
+	vpc.custom_minimum_size = Vector2(520, 190)
+	vpc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(vpc)
+	_vp = SubViewport.new()
+	_vp.transparent_bg = true
+	_vp.size = Vector2i(520, 190)
+	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	vpc.add_child(_vp)
 
-func _mk_dice_row(parent: Control, label: String) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 6)
-	var tag := Label.new()
-	tag.text = label
-	tag.custom_minimum_size = Vector2(86, 0)
-	tag.add_theme_color_override("font_color", Color("9b93b0"))
-	row.add_child(tag)
-	parent.add_child(row)
-	return row
+	var cam := Camera3D.new()
+	cam.fov = 38
+	cam.look_at_from_position(Vector3(0, 2.6, 3.1), Vector3.ZERO, Vector3.UP)
+	_vp.add_child(cam)
+	var key := DirectionalLight3D.new()
+	key.rotation_degrees = Vector3(-55, -25, 0)
+	key.light_energy = 1.3
+	_vp.add_child(key)
+	_vp.add_child(_mk_ambient())
+	_dice_root = Node3D.new()
+	_vp.add_child(_dice_root)
 
-func _make_die() -> Label:
-	var d := Label.new()
-	d.custom_minimum_size = Vector2(46, 46)
-	d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	d.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	d.add_theme_font_size_override("font_size", 26)
-	return d
+	_result = Label.new()
+	_result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result.add_theme_font_size_override("font_size", 24)
+	_result.add_theme_color_override("font_color", Color("e6b450"))
+	v.add_child(_result)
 
-func _rebuild(row: HBoxContainer, count: int) -> Array:
-	# Clear previous dice (keep the leading tag label).
-	for i in range(row.get_child_count() - 1, 0, -1):
-		row.get_child(i).queue_free()
-	var dice: Array = []
-	for i in count:
-		var d := _make_die()
-		row.add_child(d)
-		dice.append(d)
-	return dice
+	var legend := Label.new()
+	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	legend.text = "red = skull (hit)   ·   white/black = shield (block)"
+	legend.add_theme_font_size_override("font_size", 12)
+	legend.add_theme_color_override("font_color", Color("9b93b0"))
+	v.add_child(legend)
 
-func _face_glyph(face: String) -> String:
-	match face:
-		"skull": return "☠"   # ☠
-		"white": return "◇"   # ◇
-		_: return "◆"          # ◆ black shield
+func _mk_ambient() -> WorldEnvironment:
+	var env := WorldEnvironment.new()
+	var e := Environment.new()
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	e.ambient_light_color = Color("6a6480")
+	e.ambient_light_energy = 0.9
+	env.environment = e
+	return env
 
-func _set_face(die: Label, face: String) -> void:
-	die.text = _face_glyph(face)
-	var bg := StyleBoxFlat.new()
-	bg.corner_radius_top_left = 8
-	bg.corner_radius_top_right = 8
-	bg.corner_radius_bottom_left = 8
-	bg.corner_radius_bottom_right = 8
-	match face:
-		"skull":
-			bg.bg_color = Color("3a1414")
-			die.add_theme_color_override("font_color", Color("ff7676"))
-		"white":
-			bg.bg_color = Color("e8e2d4")
-			die.add_theme_color_override("font_color", Color("1a1326"))
-		_:
-			bg.bg_color = Color("15102a")
-			die.add_theme_color_override("font_color", Color("9b93b0"))
-	die.add_theme_stylebox_override("normal", bg)
+func enqueue(roll: Dictionary) -> void:
+	_queue.append(roll)
+	if _phase == 0:
+		_advance()
 
-func play(roll: Dictionary) -> void:
-	_gen += 1
-	_final_atk = roll.get("atk", [])
-	_final_def = roll.get("def", [])
-	_pending_damage = roll.get("damage", 0)
+func _advance() -> void:
+	if _queue.is_empty():
+		_phase = 0
+		var t := get_tree().create_timer(0.2)
+		t.timeout.connect(func(): if _phase == 0: visible = false)
+		return
+	_cur = _queue.pop_front()
+	_start_roll(_cur)
+
+func _start_roll(roll: Dictionary) -> void:
+	visible = true
 	_title.text = "%s  ⚔  %s" % [roll.get("attacker", "?"), roll.get("target", "?")]
 	_result.text = ""
-	_atk_dice = _rebuild(_atk_row, _final_atk.size())
-	_def_dice = _rebuild(_def_row, _final_def.size())
-	_rolling = true
+	for c in _dice_root.get_children():
+		c.queue_free()
+	_dice.clear()
+
+	var atk: Array = roll.get("atk", [])
+	var dfn: Array = roll.get("def", [])
+	var total := atk.size() + dfn.size()
+	var spacing := 0.66
+	var gap := 0.5 if dfn.size() > 0 else 0.0
+	var width := (total - 1) * spacing + gap
+	var x := -width * 0.5
+	for i in atk.size():
+		_add_die(atk[i], x, true)
+		x += spacing
+	x += gap
+	for i in dfn.size():
+		_add_die(dfn[i], x, false)
+		x += spacing
+
+	_phase = 1
 	_t = 0.0
-	visible = true
+
+func _add_die(face: String, x: float, _is_attack: bool) -> void:
+	var node := Node3D.new()
+	var cube := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.5, 0.5, 0.5)
+	cube.mesh = bm
+	var mat := StandardMaterial3D.new()
+	mat.roughness = 0.4
+	match face:
+		"skull":
+			mat.albedo_color = Color("c0392b")
+			mat.emission_enabled = true
+			mat.emission = Color("ff5a3c")
+			mat.emission_energy_multiplier = 0.25
+		"white":
+			mat.albedo_color = Color("e8e2d4")
+		_:
+			mat.albedo_color = Color("2a2438")
+	cube.material_override = mat
+	node.add_child(cube)
+	node.position = Vector3(x, 0, 0)
+	node.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
+	_dice_root.add_child(node)
+	var spin := Vector3(randf_range(6, 12), randf_range(6, 12), randf_range(6, 12))
+	_dice.append({"node": node, "spin": spin})
 
 func _process(delta: float) -> void:
-	if not _rolling:
+	if _phase == 0:
 		return
 	_t += delta
-	if _t < ROLL_TIME:
-		var faces := ["skull", "white", "black"]
-		for d in _atk_dice:
-			_set_face(d, faces[randi() % 3])
-		for d in _def_dice:
-			_set_face(d, faces[randi() % 3])
+	if _phase == 1:
+		var bob := sin(_t * 18.0) * 0.12
+		for d in _dice:
+			d.node.rotation += d.spin * delta
+			d.node.position.y = absf(bob)
+		if _t >= ROLL_TIME:
+			_phase = 2
+			_t = 0.0
+			_show_result()
+	elif _phase == 2:
+		var k := clampf(_t / SETTLE_TIME, 0.0, 1.0)
+		for d in _dice:
+			d.node.rotation = d.node.rotation.lerp(Vector3.ZERO, k)
+			d.node.position.y = lerpf(d.node.position.y, 0.0, k)
+		if _t >= SETTLE_TIME:
+			_phase = 3
+			_t = 0.0
+	elif _phase == 3:
+		if _t >= HOLD_TIME:
+			_advance()
+
+func _show_result() -> void:
+	var skulls := 0
+	for f in _cur.get("atk", []):
+		if f == "skull":
+			skulls += 1
+	var dmg: int = _cur.get("damage", 0)
+	if dmg > 0:
+		_result.text = "%d skulls → %d damage!" % [skulls, dmg]
+		_result.add_theme_color_override("font_color", Color("e06464"))
 	else:
-		for i in _atk_dice.size():
-			_set_face(_atk_dice[i], _final_atk[i])
-		for i in _def_dice.size():
-			_set_face(_def_dice[i], _final_def[i])
-		if _pending_damage > 0:
-			_result.text = "%d damage!" % _pending_damage
-			_result.add_theme_color_override("font_color", Color("e06464"))
-		else:
-			_result.text = "Blocked!"
-			_result.add_theme_color_override("font_color", Color("6fcf6f"))
-		_rolling = false
-		var my_gen := _gen
-		get_tree().create_timer(HOLD_TIME).timeout.connect(func():
-			if my_gen == _gen:
-				visible = false)
+		_result.text = "Blocked!"
+		_result.add_theme_color_override("font_color", Color("6fcf6f"))

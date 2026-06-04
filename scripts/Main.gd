@@ -23,7 +23,7 @@ var pending_spell = null
 
 var _camera: Camera3D
 # Fixed, mostly top-down angle (no orbit) — clearest for a board-game grid.
-const CAM_PITCH := 1.15      # radians (~66° above horizontal)
+const CAM_PITCH := 1.32      # radians (~76°): near top-down, board-game feel
 var _dist := 14.0
 var _follow := Vector3.ZERO  # smoothed camera focus (tracks the active hero)
 var _pan := Vector3.ZERO     # temporary user pan offset (decays back to hero)
@@ -475,10 +475,11 @@ func _apply_snapshot(s: Dictionary) -> void:
 	tokens.sync(snap)
 	hud.update_view(snap, my_id, {"pending_spell": pending_spell})
 	log_ui.update_view(snap)
-	# Play the dice animation whenever a fresh combat roll appears.
-	if snap.lastRoll.has("seq") and snap.lastRoll.seq != _last_roll_seq:
-		_last_roll_seq = snap.lastRoll.seq
-		dice_overlay.play(snap.lastRoll)
+	# Queue any new combat rolls so each fight's dice play in sequence.
+	for roll in snap.get("rolls", []):
+		if roll.seq > _last_roll_seq:
+			_last_roll_seq = roll.seq
+			dice_overlay.enqueue(roll)
 	_update_reachable()
 	_check_end(snap)
 	# Host drives the between-quest shop when a quest is cleared.
