@@ -116,7 +116,7 @@ func _start_roll(roll: Dictionary) -> void:
 		c.queue_free()
 	_dice.clear()
 
-	var is_move := roll.get("kind", "combat") == "move"
+	var is_move: bool = roll.get("kind", "combat") == "move"
 	_legend.visible = not is_move
 	if is_move:
 		_title.text = "%s rolls to move" % roll.get("attacker", "?")
