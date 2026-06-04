@@ -41,8 +41,10 @@ landscape). To get an APK for your phone:
   (Editor → Manage Export Templates; Editor Settings → Export → Android), then
   Project → Export → **Android** → Export Project.
 
-**Touch controls:** one-finger **tap** to move/attack, one-finger **drag** to
-orbit the camera, two-finger **pinch** to zoom. Multiplayer over ENet works
+**Touch controls:** the camera is top-down and **follows the active hero**.
+**Tap** a glowing tile to move, **tap** an adjacent monster to attack (an
+animated dice overlay shows the skulls/shields and the damage). **Drag** to pan
+the view, two-finger **pinch** to zoom. Multiplayer over ENet works
 between devices on the **same Wi-Fi/LAN** (one hosts, others enter its local IP
 and port `8910`); over the internet the host needs a reachable address.
 

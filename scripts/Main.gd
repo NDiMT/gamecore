@@ -9,6 +9,7 @@ const TokensScript := preload("res://scripts/render/Tokens.gd")
 const LobbyScript := preload("res://scripts/ui/Lobby.gd")
 const HUDScript := preload("res://scripts/ui/HUD.gd")
 const LogScript := preload("res://scripts/ui/Log.gd")
+const DiceScript := preload("res://scripts/ui/DiceOverlay.gd")
 
 var is_host := false
 var my_id := 1
@@ -20,10 +21,11 @@ var snap: Dictionary = {}
 var pending_spell = null
 
 var _camera: Camera3D
-var _yaw := 0.6
-var _pitch := 0.95
-var _dist := 24.0
-var _target := Vector3.ZERO
+# Fixed, mostly top-down angle (no orbit) — clearest for a board-game grid.
+const CAM_PITCH := 1.15      # radians (~66° above horizontal)
+var _dist := 14.0
+var _follow := Vector3.ZERO  # smoothed camera focus (tracks the active hero)
+var _pan := Vector3.ZERO     # temporary user pan offset (decays back to hero)
 
 # Pointer state. Single-finger gestures arrive as emulated mouse events (so GUI
 # controls keep working on touch); two-finger pinch is read from raw touches.
@@ -39,6 +41,8 @@ var tokens
 var lobby
 var hud
 var log_ui
+var dice_overlay
+var _last_roll_seq := 0
 var _toast: Label
 var _toast_root: Control
 
@@ -105,6 +109,10 @@ func _setup_ui() -> void:
 	log_ui.theme = theme
 	layer.add_child(log_ui)
 
+	dice_overlay = DiceScript.new()
+	dice_overlay.theme = theme
+	layer.add_child(dice_overlay)
+
 	# Centred win/lose toast.
 	_toast_root = Control.new()
 	_toast_root.theme = theme
@@ -136,14 +144,29 @@ func _connect_net() -> void:
 
 # ---- Camera -----------------------------------------------------------------
 func _update_camera() -> void:
-	_pitch = clampf(_pitch, 0.3, 1.45)
-	_dist = clampf(_dist, 8.0, 48.0)
-	var off := Vector3(
-		_dist * cos(_pitch) * sin(_yaw),
-		_dist * sin(_pitch),
-		_dist * cos(_pitch) * cos(_yaw))
-	_camera.position = _target + off
-	_camera.look_at(_target, Vector3.UP)
+	_dist = clampf(_dist, 7.0, 30.0)
+	var target := _follow + _pan
+	var off := Vector3(0.0, _dist * sin(CAM_PITCH), _dist * cos(CAM_PITCH))
+	_camera.position = target + off
+	_camera.look_at(target, Vector3.UP)
+
+func _process(delta: float) -> void:
+	# Smoothly track the active hero; let any user pan drift back to centre.
+	_follow = _follow.lerp(_desired_follow(), clampf(delta * 4.0, 0.0, 1.0))
+	if not _dragging:
+		_pan = _pan.lerp(Vector3.ZERO, clampf(delta * 1.5, 0.0, 1.0))
+	_update_camera()
+
+func _desired_follow() -> Vector3:
+	var hero = null
+	if not snap.is_empty():
+		for h in snap.heroes:
+			if h.id == snap.turn.order[snap.turn.idx]:
+				hero = h
+				break
+	if hero != null and board != null:
+		return board.world_from_tile(hero.x, hero.y)
+	return _follow
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Track raw touches so we can detect a two-finger pinch. Single-finger
@@ -188,9 +211,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_update_camera()
 	elif event is InputEventMouseMotion and _dragging:
 		_drag_moved += event.relative.length()
-		_yaw -= event.relative.x * 0.01
-		_pitch += event.relative.y * 0.01
-		_update_camera()
+		# Drag to pan the view across the board.
+		var k := _dist * 0.0018
+		_pan.x -= event.relative.x * k
+		_pan.z -= event.relative.y * k
 
 func _two_touch_distance() -> float:
 	var pts := _touch_points.values()
@@ -306,8 +330,9 @@ func _build_game(_map: Dictionary) -> void:
 	add_child(tokens)
 	tokens.setup(map)
 
-	_target = BoardScript.world_from_tile(int(map.w / 2.0), int(map.h / 2.0))
-	_dist = max(map.w, map.h) * 1.1
+	_follow = BoardScript.world_from_tile(int(map.w / 2.0), int(map.h / 2.0))
+	_pan = Vector3.ZERO
+	_dist = 14.0
 	_update_camera()
 
 	lobby.visible = false
@@ -324,6 +349,10 @@ func _apply_snapshot(s: Dictionary) -> void:
 	tokens.sync(snap)
 	hud.update_view(snap, my_id, {"pending_spell": pending_spell})
 	log_ui.update_view(snap)
+	# Play the dice animation whenever a fresh combat roll appears.
+	if snap.lastRoll.has("seq") and snap.lastRoll.seq != _last_roll_seq:
+		_last_roll_seq = snap.lastRoll.seq
+		dice_overlay.play(snap.lastRoll)
 	_update_reachable()
 	_check_end(snap)
 

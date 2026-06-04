@@ -13,7 +13,7 @@ var _phase_label: Label
 var _active_label: Label
 var _move_label: Label
 var _hint_label: Label
-var _actions: HBoxContainer
+var _actions: HFlowContainer
 var _party_box: VBoxContainer
 
 func _ready() -> void:
@@ -36,8 +36,10 @@ func _ready() -> void:
 	_phase_label = _mk_label(v, Color("9b93b0"), 12)
 	_active_label = _mk_label(v, Color("e6b450"), 20)
 	_move_label = _mk_label(v, Color("e8e2d4"), 13)
-	_actions = HBoxContainer.new()
-	_actions.add_theme_constant_override("separation", 6)
+	_actions = HFlowContainer.new()
+	_actions.add_theme_constant_override("h_separation", 6)
+	_actions.add_theme_constant_override("v_separation", 6)
+	_actions.custom_minimum_size = Vector2(264, 0)
 	v.add_child(_actions)
 	_hint_label = _mk_label(v, Color("9b93b0"), 12)
 	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -96,6 +98,7 @@ func _rebuild_actions(snap: Dictionary, active, my_turn: bool, pending) -> void:
 		c.queue_free()
 	var end := Button.new()
 	end.text = "End turn"
+	end.custom_minimum_size = Vector2(0, 50)
 	end.disabled = not my_turn
 	if active != null:
 		end.pressed.connect(func(): end_pressed.emit(active.id))
@@ -129,6 +132,9 @@ func _rebuild_actions(snap: Dictionary, active, my_turn: bool, pending) -> void:
 		var sid: String = s.id
 		b.pressed.connect(func(): spell_pressed.emit(active.id, sid))
 		_actions.add_child(b)
+
+	for c in _actions.get_children():
+		c.custom_minimum_size.y = 50
 
 func _rebuild_party(snap: Dictionary, my_id: int, t: Dictionary) -> void:
 	for c in _party_box.get_children():

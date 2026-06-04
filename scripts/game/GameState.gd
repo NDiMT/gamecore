@@ -36,7 +36,7 @@ func start(players: Array, start_tiles: Array, monster_spawns: Array) -> Diction
 		monsters.append({
 			"id": "m%d" % i, "type": s.type, "name": def.name, "color": def.color,
 			"boss": def.boss, "x": s.x, "y": s.y,
-			"body": def.body, "maxBody": def.body,
+			"body": def.body, "maxBody": def.body, "mind": def.mind,
 			"attack": def.attack, "defend": def.defend, "move": def.move, "alive": true,
 		})
 
@@ -48,6 +48,7 @@ func start(players: Array, start_tiles: Array, monster_spawns: Array) -> Diction
 		"turn": {"order": order, "idx": 0, "movePoints": 0, "acted": false, "phase": "hero"},
 		"revealedRooms": [], "revealedCorridor": {}, "roomSearched": [],
 		"nextMonsterId": monsters.size(), "log": [],
+		"rollSeq": 0, "lastRoll": {},
 	}
 	reveal_around()
 	begin_hero_turn(0)
@@ -193,9 +194,19 @@ func attack(peer_id: int, hero_id: String, target_id: String) -> bool:
 		return false
 	var r := Rules.resolve_attack(rng, hero.attack, target.defend, true)
 	state.turn.acted = true
+	state.turn.movePoints = 0  # beginning the action phase forfeits movement
+	record_roll(hero.name, target.name, r)
 	log_dice("%s attacks %s" % [hero.name, target.name], r)
 	_damage_monster(target, r.damage, "%s shrugs it off" % target.name if r.damage == 0 else "")
 	return true
+
+# Stash the latest combat roll so every client can animate the dice.
+func record_roll(attacker_name: String, target_name: String, r: Dictionary) -> void:
+	state.rollSeq += 1
+	state.lastRoll = {
+		"seq": state.rollSeq, "attacker": attacker_name, "target": target_name,
+		"atk": r.atk, "def": r.def, "damage": r.damage,
+	}
 
 func cast_spell(peer_id: int, hero_id: String, spell_id: String, target_id: String) -> bool:
 	if not can_control(peer_id, hero_id) or state.turn.acted:
@@ -215,6 +226,7 @@ func cast_spell(peer_id: int, hero_id: String, spell_id: String, target_id: Stri
 			return false
 		spell.charges -= 1
 		state.turn.acted = true
+		state.turn.movePoints = 0
 		log_line("%s casts %s at %s for %d" % [hero.name, spell.name, target.name, spell.power], "good")
 		_damage_monster(target, spell.power, "")
 		return true
@@ -225,6 +237,7 @@ func cast_spell(peer_id: int, hero_id: String, spell_id: String, target_id: Stri
 			return false
 		spell.charges -= 1
 		state.turn.acted = true
+		state.turn.movePoints = 0
 		var healed: int = min(spell.power, target.maxBody - target.body)
 		target.body += healed
 		log_line("%s casts %s on %s (+%d body)" % [hero.name, spell.name, target.name, healed], "good")
@@ -238,8 +251,14 @@ func search(peer_id: int, hero_id: String) -> bool:
 	var room := room_at(hero.x, hero.y)
 	if room < 0 or state.roomSearched.has(room):
 		return false
+	# You may not search while a monster shares the room (line of sight).
+	for m in state.monsters:
+		if m.alive and room_at(m.x, m.y) == room:
+			log_line("%s cannot search — a monster is watching." % hero.name, "hit")
+			return false
 	state.roomSearched.append(room)
 	state.turn.acted = true
+	state.turn.movePoints = 0
 
 	var gold := rng.randi_range(1, 5) * 5
 	hero.gold += gold
@@ -292,7 +311,7 @@ func _spawn_monster(type: String, x: int, y: int) -> String:
 	state.nextMonsterId += 1
 	state.monsters.append({
 		"id": id, "type": type, "name": def.name, "color": def.color, "boss": def.boss,
-		"x": x, "y": y, "body": def.body, "maxBody": def.body,
+		"x": x, "y": y, "body": def.body, "maxBody": def.body, "mind": def.mind,
 		"attack": def.attack, "defend": def.defend, "move": def.move, "alive": true,
 	})
 	return id

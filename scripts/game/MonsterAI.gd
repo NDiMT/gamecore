@@ -37,6 +37,7 @@ static func run(gs: GameState) -> void:
 
 		if target != null:
 			var r := Rules.resolve_attack(gs.rng, m.attack, target.defend, false)
+			gs.record_roll(m.name, target.name, r)
 			gs.log_dice("%s attacks %s" % [m.name, target.name], r)
 			if r.damage > 0:
 				target.body -= r.damage

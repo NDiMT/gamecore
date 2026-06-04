@@ -28,15 +28,19 @@ var HERO_CLASSES := {
 const HERO_ORDER := ["barbarian", "dwarf", "elf", "wizard"]
 
 # ---- Monsters ---------------------------------------------------------------
-# `move` is squares travelled per GM turn. Heroes block with white shields,
-# monsters with black shields, so monster defence is comparatively weak.
+# Canonical HeroQuest-style stat lines (Move / Attack dice / Defend dice / Body
+# / Mind). Heroes block with white shields, monsters with black shields.
 var MONSTERS := {
-	"goblin": {"name": "Goblin", "color": Color("5b7d3a"), "attack": 2, "defend": 1, "body": 1, "move": 6, "boss": false},
-	"orc": {"name": "Orc", "color": Color("7a5a30"), "attack": 3, "defend": 2, "body": 1, "move": 5, "boss": false},
-	"skeleton": {"name": "Skeleton", "color": Color("cdc9bd"), "attack": 2, "defend": 2, "body": 1, "move": 4, "boss": false},
-	"gargoyle": {"name": "Gargoyle", "color": Color("4a4458"), "attack": 4, "defend": 4, "body": 3, "move": 4, "boss": true},
+	"goblin": {"name": "Goblin", "color": Color("5b7d3a"), "attack": 2, "defend": 1, "body": 1, "mind": 1, "move": 10, "boss": false},
+	"orc": {"name": "Orc", "color": Color("7a5a30"), "attack": 3, "defend": 2, "body": 1, "mind": 2, "move": 8, "boss": false},
+	"fimir": {"name": "Fimir", "color": Color("4f6b66"), "attack": 3, "defend": 3, "body": 2, "mind": 3, "move": 6, "boss": false},
+	"skeleton": {"name": "Skeleton", "color": Color("cdc9bd"), "attack": 2, "defend": 2, "body": 1, "mind": 0, "move": 6, "boss": false},
+	"zombie": {"name": "Zombie", "color": Color("6b7a4f"), "attack": 2, "defend": 3, "body": 1, "mind": 0, "move": 4, "boss": false},
+	"mummy": {"name": "Mummy", "color": Color("b3a98a"), "attack": 3, "defend": 4, "body": 2, "mind": 0, "move": 4, "boss": false},
+	"chaos_warrior": {"name": "Chaos Warrior", "color": Color("6a2f3a"), "attack": 4, "defend": 4, "body": 3, "mind": 3, "move": 6, "boss": true},
+	"gargoyle": {"name": "Gargoyle", "color": Color("4a4458"), "attack": 4, "defend": 5, "body": 3, "mind": 4, "move": 6, "boss": true},
 }
-const FODDER := ["goblin", "goblin", "orc", "skeleton"]
+const FODDER := ["goblin", "goblin", "orc", "skeleton", "zombie"]
 
 # ---- Spellbooks -------------------------------------------------------------
 # Returns a fresh, independent copy so each hero owns its own charges.
